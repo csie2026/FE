@@ -1,19 +1,63 @@
 import { useEffect, useState } from 'react'
 import './App.css'
 import MountainCard, { MountainArt } from './components/MountainCard'
-import RegionExplorer from './components/RegionExplorer'
+import InteractiveMountainMap from './components/mountain/InteractiveMountainMap'
 import { api, ApiError, scoreText, type Member, type Journal, type PublicProfile } from './api'
 
 type Screen = 'login' | 'explore' | 'detail' | 'hiking' | 'diary' | 'write' | 'profile' | 'settings' | 'ranking' | 'setup' | 'myJournals' | 'publicProfile'
 
 const mountains = [
-  { name: '천안산', area: '경기도 남양주시 서쪽', height: '812m', distance: '3.8km', time: '2시간 10분', color: 'sage' },
-  { name: '운길산', area: '경기도 남양주시 조안면', height: '610m', distance: '2.1km', time: '1시간 25분', color: 'mint' },
-  { name: '축령산', area: '경기도 남양주시 수동면', height: '886m', distance: '5.2km', time: '3시간 20분', color: 'olive' },
-]
+  {
+    name: "천안산",
+    area: "경기도 남양주시 서쪽",
+    height: "812m",
+    distance: "3.8km",
+    time: "2시간 10분",
+    color: "sage",
+  },
+  {
+    name: "운길산",
+    area: "경기도 남양주시 조안면",
+    height: "610m",
+    distance: "2.1km",
+    time: "1시간 25분",
+    color: "mint",
+  },
+  {
+    name: "축령산",
+    area: "경기도 남양주시 수동면",
+    height: "886m",
+    distance: "5.2km",
+    time: "3시간 20분",
+    color: "olive",
+  },
+];
 
 function BrandMark() {
-  return <div className="brand-mark" aria-label="ToPeak 로고"><svg viewBox="0 0 160 130" role="img"><path d="M8 119 63 22l18 34 18-48 53 111H8Z" fill="#155b43"/><path d="m36 119 45-70 15 23 19-36 31 83H36Z" fill="#34825e"/><path d="M77 29c-4 15 17 20 7 31-7 8-23 10-26 24-2 11 6 19 17 25" fill="none" stroke="#f8f6e9" strokeWidth="7" strokeLinecap="round"/><path d="m69 105 8 8 4-12" fill="none" stroke="#f8f6e9" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg><strong>ToPeak</strong></div>
+  return (
+    <div className="brand-mark" aria-label="ToPeak 로고">
+      <svg viewBox="0 0 160 130" role="img">
+        <path d="M8 119 63 22l18 34 18-48 53 111H8Z" fill="#155b43" />
+        <path d="m36 119 45-70 15 23 19-36 31 83H36Z" fill="#34825e" />
+        <path
+          d="M77 29c-4 15 17 20 7 31-7 8-23 10-26 24-2 11 6 19 17 25"
+          fill="none"
+          stroke="#f8f6e9"
+          strokeWidth="7"
+          strokeLinecap="round"
+        />
+        <path
+          d="m69 105 8 8 4-12"
+          fill="none"
+          stroke="#f8f6e9"
+          strokeWidth="5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+      <strong>ToPeak</strong>
+    </div>
+  );
 }
 
 
@@ -38,7 +82,6 @@ function App() {
   const [journalMountain, setJournalMountain] = useState('')
   const [selected, setSelected] = useState(0)
   const [started, setStarted] = useState(false)
-  const [query, setQuery] = useState('')
   const [isPublic, setIsPublic] = useState(false)
   const mountain = mountains[selected]
   const go = (next: Screen) => {
@@ -119,11 +162,110 @@ function App() {
     {error && <div className="error-banner" role="alert">{error}<button onClick={() => setError('')}>닫기</button></div>}
     {screen === 'login' && <section className="login-screen"><div className="login-brand"><BrandMark/><p>기록하고 즐겁게 오르는 방법</p></div><div className="login-actions"><button className="social google" onClick={() => window.location.assign('/oauth2/authorization/google')}><b>G</b> Google로 시작하기</button><button className="social kakao" onClick={() => window.location.assign('/oauth2/authorization/kakao')}><b>●</b> 카카오로 시작하기</button><small>간편하게 시작하고 나만의 산행을 기록해보세요</small></div></section>}
 
-    {screen === 'explore' && <>{header('찾기 탐색')}<div className="scroll-content"><label className="search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="경기도 이름을 검색해 보세요"/></label><RegionExplorer/><section className="weather"><div><small>남양주</small><b>☀️ 21°</b></div><div className="weather-details">맑음　바람 약함<br/><small>오늘 산행하기 좋은 날이에요</small></div></section><div className="section-heading"><b>산별 추천</b><button>전체 보기</button></div><div className="difficulty"><span>산행 환경</span><i>Easy</i><i>Mid</i><i>Hard</i></div>{mountains.map((_, i) => card(i, true))}</div>{tabs}</>}
+      {screen === "explore" && (
+        <>
+          {header("산 탐색")}
+          <div className="scroll-content">
+            <InteractiveMountainMap
+              onMountainSelect={(mountain) => {
+                const match = mountains.findIndex(
+                  (item) => item.name === mountain.name,
+                );
+                if (match >= 0) setSelected(match);
+              }}
+            />
+          </div>
+          {tabs}
+        </>
+      )}
 
-    {screen === 'detail' && <>{header('상세', true)}<div className="scroll-content detail-content"><MountainArt/><div className="detail-title"><div><h1>{mountain.name}</h1><small>{mountain.area}</small></div><button className="heart">♡</button></div><div className="stats"><div><b>{mountain.height}</b><small>세로 높지</small></div><div><b>{mountain.distance}</b><small>거리 코스</small></div><div><b>보통</b><small>난이도</small></div></div><h3>다른 사람들의 공개 기록</h3>{card(0,true)}{card(1,true)}<div className="bottom-actions"><button onClick={() => go('diary')}>등산 기록하기</button><button className="primary" onClick={() => { setStarted(true); go('hiking') }}>등산 앱과 연동하기</button></div></div>{tabs}</>}
+      {screen === "detail" && (
+        <>
+          {header("상세", true)}
+          <div className="scroll-content detail-content">
+            <MountainArt />
+            <div className="detail-title">
+              <div>
+                <h1>{mountain.name}</h1>
+                <small>{mountain.area}</small>
+              </div>
+              <button className="heart">♡</button>
+            </div>
+            <div className="stats">
+              <div>
+                <b>{mountain.height}</b>
+                <small>세로 높지</small>
+              </div>
+              <div>
+                <b>{mountain.distance}</b>
+                <small>거리 코스</small>
+              </div>
+              <div>
+                <b>보통</b>
+                <small>난이도</small>
+              </div>
+            </div>
+            <h3>다른 사람들의 공개 기록</h3>
+            {card(0, true)}
+            {card(1, true)}
+            <div className="bottom-actions">
+              <button onClick={() => go("diary")}>등산 기록하기</button>
+              <button
+                className="primary"
+                onClick={() => {
+                  setStarted(true);
+                  go("hiking");
+                }}
+              >
+                등산 앱과 연동하기
+              </button>
+            </div>
+          </div>
+          {tabs}
+        </>
+      )}
 
-    {screen === 'hiking' && <>{header('등산 중', true)}<div className="trail-map"><div className="map-pattern dense"/><svg className="trail-line" viewBox="0 0 300 400"><path d="M145 375 C120 330 184 310 156 270 S115 210 160 178 204 134 170 100 160 65 185 28" fill="none" stroke="#155b43" strokeWidth="6" strokeLinecap="round" strokeDasharray="2 3"/></svg><span className="live-pill">Ⅱ 오프라인</span><span className="map-control">◎</span><span className="map-control second">➤</span><span className="trail-start">시작</span></div><div className="hike-panel"><div className="hike-stats"><b>⌁ 520m</b><b>↪ 2.3km</b></div><div className="hike-stats timer"><b>{started ? '00:18:42' : '01:15:20'}</b><b>◴ 2.4km/h</b></div><div className="bottom-actions"><button onClick={() => setStarted(!started)}>{started ? 'Ⅱ 일시정지' : '▶ 계속하기'}</button><button className="primary" onClick={() => go('write')}>■ 등산 완료</button></div></div>{tabs}</>}
+      {screen === "hiking" && (
+        <>
+          {header("등산 중", true)}
+          <div className="trail-map">
+            <div className="map-pattern dense" />
+            <svg className="trail-line" viewBox="0 0 300 400">
+              <path
+                d="M145 375 C120 330 184 310 156 270 S115 210 160 178 204 134 170 100 160 65 185 28"
+                fill="none"
+                stroke="#155b43"
+                strokeWidth="6"
+                strokeLinecap="round"
+                strokeDasharray="2 3"
+              />
+            </svg>
+            <span className="live-pill">Ⅱ 오프라인</span>
+            <span className="map-control">◎</span>
+            <span className="map-control second">➤</span>
+            <span className="trail-start">시작</span>
+          </div>
+          <div className="hike-panel">
+            <div className="hike-stats">
+              <b>⌁ 520m</b>
+              <b>↪ 2.3km</b>
+            </div>
+            <div className="hike-stats timer">
+              <b>{started ? "00:18:42" : "01:15:20"}</b>
+              <b>◴ 2.4km/h</b>
+            </div>
+            <div className="bottom-actions">
+              <button onClick={() => setStarted(!started)}>
+                {started ? "Ⅱ 일시정지" : "▶ 계속하기"}
+              </button>
+              <button className="primary" onClick={() => go("write")}>
+                ■ 등산 완료
+              </button>
+            </div>
+          </div>
+          {tabs}
+        </>
+      )}
 
     {screen === 'setup' && <>{header('프로필 설정')}<form className="scroll-content form-content" onSubmit={e => { e.preventDefault(); void saveProfile() }}><h2>To Peak에서 사용할<br/>정보를 입력해주세요.</h2><label>닉네임<input value={nickname} onChange={e => setNickname(e.target.value)} maxLength={30} required autoComplete="nickname"/></label><label>출생연도<input value={birthYear} onChange={e => setBirthYear(e.target.value)} inputMode="numeric" placeholder="2003" maxLength={4} required/></label><p className="muted">출생연도만 입력해주세요.</p><button className="submit" disabled={busy}>시작하기</button></form></>}
     {(screen === 'diary' || screen === 'myJournals') && <>{header(screen === 'diary' ? '등산일지' : '내 등산일지', screen === 'myJournals')}<div className="scroll-content"><div className="section-heading"><b>{screen === 'diary' ? '등산일지' : '내 등산일지'}</b><button onClick={() => go('write')}>기록 작성 ＋</button></div>{journalList()}</div>{tabs}</>}
@@ -138,4 +280,4 @@ function App() {
   </main>
 }
 
-export default App
+export default App;
