@@ -1,8 +1,8 @@
 import { useState } from 'react'
+import InteractiveMountainMap from './components/mountain/InteractiveMountainMap'
 import './App.css'
 
 type Screen = 'login' | 'explore' | 'detail' | 'hiking' | 'diary' | 'write' | 'profile' | 'settings' | 'ranking'
-
 const mountains = [
   { name: '천안산', area: '경기도 남양주시 서쪽', height: '812m', distance: '3.8km', time: '2시간 10분', color: 'sage' },
   { name: '운길산', area: '경기도 남양주시 조안면', height: '610m', distance: '2.1km', time: '1시간 25분', color: 'mint' },
@@ -21,7 +21,6 @@ function App() {
   const [screen, setScreen] = useState<Screen>('login')
   const [selected, setSelected] = useState(0)
   const [started, setStarted] = useState(false)
-  const [query, setQuery] = useState('')
   const [isPublic, setIsPublic] = useState(true)
   const mountain = mountains[selected]
   const go = (next: Screen) => setScreen(next)
@@ -33,7 +32,7 @@ function App() {
   return <main className="app-shell">
     {screen === 'login' && <section className="login-screen"><div className="login-brand"><BrandMark/><p>기록하고 즐겁게 오르는 방법</p></div><div className="login-actions"><button className="social google" onClick={() => go('explore')}><b>G</b> Google로 시작하기</button><button className="social kakao" onClick={() => go('explore')}><b>●</b> 카카오로 시작하기</button><small>간편하게 시작하고 나만의 산행을 기록해보세요</small></div></section>}
 
-    {screen === 'explore' && <>{header('찾기 탐색')}<div className="scroll-content"><label className="search"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="경기도 이름을 검색해 보세요"/></label><div className="map-card"><div className="map-pattern"/><div className="region region-one">가평군</div><div className="region region-two">포천시</div><div className="region region-three">남양주</div><div className="region region-four">양평군</div><div className="region region-five">구리시</div><div className="map-pin">●</div><div className="map-label">경기도</div></div><section className="weather"><div><small>남양주</small><b>☀️ 21°</b></div><div className="weather-details">맑음　바람 약함<br/><small>오늘 산행하기 좋은 날이에요</small></div></section><div className="section-heading"><b>산별 추천</b><button>전체 보기</button></div><div className="difficulty"><span>산행 환경</span><i>Easy</i><i>Mid</i><i>Hard</i></div>{mountains.map((_, i) => card(i, true))}</div>{tabs}</>}
+    {screen === 'explore' && <>{header('산 탐색')}<div className="scroll-content"><InteractiveMountainMap onMountainSelect={mountain => { const match = mountains.findIndex(item => item.name === mountain.name); if (match >= 0) setSelected(match) }}/></div>{tabs}</>}
 
     {screen === 'detail' && <>{header('상세', true)}<div className="scroll-content detail-content"><MountainArt/><div className="detail-title"><div><h1>{mountain.name}</h1><small>{mountain.area}</small></div><button className="heart">♡</button></div><div className="stats"><div><b>{mountain.height}</b><small>세로 높지</small></div><div><b>{mountain.distance}</b><small>거리 코스</small></div><div><b>보통</b><small>난이도</small></div></div><h3>다른 사람들의 공개 기록</h3>{card(0,true)}{card(1,true)}<div className="bottom-actions"><button onClick={() => go('diary')}>등산 기록하기</button><button className="primary" onClick={() => { setStarted(true); go('hiking') }}>등산 앱과 연동하기</button></div></div>{tabs}</>}
 
