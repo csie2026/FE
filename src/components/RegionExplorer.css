@@ -1,0 +1,34 @@
+.region-explorer{position:relative;background:#eef2e9;border:1px solid #d8ddd5;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px #21382c08}
+.region-map-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 14px 0}
+.region-map-heading b{font-size:14px;color:#315d45}.region-map-heading small{font-size:10px;color:#657268}
+.region-map-gesture{touch-action:pan-y pinch-zoom;user-select:none;cursor:grab}.region-map-gesture:active{cursor:grabbing}
+.gyeonggi-map{display:block;width:100%;height:auto;overflow:visible}
+.region-north{--region-fill:#d4e3c5}.region-east{--region-fill:#e0e8d3}.region-south{--region-fill:#c5d8b7}.region-central{--region-fill:#b9d1c3}
+.map-city{cursor:pointer;outline:none}.map-city-fill{fill:var(--region-fill);transition:fill .25s ease}
+.map-city-outline{stroke:#7e9b83;stroke-width:.8;pointer-events:none;stroke-linejoin:round}
+.map-city.is-active .map-city-fill{fill:#176044}.map-city.is-active .map-city-outline{stroke:#92b59c}
+.map-city.is-selected .map-city-fill{fill:#083c29}.map-city.is-selected .map-city-outline{stroke:#b7dbc2;stroke-width:2.5}
+.map-city:focus-visible .map-city-outline{stroke:#17261f;stroke-width:3}
+.map-city-label{cursor:pointer}.map-city-label text{font-size:10px;font-weight:600;fill:#fff;pointer-events:none}
+.map-city-label.is-selected text{font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.map-city-label.is-external text{fill:#176044;paint-order:stroke;stroke:#eef2e9;stroke-width:3px;stroke-linejoin:round}
+.map-label-line{fill:none;stroke:#557d62;stroke-width:.8;pointer-events:none}.map-label-point{fill:#cee4d0;pointer-events:none}
+.map-label-hit{fill:transparent}.map-context-label{fill:#879487;font-size:10px;pointer-events:none}
+.region-current{display:flex;align-items:center;justify-content:center;gap:18px;padding:0 12px}
+.region-current>div{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:115px}.region-current b{font-size:17px;color:#176044}.region-current small{font-size:10px;color:#657268}
+.region-arrow{width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:#176044;font-size:28px;line-height:1}.region-arrow:disabled{opacity:.25;cursor:default}
+.region-indicators{display:flex;justify-content:center;gap:2px;margin:6px 8px 2px}
+.region-key{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;padding:0 5px;border:0;background:transparent;color:#657268;font-size:10px;border-radius:8px;white-space:nowrap}
+.region-key span{width:8px;height:8px;border-radius:50%;background:var(--region-fill);border:1px solid #7e9b83}
+.region-key[aria-current=true]{color:#176044;font-weight:700}.region-key[aria-current=true] span{background:#176044;border-color:#176044}
+.region-hint{text-align:center;color:#657268;font-size:10px;margin:0 10px 14px}
+.region-explorer button:focus-visible,.city-mountains button:focus-visible{outline:2px solid #176044;outline-offset:-2px}
+.region-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.city-mountains{padding:0 0 10px;margin-top:18px;border-bottom:1px solid #dfe3dc}
+.city-mountains .section-heading{margin:0 0 6px}.city-mountains .section-heading small{font-size:11px;color:#657268}
+.city-mountains-note{font-size:10px;color:#738076;margin:0 0 10px}
+.city-mountains .mountain-card{min-height:76px}.city-mountains .mountain-info{min-width:0}.city-mountains .mountain-info b{overflow-wrap:anywhere}
+.region-mountain-dialog{width:calc(100% - 40px);max-width:360px;border:1px solid #d8ddd5;border-radius:14px;padding:18px;background:#f7f7f1;color:#17261f}
+.region-mountain-dialog::backdrop{background:#17261f66}.region-mountain-dialog .section-heading{margin-top:0}.region-mountain-dialog p{font-size:12px;color:#657268}
+@media(hover:hover){.map-city:hover .map-city-fill{fill:#8eaf96}.map-city.is-active:hover .map-city-fill{fill:#287452}.map-city.is-selected:hover .map-city-fill{fill:#083c29}}
+@media(prefers-reduced-motion:reduce){.map-city-fill{transition:none}}
