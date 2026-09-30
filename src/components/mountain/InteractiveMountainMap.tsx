@@ -103,4 +103,3 @@ export default function InteractiveMountainMap({ mountains = sampleMountains, on
     {selectedMountain && <aside className="interactive-map__detail" aria-live="polite"><button className="interactive-map__detail-close" aria-label="상세 닫기" onClick={() => setSelectedMountain(null)}>×</button><span className="interactive-map__detail-eyebrow">{regionInfo[selectedMountain.region].label}권역 · {selectedMountain.city}</span><h3>{selectedMountain.name}</h3><div className="interactive-map__detail-height">▲ <b>{selectedMountain.height.toLocaleString()}</b> m</div><p>{selectedMountain.description}</p></aside>}
   </section>
 }
-

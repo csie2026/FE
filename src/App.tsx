@@ -1,19 +1,11 @@
-import { useState } from "react";
-import InteractiveMountainMap from "./components/mountain/InteractiveMountainMap";
-import "./App.css";
-import MountainCard, { MountainArt } from "./components/MountainCard";
-import RegionExplorer from "./components/RegionExplorer";
+import { useEffect, useState } from 'react'
+import './App.css'
+import MountainCard, { MountainArt } from './components/MountainCard'
+import InteractiveMountainMap from './components/mountain/InteractiveMountainMap'
+import { api, ApiError, scoreText, type Member, type Journal, type PublicProfile } from './api'
 
-type Screen =
-  | "login"
-  | "explore"
-  | "detail"
-  | "hiking"
-  | "diary"
-  | "write"
-  | "profile"
-  | "settings"
-  | "ranking";
+type Screen = 'login' | 'explore' | 'detail' | 'hiking' | 'diary' | 'write' | 'profile' | 'settings' | 'ranking' | 'setup' | 'myJournals' | 'publicProfile'
+
 const mountains = [
   {
     name: "천안산",
@@ -68,91 +60,107 @@ function BrandMark() {
   );
 }
 
+
+function localDate() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+
 function App() {
-  const [screen, setScreen] = useState<Screen>("login");
-  const [selected, setSelected] = useState(0);
-  const [started, setStarted] = useState(false);
-  const [isPublic, setIsPublic] = useState(true);
-  const mountain = mountains[selected];
-  const go = (next: Screen) => setScreen(next);
+  const [screen, setScreen] = useState<Screen>('login')
+  const [loading, setLoading] = useState(true)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [me, setMe] = useState<Member | null>(null)
+  const [nickname, setNickname] = useState('')
+  const [birthYear, setBirthYear] = useState('')
+  const [journals, setJournals] = useState<Journal[]>([])
+  const [ranking, setRanking] = useState<PublicProfile[]>([])
+  const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null)
+  const [publicId, setPublicId] = useState<number | null>(null)
+  const [editing, setEditing] = useState<number | null>(null)
+  const [title, setTitle] = useState('')
+  const [content, setContent] = useState('')
+  const [date, setDate] = useState(localDate())
+  const [journalMountain, setJournalMountain] = useState('')
+  const [selected, setSelected] = useState(0)
+  const [started, setStarted] = useState(false)
+  const [isPublic, setIsPublic] = useState(false)
+  const mountain = mountains[selected]
+  const go = (next: Screen) => {
+    setError('')
+    if (!me) { setScreen('login'); return }
+    if (!me.profileCompleted) { setScreen('setup'); return }
+    if (next === 'write') { setEditing(null); setTitle(''); setContent(''); setJournalMountain(''); setIsPublic(false) }
+    if (next === screen) return
+    setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile'].includes(next)); setJournals([]); setPublicProfile(null)
+    setScreen(next)
+    if (next !== 'publicProfile' && window.location.hash) window.history.pushState(null, '', window.location.pathname)
+  }
+  const fail = (e: unknown) => {
+    setError(e instanceof Error ? e.message : '요청에 실패했습니다.')
+    if (e instanceof ApiError && e.status === 401) { setMe(null); setScreen('login') }
+  }
+  useEffect(() => {
+    let active = true
+    api<Member>('/api/users/me').then(user => {
+      if (!active) return
+      setMe(user); setNickname(user.nickname ?? '')
+      const match = window.location.hash.match(/^#users\/(\d+)$/)
+      if (!user.profileCompleted) setScreen('setup')
+      else if (match) { setBusy(true); setPublicId(Number(match[1])); setScreen('publicProfile') }
+      else setScreen('explore')
+    }).catch(e => { if (active && (!(e instanceof ApiError) || e.status !== 401)) fail(e) })
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
+  useEffect(() => {
+    const back = () => {
+      if (!me) { setScreen('login'); return }
+      if (!me.profileCompleted) { setScreen('setup'); return }
+      const match = window.location.hash.match(/^#users\/(\d+)$/)
+      if (match) {
+        const id = Number(match[1])
+        if (screen === 'publicProfile' && publicId === id) return
+        setBusy(true); setPublicProfile(null); setJournals([]); setPublicId(id); setScreen('publicProfile')
+      } else if (screen !== 'ranking') { setBusy(true); setScreen('ranking') }
+    }
+    window.addEventListener('popstate', back)
+    return () => window.removeEventListener('popstate', back)
+  }, [me, screen, publicId])
+  useEffect(() => {
+    if (!me?.profileCompleted) return
+    let active = true
+    const update = <T,>(setter: (value: T) => void) => (value: T) => { if (active) setter(value) }
+    const request = screen === 'diary' ? api<Journal[]>('/api/journals').then(update(setJournals))
+      : screen === 'myJournals' ? api<Journal[]>('/api/users/me/journals').then(update(setJournals))
+      : screen === 'ranking' ? api<PublicProfile[]>('/api/rankings').then(update(setRanking))
+      : screen === 'publicProfile' && publicId ? Promise.all([api<PublicProfile>(`/api/users/${publicId}/profile`), api<Journal[]>(`/api/users/${publicId}/journals`)]).then(([profile, records]) => { if (active) { setPublicProfile(profile); setJournals(records) } })
+      : screen === 'profile' ? api<Member>('/api/users/me').then(update(setMe)) : Promise.resolve()
+    request.catch(e => { if (active) fail(e) }).finally(() => { if (active) setBusy(false) })
+    return () => { active = false }
+  }, [screen, publicId, me?.profileCompleted])
+  const openProfile = (id: number) => { window.history.pushState({ toPeakProfile: true }, '', `#users/${id}`); setBusy(true); setPublicProfile(null); setJournals([]); setPublicId(id); setScreen('publicProfile') }
+  const saveProfile = async () => {
+    const year = Number(birthYear)
+    if (!nickname.trim() || nickname.trim().length > 30) { setError('닉네임은 1~30자로 입력해주세요.'); return }
+    if (!/^\d{4}$/.test(birthYear) || year < 1900 || year > new Date().getFullYear()) { setError('출생연도는 1900년부터 현재 연도 사이로 입력해주세요.'); return }
+    setBusy(true); setError('')
+    try { const user = await api<Member>('/api/users/me/profile', 'PATCH', { nickname: nickname.trim(), birthYear: year }); setMe(user); setScreen('explore') } catch (e) { fail(e) } finally { setBusy(false) }
+  }
+  const saveJournal = async () => {
+    if (!title.trim() || !date || date > localDate()) { setError('제목과 올바른 등산 날짜를 입력해주세요.'); return }
+    setBusy(true); setError('')
+    try { await api(`/api/journals${editing ? `/${editing}` : ''}`, editing ? 'PATCH' : 'POST', { mountainName: journalMountain || mountain.name, title, content, hikingDate: date, isPublic }); setJournals([]); setScreen('myJournals') } catch (e) { fail(e); setBusy(false) }
+  }
+  const avatar = (profile: PublicProfile) => <span className="avatar">☺{profile.profileImageUrl && <img src={profile.profileImageUrl} alt="프로필" referrerPolicy="no-referrer" onError={e => { e.currentTarget.style.display = 'none' }}/>}</span>
+  const journalList = () => busy ? <p role="status">불러오는 중…</p> : journals.length ? journals.map(j => <article className="diary-card" key={j.id}><MountainArt small/><div><b>{j.title}</b><small>{j.mountainName} · {j.hikingDate} · {j.nickname}</small><p className="journal-content">{j.content}</p>{screen === 'myJournals' && <button onClick={() => { setEditing(j.id); setTitle(j.title); setContent(j.content); setDate(j.hikingDate); setJournalMountain(j.mountainName); setIsPublic(j.isPublic); setScreen('write') }}>수정</button>}</div><span className="badge">{j.isPublic ? '공개' : '비공개'}</span></article>) : <p className="muted">아직 등산일지가 없습니다.</p>
+  if (loading) return <main className="app-shell"><p role="status">로그인 정보를 확인하는 중…</p></main>
 
-  const header = (title: string, back = false) => (
-    <header className="topbar">
-      {back ? (
-        <button className="back" onClick={() => go("explore")}>
-          ‹ <span>Back</span>
-        </button>
-      ) : (
-        <span className="header-spacer" aria-hidden="true" />
-      )}
-      <strong>{title}</strong>
-      <button
-        className="icon-button"
-        onClick={() => go("settings")}
-        aria-label="설정"
-      >
-        {back ? "☰" : "⋯"}
-      </button>
-    </header>
-  );
-  const tabs = (
-    <nav className="tabbar">
-      {(
-        [
-          ["explore", "♧", "산 탐색"],
-          ["ranking", "♜", "랭킹"],
-          ["diary", "▤", "등산 일지"],
-          ["profile", "☻", "마이"],
-        ] as [Screen, string, string][]
-      ).map(([id, icon, label]) => (
-        <button
-          key={id}
-          className={
-            screen === id ||
-            (screen === "detail" && id === "explore") ||
-            (screen === "write" && id === "diary")
-              ? "active"
-              : ""
-          }
-          onClick={() => go(id)}
-        >
-          <span>{icon}</span>
-          {label}
-        </button>
-      ))}
-    </nav>
-  );
-  const card = (index: number, compact = false) => (
-    <MountainCard
-      key={mountains[index].name}
-      mountain={mountains[index]}
-      compact={compact}
-      onClick={() => {
-        setSelected(index);
-        go("detail");
-      }}
-    />
-  );
+  const header = (title: string, back = false) => <header className="topbar">{back ? <button className="back" onClick={() => screen === 'publicProfile' && window.history.state?.toPeakProfile ? window.history.back() : go(screen === 'publicProfile' ? 'ranking' : screen === 'myJournals' ? 'profile' : 'explore')}>‹ <span>Back</span></button> : <span className="header-spacer" aria-hidden="true"/>}<strong>{title}</strong><button className="icon-button" onClick={() => go('settings')} aria-label="설정">{back ? '☰' : '⋯'}</button></header>
+  const tabs = <nav className="tabbar">{([['explore','mountain','산 탐색'],['ranking','♜','랭킹'],['diary','▤','등산일지'],['profile','☻','마이']] as [Screen,string,string][]).map(([id,icon,label]) => <button key={id} className={screen === id || (screen === 'detail' && id === 'explore') || (screen === 'write' && id === 'diary') || (screen === 'myJournals' && id === 'profile') || (screen === 'publicProfile' && id === 'ranking') ? 'active' : ''} onClick={() => go(id)}><span>{icon === 'mountain' ? <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="m2 20 7-14 5 8 3-5 5 11H2Z"/><path d="m6 12 3 2 2-2"/></svg> : icon}</span>{label}</button>)}</nav>
+  const card = (index: number, compact = false) => <MountainCard key={mountains[index].name} mountain={mountains[index]} compact={compact} onClick={() => { setSelected(index); go('detail') }}/>
 
-  return (
-    <main className="app-shell">
-      {screen === "login" && (
-        <section className="login-screen">
-          <div className="login-brand">
-            <BrandMark />
-            <p>기록하고 즐겁게 오르는 방법</p>
-          </div>
-          <div className="login-actions">
-            <button className="social google" onClick={() => go("explore")}>
-              <b>G</b> Google로 시작하기
-            </button>
-            <button className="social kakao" onClick={() => go("explore")}>
-              <b>●</b> 카카오로 시작하기
-            </button>
-            <small>간편하게 시작하고 나만의 산행을 기록해보세요</small>
-          </div>
-        </section>
-      )}
+  return <main className="app-shell">
+    {error && <div className="error-banner" role="alert">{error}<button onClick={() => setError('')}>닫기</button></div>}
+    {screen === 'login' && <section className="login-screen"><div className="login-brand"><BrandMark/><p>기록하고 즐겁게 오르는 방법</p></div><div className="login-actions"><button className="social google" onClick={() => window.location.assign('/oauth2/authorization/google')}><b>G</b> Google로 시작하기</button><button className="social kakao" onClick={() => window.location.assign('/oauth2/authorization/kakao')}><b>●</b> 카카오로 시작하기</button><small>간편하게 시작하고 나만의 산행을 기록해보세요</small></div></section>}
 
       {screen === "explore" && (
         <>
@@ -259,185 +267,17 @@ function App() {
         </>
       )}
 
-      {screen === "diary" && (
-        <>
-          {header("목록", true)}
-          <div className="scroll-content">
-            <h2>내 등산 일지</h2>
-            {[0, 1].map((i) => (
-              <article className="diary-card" key={i}>
-                <MountainArt small />
-                <div>
-                  <b>{mountains[i].name}</b>
-                  <small>
-                    2026.09.{29 - i} 09:30
-                    <br />
-                    정상까지 여유롭게 산행
-                  </small>
-                </div>
-                <span className="badge">공개/비공개</span>
-              </article>
-            ))}
-            <div className="section-heading">
-              <b>기록 목록</b>
-              <button onClick={() => go("write")}>기록 작성 ＋</button>
-            </div>
-            {mountains.map((_, i) => card(i, true))}
-          </div>
-          <div className="bottom-actions fixed">
-            <button onClick={() => go("hiking")}>Ⅱ 일시정지</button>
-            <button className="primary" onClick={() => go("write")}>
-              ■ 등산 완료
-            </button>
-          </div>
-          {tabs}
-        </>
-      )}
+    {screen === 'setup' && <>{header('프로필 설정')}<form className="scroll-content form-content" onSubmit={e => { e.preventDefault(); void saveProfile() }}><h2>To Peak에서 사용할<br/>정보를 입력해주세요.</h2><label>닉네임<input value={nickname} onChange={e => setNickname(e.target.value)} maxLength={30} required autoComplete="nickname"/></label><label>출생연도<input value={birthYear} onChange={e => setBirthYear(e.target.value)} inputMode="numeric" placeholder="2003" maxLength={4} required/></label><p className="muted">출생연도만 입력해주세요.</p><button className="submit" disabled={busy}>시작하기</button></form></>}
+    {(screen === 'diary' || screen === 'myJournals') && <>{header(screen === 'diary' ? '등산일지' : '내 등산일지', screen === 'myJournals')}<div className="scroll-content"><div className="section-heading"><b>{screen === 'diary' ? '등산일지' : '내 등산일지'}</b><button onClick={() => go('write')}>기록 작성 ＋</button></div>{journalList()}</div>{tabs}</>}
+    {screen === 'write' && <>{header(editing ? '일지 수정' : '일지 작성')}<form className="scroll-content form-content" onSubmit={e => { e.preventDefault(); void saveJournal() }}><h2>오늘의 산행을 기록해요</h2><p className="muted">멋있었던 순간을 남겨보세요</p><label>산 선택<select value={journalMountain || mountain.name} onChange={e => setJournalMountain(e.target.value)}>{!mountains.some(m => m.name === journalMountain) && journalMountain && <option>{journalMountain}</option>}{mountains.map(m => <option key={m.name}>{m.name}</option>)}</select></label><label>등산 날짜<input type="date" value={date} max={localDate()} onChange={e => setDate(e.target.value)} required/></label><label>제목<input value={title} onChange={e => setTitle(e.target.value)} maxLength={100} required placeholder="산행 제목을 입력하세요"/></label><label>오늘의 여정<textarea value={content} onChange={e => setContent(e.target.value)} maxLength={10000} rows={4}/></label><div className="switch-row"><b>다른 사용자에게 공개</b><button type="button" role="switch" aria-checked={isPublic} aria-label="다른 사용자에게 공개" className={`switch ${isPublic ? 'on' : ''}`} onClick={() => setIsPublic(!isPublic)}><span/></button></div><button className="submit" disabled={busy}>기록 저장하기</button></form>{tabs}</>}
+    {screen === 'profile' && me && <>{header('마이페이지')}<div className="scroll-content profile-content"><article className="profile-card">{avatar(me)}<div><b>{me.nickname}</b>{me.age !== null && <small>{me.age}살</small>}</div></article><div className="profile-stats"><div><b>{scoreText(me.score)}</b><small>내 점수</small></div></div><button className="settings-link" onClick={() => go('myJournals')}>내 등산일지　›</button><button className="settings-link" onClick={() => go('settings')}>설정　›</button></div>{tabs}</>}
+    {screen === 'publicProfile' && <>{header('사용자 프로필', true)}<div className="scroll-content profile-content">{busy ? <p role="status">불러오는 중…</p> : publicProfile && <><article className="profile-card">{avatar(publicProfile)}<div><b>{publicProfile.nickname}</b><small>{scoreText(publicProfile.score)}</small></div></article><h3>등산일지</h3>{journalList()}</>}</div>{tabs}</>}
 
-      {screen === "write" && (
-        <>
-          {header("일지 작성")}
-          <div className="scroll-content form-content">
-            <h2>오늘의 산행을 기록해요</h2>
-            <p className="muted">멋있었던 순간을 남겨보세요</p>
-            <label>
-              산 선택
-              <select
-                value={selected}
-                onChange={(e) => setSelected(Number(e.target.value))}
-              >
-                {mountains.map((m, i) => (
-                  <option value={i} key={m.name}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              등산 날짜
-              <input type="date" defaultValue="2026-09-29" />
-            </label>
-            <label>
-              제목
-              <input placeholder="산행 제목을 입력하세요" />
-            </label>
-            <label>
-              사진
-              <div className="upload">
-                ▧<small>사진 업로드</small>
-              </div>
-            </label>
-            <label>
-              오늘의 여정
-              <textarea placeholder="산행에서 느낀 점을 적어주세요" rows={4} />
-            </label>
-            <div className="switch-row">
-              <b>공개/비공개</b>
-              <button
-                className={`switch ${isPublic ? "on" : ""}`}
-                onClick={() => setIsPublic(!isPublic)}
-              >
-                <span />
-              </button>
-            </div>
-            <button className="submit" onClick={() => go("diary")}>
-              기록 저장하기
-            </button>
-          </div>
-          {tabs}
-        </>
-      )}
+    {screen === 'settings' && <>{header('설정', true)}<div className="scroll-content settings-content"><h2>계정 설정</h2><button disabled={busy} onClick={async () => { setBusy(true); try { await api('/api/logout', 'POST'); setMe(null); setScreen('login'); window.history.replaceState(null, '', '/') } catch(e) { fail(e) } finally { setBusy(false) } }}>로그아웃</button>{['계정 설정','오프라인 지도 관리','센서 설정','앱 정보'].map(x=><button key={x}>{x}<span>›</span></button>)}</div>{tabs}</>}
 
-      {screen === "profile" && (
-        <>
-          {header("마이페이지")}
-          <div className="scroll-content profile-content">
-            <article className="profile-card">
-              <div className="avatar">☺</div>
-              <div>
-                <b>닉네임</b>
-                <small>이번 겨울 첫 정상에!</small>
-              </div>
-              <button>›</button>
-            </article>
-            <div className="profile-stats">
-              <div>
-                <b>7회</b>
-                <small>기록한 산행</small>
-              </div>
-              <div>
-                <b>24km</b>
-                <small>거리 및 횟수</small>
-              </div>
-              <div>
-                <b>19회</b>
-                <small>완료 산행</small>
-              </div>
-              <div>
-                <b>325정</b>
-                <small>총 고도</small>
-              </div>
-            </div>
-            <h3>내가 정복한 산</h3>
-            {mountains.map((m, i) => (
-              <div className="conquered" key={m.name}>
-                <span className="tree">♧</span>
-                <b>{m.name}</b>
-                <small>{3 - i}회 정복</small>
-              </div>
-            ))}
-            <button className="settings-link" onClick={() => go("settings")}>
-              설정　›
-            </button>
-          </div>
-          {tabs}
-        </>
-      )}
+    {screen === 'ranking' && <>{header('랭킹')}<div className="scroll-content"><div className="ranking-hero"><span>산행 랭킹</span><b>함께 오르는 즐거움</b><div>🥈　🥇　🥉</div></div><h2>등산러</h2>{busy ? <p role="status">불러오는 중…</p> : ranking.map((user, i) => <button className="rank-row" key={user.userId} onClick={() => openProfile(user.userId)}><strong>{user.score === null ? '—' : i + 1}</strong>{avatar(user)}<b>{user.nickname}</b><small>{scoreText(user.score)}</small></button>)}{!busy && !ranking.length && <p className="muted">등록된 사용자가 없습니다.</p>}<h3>이달의 추천 산</h3>{mountains.map((_,i)=>card(i,true))}</div>{tabs}</>}
 
-      {screen === "settings" && (
-        <>
-          {header("설정", true)}
-          <div className="scroll-content settings-content">
-            <h2>계정 설정</h2>
-            {["계정 설정", "오프라인 지도 관리", "센서 설정", "앱 정보"].map(
-              (x) => (
-                <button key={x}>
-                  {x}
-                  <span>›</span>
-                </button>
-              ),
-            )}
-          </div>
-          {tabs}
-        </>
-      )}
-
-      {screen === "ranking" && (
-        <>
-          {header("랭킹")}
-          <div className="scroll-content">
-            <div className="ranking-hero">
-              <span>이번 주 산행 랭킹</span>
-              <b>함께 오르는 즐거움</b>
-              <div>🥈　🥇　🥉</div>
-            </div>
-            <h2>이번 주 TOP 등산러</h2>
-            {["산타는곰", "초록발자국", "바람따라"].map((x, i) => (
-              <div className="rank-row" key={x}>
-                <strong>{i + 1}</strong>
-                <span className="avatar">♧</span>
-                <b>{x}</b>
-                <small>{24 - i * 5}km</small>
-              </div>
-            ))}
-            <h3>이달의 추천 산</h3>
-            {mountains.map((_, i) => card(i, true))}
-          </div>
-          {tabs}
-        </>
-      )}
-    </main>
-  );
+  </main>
 }
 
 export default App;
