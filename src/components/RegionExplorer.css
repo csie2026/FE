@@ -269,9 +269,9 @@
   font-size: 10px;
 }
 .mountain-dialog-actions .mountain-dialog-favorite.is-favorite {
-  border-color: #f0d5d3;
-  background: #fff2f1;
-  color: #bd5858;
+  border-color: #c5dfc8;
+  background: #edf6ee;
+  color: #2e7d32;
 }
 .city-mountains-note {
   font-size: 10px;

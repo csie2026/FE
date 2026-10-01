@@ -6,6 +6,8 @@ import MountainCollection from './components/profile/MountainCollection';
 import RankingPage from './components/ranking/RankingPage';
 import { regions } from './data/exploreRegions';
 import { usePersistentIds } from './hooks/usePersistentIds';
+import { useMonthlyGoals } from './hooks/useMonthlyGoals';
+import SideDrawer, { type DrawerDestination } from './components/common/SideDrawer';
 import { api, ApiError, scoreText, type Member, type Journal, type PublicProfile } from './api';
 
 const RegionExplorer = lazy(() => import('./components/RegionExplorer'));
@@ -24,7 +26,10 @@ type Screen =
   | 'myJournals'
   | 'publicProfile'
   | 'favorites'
-  | 'conquered';
+  | 'conquered'
+  | 'offline'
+  | 'sensors'
+  | 'about';
 
 const mountains = [
   {
@@ -90,6 +95,7 @@ function localDate() {
 
 function App() {
   const [screen, setCurrentScreen] = useState<Screen>('login');
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -115,14 +121,7 @@ function App() {
   const { ids: conqueredIds, toggle: toggleConquered } = usePersistentIds(
     'topeak.completedMountainIds',
   );
-  const [monthlyGoalKm, setMonthlyGoalKm] = useState(() => {
-    try {
-      const stored = Number(localStorage.getItem('topeak.monthlyGoalKm'));
-      return Number.isFinite(stored) && stored > 0 ? stored : 80;
-    } catch {
-      return 80;
-    }
-  });
+  const { goals: monthlyGoals, saveGoals, error: goalsError } = useMonthlyGoals();
   const mountain = mountains[selected];
   const mountainCatalog = useMemo(
     () => [
@@ -161,6 +160,7 @@ function App() {
     setCurrentScreen(next);
   };
   const go = (next: Screen, nextMountain = selected) => {
+    setDrawerOpen(false);
     setError('');
     if (!me) {
       setScreen('login');
@@ -190,6 +190,7 @@ function App() {
   const fail = useCallback((e: unknown) => {
     setError(e instanceof Error ? e.message : '요청에 실패했습니다.');
     if (e instanceof ApiError && e.status === 401) {
+      setDrawerOpen(false);
       setMe(null);
       window.history.replaceState(
         { toPeakScreen: 'login', toPeakIndex: 0 },
@@ -241,6 +242,9 @@ function App() {
             'myJournals',
             'favorites',
             'conquered',
+            'offline',
+            'sensors',
+            'about',
           ];
           if (screens.includes(saved?.toPeakScreen)) {
             setSelected(
@@ -264,6 +268,7 @@ function App() {
   }, [fail]);
   useEffect(() => {
     const back = () => {
+      setDrawerOpen(false);
       if (!me) {
         setCurrentScreen('login');
         return;
@@ -288,6 +293,9 @@ function App() {
         'publicProfile',
         'favorites',
         'conquered',
+        'offline',
+        'sensors',
+        'about',
       ];
       const next: Screen = match
         ? 'publicProfile'
@@ -352,7 +360,7 @@ function App() {
     };
   }, [screen, publicId, me?.profileCompleted, fail]);
   useEffect(() => {
-    document.title = 'To Peak';
+    document.title = 'ToPeak';
   }, []);
   const openProfile = (id: number) => {
     setBusy(true);
@@ -361,13 +369,26 @@ function App() {
     setPublicId(id);
     setScreen('publicProfile', id);
   };
-  const saveMonthlyGoal = (goal: number) => {
-    setMonthlyGoalKm(goal);
+  const logout = async () => {
+    setDrawerOpen(false);
+    setBusy(true);
     try {
-      localStorage.setItem('topeak.monthlyGoalKm', String(goal));
-    } catch {
-      setError('목표를 저장하지 못했습니다. 브라우저 저장 공간을 확인해주세요.');
+      await api('/api/logout', 'POST');
+      setMe(null);
+      setScreen('login');
+      window.history.replaceState(null, '', '/');
+    } catch (cause) {
+      fail(cause);
+    } finally {
+      setBusy(false);
     }
+  };
+  const navigateMenu = (destination: DrawerDestination) => {
+    if (destination === 'setup' && me) {
+      setNickname(me.nickname);
+      setBirthYear(me.birthYear === null ? '' : String(me.birthYear));
+    }
+    go(destination);
   };
   const saveProfile = async () => {
     const year = Number(birthYear);
@@ -477,68 +498,36 @@ function App() {
   const header = (title: string, back = false) => (
     <header className={`topbar${screen === 'ranking' ? ' topbar--ranking' : ''}`}>
       {back ? (
-        <button className="back" onClick={goBack}>
-          ‹ <span>Back</span>
+        <button type="button" className="back" onClick={goBack} aria-label="뒤로가기">
+          ‹
         </button>
       ) : (
-        <span className="header-spacer" aria-hidden="true" />
+        <span aria-hidden="true" />
       )}
       <strong>{title}</strong>
-      {screen === 'settings' ? (
-        <span className="icon-button" aria-hidden="true" />
-      ) : (
-        <button className="icon-button" onClick={() => go('settings')} aria-label="설정">
-          {back ? '☰' : '⋯'}
+      {me?.profileCompleted ? (
+        <button
+          type="button"
+          className="icon-button menu-button"
+          onClick={() => setDrawerOpen(true)}
+          aria-label="메뉴 열기"
+          aria-haspopup="dialog"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
+            <path d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
         </button>
+      ) : (
+        <span aria-hidden="true" />
       )}
     </header>
-  );
-  const tabs = (
-    <nav className="tabbar">
-      {(
-        [
-          ['explore', 'mountain', '산 탐색'],
-          ['ranking', '♜', '랭킹'],
-          ['diary', '▤', '등산일지'],
-          ['profile', '☻', '마이'],
-        ] as [Screen, string, string][]
-      ).map(([id, icon, label]) => (
-        <button
-          key={id}
-          className={
-            screen === id ||
-            (screen === 'detail' && id === 'explore') ||
-            (screen === 'write' && id === 'diary') ||
-            (screen === 'myJournals' && id === 'profile') ||
-            (['favorites', 'conquered'].includes(screen) && id === 'profile') ||
-            (screen === 'publicProfile' && id === 'ranking')
-              ? 'active'
-              : ''
-          }
-          onClick={() => go(id)}
-        >
-          <span>
-            {icon === 'mountain' ? (
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                aria-hidden="true"
-              >
-                <path d="m2 20 7-14 5 8 3-5 5 11H2Z" />
-                <path d="m6 12 3 2 2-2" />
-              </svg>
-            ) : (
-              icon
-            )}
-          </span>
-          {label}
-        </button>
-      ))}
-    </nav>
   );
   const card = (index: number, compact = false) => (
     <MountainCard
@@ -556,6 +545,14 @@ function App() {
 
   return (
     <main className="app-shell">
+      <SideDrawer
+        open={drawerOpen}
+        activeScreen={screen}
+        onClose={() => setDrawerOpen(false)}
+        onNavigate={navigateMenu}
+        onLogout={() => void logout()}
+        busy={busy}
+      />
       {error && (
         <div className="error-banner" role="alert">
           {error}
@@ -633,7 +630,6 @@ function App() {
               />
             </Suspense>
           </div>
-          {tabs}
         </>
       )}
 
@@ -694,7 +690,6 @@ function App() {
               </button>
             </div>
           </div>
-          {tabs}
         </>
       )}
 
@@ -736,7 +731,6 @@ function App() {
               </button>
             </div>
           </div>
-          {tabs}
         </>
       )}
 
@@ -754,7 +748,7 @@ function App() {
             }}
           >
             <h2>
-              To Peak에서 사용할
+              ToPeak에서 사용할
               <br />
               정보를 입력해주세요.
             </h2>
@@ -796,7 +790,6 @@ function App() {
             </div>
             {journalList()}
           </div>
-          {tabs}
         </>
       )}
       {screen === 'write' && (
@@ -871,7 +864,6 @@ function App() {
               기록 저장하기
             </button>
           </form>
-          {tabs}
         </>
       )}
       {screen === 'profile' && me && (
@@ -883,9 +875,10 @@ function App() {
               completedCount={conqueredMountains.length}
               totalDistanceKm={0}
               monthlyDistanceKm={0}
-              monthlyGoalKm={monthlyGoalKm}
-              onSaveGoal={saveMonthlyGoal}
-              onSettings={() => go('settings')}
+              monthlyGoals={monthlyGoals}
+              onSaveGoals={saveGoals}
+              goalsError={goalsError}
+              onSettings={() => setDrawerOpen(true)}
               onEditProfile={() => {
                 setNickname(me.nickname);
                 setBirthYear(me.birthYear === null ? '' : String(me.birthYear));
@@ -894,7 +887,6 @@ function App() {
               onNavigate={go}
             />
           </div>
-          {tabs}
         </>
       )}
       {(screen === 'favorites' || screen === 'conquered') && (
@@ -916,7 +908,6 @@ function App() {
               onCompletedToggle={toggleConquered}
             />
           </div>
-          {tabs}
         </>
       )}
       {screen === 'publicProfile' && (
@@ -941,7 +932,6 @@ function App() {
               )
             )}
           </div>
-          {tabs}
         </>
       )}
 
@@ -950,35 +940,56 @@ function App() {
           {header('설정', true)}
           <div className="scroll-content settings-content">
             <h2>계정 설정</h2>
-            <button
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  await api('/api/logout', 'POST');
-                  setMe(null);
-                  setScreen('login');
-                  window.history.replaceState(null, '', '/');
-                } catch (e) {
-                  fail(e);
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
+            <button disabled={busy} onClick={() => void logout()}>
               로그아웃
             </button>
             {['계정 설정', '오프라인 지도 관리', '센서 설정', '앱 정보'].map((x) => (
-              <button key={x}>
+              <button
+                key={x}
+                onClick={() =>
+                  navigateMenu(
+                    x === '계정 설정'
+                      ? 'setup'
+                      : x === '오프라인 지도 관리'
+                        ? 'offline'
+                        : x === '센서 설정'
+                          ? 'sensors'
+                          : 'about',
+                  )
+                }
+              >
                 {x}
                 <span>›</span>
               </button>
             ))}
           </div>
-          {tabs}
         </>
       )}
 
+      {(screen === 'offline' || screen === 'sensors' || screen === 'about') && (
+        <>
+          {header(
+            screen === 'offline'
+              ? '오프라인 지도 관리'
+              : screen === 'sensors'
+                ? '센서 설정'
+                : '앱 정보',
+            true,
+          )}
+          <section className="scroll-content utility-content">
+            <h2>
+              {screen === 'offline' ? '저장한 지도' : screen === 'sensors' ? '산행 센서' : 'ToPeak'}
+            </h2>
+            <p>
+              {screen === 'offline'
+                ? '저장한 지도가 없습니다. 오프라인 지도 저장 기능은 준비 중입니다.'
+                : screen === 'sensors'
+                  ? '센서 연결 기능은 준비 중입니다.'
+                  : '산을 탐색하고, 나만의 산행을 기록하는 아웃도어 서비스입니다.'}
+            </p>
+          </section>
+        </>
+      )}
       {screen === 'ranking' && (
         <>
           {header('랭킹')}
@@ -987,7 +998,6 @@ function App() {
             onSelectUser={openProfile}
             onAuthError={fail}
           />
-          {tabs}
         </>
       )}
     </main>
