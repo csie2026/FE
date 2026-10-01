@@ -37,6 +37,16 @@
   font-size: 17px;
   color: #18251f;
 }
+.topbar--ranking {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+}
+.topbar--ranking > strong {
+  text-align: center;
+}
+.topbar--ranking > .icon-button {
+  justify-self: end;
+}
 .icon-button,
 .back {
   border: 0;
@@ -778,48 +788,6 @@
   font-size: 21px;
   color: #758076;
 }
-.ranking-hero {
-  height: 155px;
-  border-radius: 16px;
-  padding: 18px;
-  color: #fff;
-  background: linear-gradient(145deg, #a7c9a6, #1a6948);
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-  margin: 8px 0 19px;
-}
-.ranking-hero span {
-  font-size: 11px;
-}
-.ranking-hero b {
-  font-size: 20px;
-}
-.ranking-hero div {
-  text-align: center;
-  font-size: 27px;
-  margin-top: auto;
-}
-.rank-row {
-  height: 56px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  border-bottom: 1px solid #e6e9e3;
-}
-.rank-row > strong {
-  width: 22px;
-  color: #497457;
-}
-.rank-row .avatar {
-  width: 34px;
-  height: 34px;
-  font-size: 17px;
-}
-.rank-row small {
-  margin-left: auto;
-  color: #5d7564;
-}
 .login-screen {
   height: 100%;
   display: flex;
@@ -908,15 +876,6 @@
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
-}
-.rank-row {
-  width: 100%;
-  background: transparent;
-  border: 0;
-  border-bottom: 1px solid #e6e9e3;
-  text-align: left;
-  color: inherit;
-  cursor: pointer;
 }
 .journal-content {
   white-space: pre-wrap;
