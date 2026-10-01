@@ -9,6 +9,8 @@ type Props = {
   onSelectCity: (cityId: string | null) => void;
   favoriteIds: string[];
   onFavoriteToggle: (id: string) => void;
+  completedIds: string[];
+  onCompletedToggle: (id: string) => void;
 };
 
 export default function CityMountainList({
@@ -18,6 +20,8 @@ export default function CityMountainList({
   onSelectCity,
   favoriteIds,
   onFavoriteToggle,
+  completedIds,
+  onCompletedToggle,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [viewed, setViewed] = useState<Mountain | null>(null);
@@ -120,6 +124,14 @@ export default function CityMountainList({
                 <small>난이도</small>
               </div>
             </div>
+            <button
+              type="button"
+              className="collection-dialog-complete"
+              aria-pressed={completedIds.includes(viewed.id)}
+              onClick={() => onCompletedToggle(viewed.id)}
+            >
+              {completedIds.includes(viewed.id) ? '완등 기록 해제' : '완등으로 기록'}
+            </button>
             <small className="city-mountains-note">실제 산행 정보는 추후 제공됩니다.</small>
           </>
         )}

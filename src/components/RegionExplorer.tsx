@@ -11,9 +11,16 @@ const orderedRegions = regionOrder.map((id) => regions.find((region) => region.i
 type Props = {
   favoriteIds: string[];
   onFavoriteToggle: (id: string) => void;
+  completedIds: string[];
+  onCompletedToggle: (id: string) => void;
 };
 
-export default function RegionExplorer({ favoriteIds, onFavoriteToggle }: Props) {
+export default function RegionExplorer({
+  favoriteIds,
+  onFavoriteToggle,
+  completedIds,
+  onCompletedToggle,
+}: Props) {
   const [active, setActive] = useState(0);
   const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const gesture = useRef<{
@@ -173,6 +180,8 @@ export default function RegionExplorer({ favoriteIds, onFavoriteToggle }: Props)
         onSelectCity={setSelectedCity}
         favoriteIds={favoriteIds}
         onFavoriteToggle={onFavoriteToggle}
+        completedIds={completedIds}
+        onCompletedToggle={onCompletedToggle}
       />
     </>
   );

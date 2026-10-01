@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Member, Journal } from '../../api';
 import { useCustomAvatar } from '../../hooks/useCustomAvatar';
 import './MyPage.css';
@@ -14,6 +14,11 @@ type Props = {
   onSettings: () => void;
   onNavigate: (screen: 'myJournals' | 'favorites' | 'conquered' | 'diary') => void;
 };
+
+function currentMonthKey() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+}
 
 export default function MyPage({
   member,
@@ -44,12 +49,29 @@ export default function MyPage({
   const initials = Array.from(member.nickname.trim()).slice(-2).join('') || '나';
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalDraft, setGoalDraft] = useState(String(monthlyGoalKm));
-  const now = new Date();
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const [monthKey, setMonthKey] = useState(currentMonthKey);
+  useEffect(() => {
+    const timer = window.setInterval(() => setMonthKey(currentMonthKey()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   const monthlyHikes = journals.filter((journal) => journal.hikingDate.startsWith(monthKey)).length;
   const progress =
     monthlyGoalKm > 0 ? Math.min(100, Math.round((monthlyDistanceKm / monthlyGoalKm) * 100)) : 0;
   const remaining = Math.max(0, monthlyGoalKm - monthlyDistanceKm);
+  const stats = [
+    { label: '이번 달 산행', value: `${monthlyHikes}회` },
+    {
+      label: '이번 달 거리',
+      value: `${monthlyDistanceKm} km`,
+    },
+    {
+      label: '내 점수',
+      value: `${(member.score ?? 0).toLocaleString()}점`,
+    },
+    { label: '완등', value: `${completedCount}회` },
+    { label: '총 산행', value: `${journals.length}회` },
+    { label: '총 거리', value: `${totalDistanceKm} km` },
+  ];
 
   function saveGoal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -161,41 +183,15 @@ export default function MyPage({
             {avatarError}
           </p>
         )}
-        <div className="my-profile-card__stats">
-          <div>
-            <strong>
-              {completedCount}
-              <small>회</small>
-            </strong>
-            <span>완등</span>
-          </div>
-          <div>
-            <strong>
-              {totalDistanceKm}
-              <small> km</small>
-            </strong>
-            <span>산행거리</span>
-          </div>
-          <div>
-            <strong>
-              {journals.length}
-              <small>회</small>
-            </strong>
-            <span>산행횟수</span>
-          </div>
+        <div className="my-profile-card__stats" aria-label="산행 통계">
+          {stats.map(({ label, value }) => (
+            <div key={label}>
+              <strong>{value}</strong>
+              <span>{label}</span>
+            </div>
+          ))}
         </div>
-        <div className="my-profile-card__extras" aria-label="추가 산행 정보">
-          <span>
-            이번 달 산행 <b>{monthlyHikes}회</b>
-          </span>
-          <span>
-            이번 달 거리 <b>{monthlyDistanceKm} km</b>
-          </span>
-          <span>
-            내 점수{' '}
-            <b>{member.score === null ? '점수 미산정' : `${member.score.toLocaleString()}점`}</b>
-          </span>
-        </div>
+        <p className="my-stats-note">산행 횟수는 등산일지 기준 · 완등은 직접 등록한 산 기준</p>
       </section>
 
       <section className="monthly-challenge">
@@ -229,7 +225,7 @@ export default function MyPage({
             </p>
           </div>
           <b className="monthly-challenge__amount">
-            {monthlyDistanceKm} <small>/ {monthlyGoalKm} km</small>
+            {monthlyDistanceKm} <small>km / {monthlyGoalKm} km</small>
           </b>
         </div>
         <div

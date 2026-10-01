@@ -138,6 +138,7 @@ function App() {
     [],
   );
   const favoriteMountains = mountainCatalog.filter((item) => favoriteIds.includes(item.id));
+  const conqueredMountains = mountainCatalog.filter((item) => conqueredIds.includes(item.id));
   const go = (next: Screen) => {
     setError('');
     if (!me) {
@@ -403,7 +404,7 @@ function App() {
     );
   if (loading)
     return (
-      <main className="app-shell">
+      <main className="app-shell auth-loading" aria-busy="true">
         <span className="auth-loading__spinner" aria-hidden="true" />
         <p role="status">ToPeak으로 이동 중...</p>
       </main>
@@ -491,6 +492,8 @@ function App() {
       key={mountains[index].name}
       mountain={mountains[index]}
       compact={compact}
+      isFavorite={favoriteIds.includes(mountains[index].id)}
+      onFavoriteToggle={() => toggleFavorite(mountains[index].id)}
       onClick={() => {
         setSelected(index);
         go('detail');
@@ -565,7 +568,12 @@ function App() {
                 </p>
               }
             >
-              <RegionExplorer favoriteIds={favoriteIds} onFavoriteToggle={toggleFavorite} />
+              <RegionExplorer
+                favoriteIds={favoriteIds}
+                onFavoriteToggle={toggleFavorite}
+                completedIds={conqueredIds}
+                onCompletedToggle={toggleConquered}
+              />
             </Suspense>
           </div>
           {tabs}
@@ -605,6 +613,14 @@ function App() {
                 <small>난이도</small>
               </div>
             </div>
+            <button
+              type="button"
+              className="collection-dialog-complete"
+              aria-pressed={conqueredIds.includes(mountain.id)}
+              onClick={() => toggleConquered(mountain.id)}
+            >
+              {conqueredIds.includes(mountain.id) ? '완등 기록 해제' : '완등으로 기록'}
+            </button>
             <h3>다른 사람들의 공개 기록</h3>
             {card(0, true)}
             {card(1, true)}
@@ -804,7 +820,7 @@ function App() {
             <MyPage
               member={me}
               journals={journals}
-              completedCount={conqueredIds.length}
+              completedCount={conqueredMountains.length}
               totalDistanceKm={0}
               monthlyDistanceKm={0}
               monthlyGoalKm={monthlyGoalKm}
@@ -828,7 +844,7 @@ function App() {
                   ? '마음에 담아둔 산을 모아봤어요.'
                   : '나의 산행을 완등 기록으로 남겨보세요.'
               }
-              items={screen === 'favorites' ? favoriteMountains : mountainCatalog}
+              items={screen === 'favorites' ? favoriteMountains : conqueredMountains}
               favoriteIds={favoriteIds}
               completedIds={conqueredIds}
               onFavoriteToggle={toggleFavorite}

@@ -271,22 +271,26 @@
 .my-profile-card__stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: 16px 0 12px;
+  row-gap: 20px;
+  padding: 18px 0;
 }
 
 .my-profile-card__stats > div {
+  min-width: 0;
+  text-align: center;
   display: grid;
   justify-items: center;
   gap: 4px;
   border-right: 1px solid #e8ede7;
 }
 
-.my-profile-card__stats > div:last-child {
+.my-profile-card__stats > div:nth-child(3n) {
   border: 0;
 }
 
 .my-profile-card__stats strong {
-  font-size: 19px;
+  font-size: clamp(14px, 4vw, 19px);
+  overflow-wrap: anywhere;
   line-height: 1.2;
   color: #244b34;
 }
@@ -300,25 +304,13 @@
   color: #819087;
 }
 
-.my-profile-card__extras {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.my-stats-note {
+  margin: 0;
   padding-top: 10px;
   border-top: 1px solid #f0f2ef;
-}
-
-.my-profile-card__extras span {
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: #f5f7f3;
   color: #718075;
   font-size: 9px;
-}
-
-.my-profile-card__extras b {
-  margin-left: 3px;
-  color: #365941;
+  text-align: center;
 }
 
 .monthly-challenge {

@@ -73,7 +73,7 @@ export default function MountainCollection({
           <span>
             {mode === 'favorites'
               ? '산 탐색에서 하트를 눌러 저장해보세요.'
-              : '완등한 산을 기록하면 이곳에서 볼 수 있어요.'}
+              : '산 탐색에서 산 상세를 열어 완등으로 기록해보세요.'}
           </span>
         </div>
       )}
@@ -103,14 +103,14 @@ export default function MountainCollection({
                 <small>코스 거리</small>
               </div>
             </div>
-            {mode === 'conquered' && (
-              <button
-                className="collection-dialog-complete"
-                onClick={() => onCompletedToggle(selected.id)}
-              >
-                {completedIds.includes(selected.id) ? '완등 기록 해제' : '완등으로 기록'}
-              </button>
-            )}
+            <button
+              type="button"
+              className="collection-dialog-complete"
+              aria-pressed={completedIds.includes(selected.id)}
+              onClick={() => onCompletedToggle(selected.id)}
+            >
+              {completedIds.includes(selected.id) ? '완등 기록 해제' : '완등으로 기록'}
+            </button>
           </>
         )}
       </dialog>
