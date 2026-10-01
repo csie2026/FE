@@ -7,7 +7,7 @@
   min-height: 100dvh;
   min-width: 0;
   margin: 0 auto;
-  padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+  padding: var(--safe-top) var(--safe-right) var(--safe-bottom) var(--safe-left);
   background: #f7f7f1;
   position: relative;
   isolation: isolate;
@@ -26,7 +26,8 @@
   margin-inline: auto;
   height: 58px;
   flex: none;
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   justify-content: space-between;
   padding: 0 18px;
@@ -34,6 +35,7 @@
   z-index: 2;
 }
 .topbar strong {
+  text-align: center;
   font-size: 17px;
   color: #18251f;
 }
@@ -48,7 +50,17 @@
 }
 .back {
   font-size: 23px;
-  text-align: left;
+  text-align: center;
+}
+.menu-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+}
+.menu-button svg {
+  width: 24px;
+  height: 24px;
 }
 .back span {
   font-size: 13px;
@@ -301,9 +313,9 @@
   transform: scale(0.9);
 }
 .mountain-card__favorite.is-favorite {
-  border-color: #f3dede;
-  background: #fff4f3;
-  color: #c55b5b;
+  border-color: #c5dfc8;
+  background: #edf6ee;
+  color: #2e7d32;
 }
 .mountain-card__main .mountain-art.small {
   width: 57px;
@@ -358,40 +370,7 @@
   font-size: 9px;
   white-space: nowrap;
 }
-.tabbar {
-  width: 100%;
-  max-width: var(--app-max-width);
-  margin-inline: auto;
-  height: calc(64px + var(--safe-bottom));
-  min-height: calc(64px + var(--safe-bottom));
-  padding-bottom: env(safe-area-inset-bottom, 16px);
-  flex: none;
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
-  background: #fff;
-  border-top: 1px solid #e7e9e2;
-  z-index: 3;
-}
-.tabbar button {
-  border: 0;
-  background: none;
-  color: #757f77;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  align-items: center;
-  font-size: 10px;
-  padding: 4px 12px;
-}
-.tabbar button span {
-  font-size: 19px;
-  line-height: 22px;
-}
-.tabbar button.active {
-  color: #176044;
-  font-weight: 700;
-}
+
 .detail-content {
   padding-top: 10px;
 }
@@ -417,7 +396,7 @@
   color: #446c52;
 }
 .heart.is-favorite {
-  color: #c55b5b;
+  color: #2e7d32;
 }
 .stats {
   display: flex;
@@ -940,9 +919,6 @@
 button:disabled {
   opacity: 0.55;
   cursor: wait;
-}
-.tabbar svg {
-  display: block;
 }
 
 .avatar {

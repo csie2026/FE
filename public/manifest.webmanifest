@@ -1,7 +1,7 @@
 {
-  "name": "To Peak",
+  "name": "ToPeak",
   "short_name": "ToPeak",
-  "description": "나만의 산행을 기록하는 To Peak",
+  "description": "나만의 산행을 기록하는 ToPeak",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f8f9fa",
