@@ -1,44 +1,102 @@
-import { gyeonggiMap } from '../data/gyeonggiMap'
-import { regions } from '../data/exploreRegions'
+import { geoMercator, geoPath } from 'd3-geo';
+import type { Feature, FeatureCollection, Geometry } from 'geojson';
+import mapData from '../data/gyeonggi-si-gun.json';
+import { regions } from '../data/exploreRegions';
 
-// Callouts for the dense southwest cluster; boundary paths remain unchanged.
-const callouts: Record<string, [number, number]> = {
-  부천시: [48, 212], 광명시: [48, 236], 시흥시: [48, 260], 안산시: [48, 284],
-  과천시: [365, 244], 안양시: [365, 268], 의왕시: [365, 292],
-  군포시: [365, 316], 수원시: [365, 340], 오산시: [365, 364],
+interface DistrictProperties extends Record<string, unknown> {
+  CTPRVN_CD: string;
+  SIG_CD: string;
+  SIG_KOR_NM: string;
 }
 
-type Props = { activeRegion: string; selectedCity: string | null; onSelect: (regionId: string, cityId: string) => void }
+type District = Feature<Geometry, DistrictProperties>;
+
+const allFeatures = (mapData as unknown as FeatureCollection<Geometry, DistrictProperties>)
+  .features;
+const gyeonggiFeatures = allFeatures.filter(
+  (feature) => feature.properties.CTPRVN_CD === '41' && feature.properties.SIG_CD.startsWith('41'),
+);
+const cityOf = (feature: District) => feature.properties.SIG_KOR_NM.split(' ')[0];
+
+type Props = {
+  activeRegion: string;
+  selectedCity: string | null;
+  onSelect: (regionId: string, cityId: string) => void;
+};
 
 export default function GyeonggiMap({ activeRegion, selectedCity, onSelect }: Props) {
-  return <svg className="gyeonggi-map" viewBox="0 0 400 400" aria-label="경기도 31개 시·군 지도">
-    <text className="map-context-label" x="157" y="213" textAnchor="middle">서울</text>
-    {gyeonggiMap.map(area => {
-      const region = regions.find(item => item.cities.some(city => city.id === area.name))!
-      const active = region.id === activeRegion
-      const selected = area.name === selectedCity
-      return <g key={area.name} className={`map-city region-${region.id}${active ? ' is-active' : ''}${selected ? ' is-selected' : ''}`}
-        role="button" tabIndex={0} aria-pressed={selected} aria-label={`${area.name}, ${region.name}${active ? ', 산 목록 보기' : ', 권역 선택'}`}
-        onClick={() => onSelect(region.id, area.name)} onKeyDown={event => {
-          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); onSelect(region.id, area.name) }
-        }}>
-        <title>{area.name} · {region.name}</title>
-        <path className="map-city-fill" d={area.path} fillRule="evenodd"/>
-        <path className="map-city-outline" d={area.outline} fill="none"/>
+  const region = regions.find((item) => item.id === activeRegion);
+  const cityIds = new Set(region?.cities.map((city) => city.id) ?? []);
+  const features = gyeonggiFeatures.filter((feature) => cityIds.has(cityOf(feature)));
+  const collection: FeatureCollection<Geometry, DistrictProperties> = {
+    type: 'FeatureCollection',
+    features,
+  };
+  const projection = geoMercator().fitSize([360, 320], collection);
+  const path = geoPath(projection);
+  const cityGroups =
+    region?.cities.map((city) => {
+      const cityFeatures = features.filter((feature) => cityOf(feature) === city.id);
+      const centroids = cityFeatures.map((feature) => path.centroid(feature));
+      const center = centroids.length
+        ? centroids
+            .reduce(([sumX, sumY], [x, y]) => [sumX + x, sumY + y], [0, 0])
+            .map((value) => value / centroids.length)
+        : [0, 0];
+      return { city, features: cityFeatures, center };
+    }) ?? [];
+
+  return (
+    <svg
+      className={`gyeonggi-map region-map-${activeRegion}`}
+      viewBox="0 0 400 350"
+      role="img"
+      aria-label={`${region?.name ?? '경기도'} 행정구역 지도`}
+    >
+      <defs>
+        <filter id="map-soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#2d4b39" floodOpacity=".13" />
+        </filter>
+      </defs>
+      <rect x="0" y="0" width="400" height="350" rx="22" fill="#f5f7f2" />
+      <g transform="translate(20 15)">
+        <g className="focused-region-shapes" filter="url(#map-soft-shadow)">
+          {cityGroups.flatMap(({ city, features: cityFeatures }) =>
+            cityFeatures.map((feature) => (
+              <path
+                key={feature.properties.SIG_CD}
+                className={`map-city-fill${selectedCity === city.id ? ' is-selected' : ''}`}
+                d={path(feature) ?? ''}
+                onClick={() => onSelect(activeRegion, city.id)}
+                role="button"
+                tabIndex={0}
+                aria-label={`${city.name} 선택`}
+                aria-pressed={selectedCity === city.id}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    onSelect(activeRegion, city.id);
+                  }
+                }}
+              />
+            )),
+          )}
+        </g>
+        <g className="focused-region-labels" pointerEvents="none">
+          {cityGroups.map(({ city, center }) => (
+            <text
+              key={city.id}
+              x={center[0]}
+              y={center[1]}
+              textAnchor="middle"
+              dominantBaseline="central"
+              className={selectedCity === city.id ? 'is-selected' : ''}
+            >
+              {city.name.replace(/시|군$/, '')}
+            </text>
+          ))}
+        </g>
       </g>
-    })}
-    {/* Labels sit above all paths so adjacent geometry cannot cover their hit targets. */}
-    {gyeonggiMap.map(area => {
-      const region = regions.find(item => item.cities.some(city => city.id === area.name))!
-      if (region.id !== activeRegion) return null
-      const external = callouts[area.name]
-      const [x, y] = external ?? area.anchor
-      const selected = area.name === selectedCity
-      return <g key={area.name} className={`map-city-label${external ? ' is-external' : ''}${selected ? ' is-selected' : ''}`} aria-hidden="true" onClick={() => onSelect(region.id, area.name)}>
-        {external && <><path className="map-label-line" d={`M${area.anchor[0]},${area.anchor[1]} L${x < 100 ? x + 23 : x - 23},${y}`}/><circle className="map-label-point" cx={area.anchor[0]} cy={area.anchor[1]} r="2"/></>}
-        <rect className="map-label-hit" x={x - 24} y={y - 12} width="48" height="24"/>
-        <text x={x} y={y} textAnchor="middle" dominantBaseline="central">{area.name}</text>
-      </g>
-    })}
-  </svg>
+    </svg>
+  );
 }

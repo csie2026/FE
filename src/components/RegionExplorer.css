@@ -1,34 +1,462 @@
-.region-explorer{position:relative;background:#eef2e9;border:1px solid #d8ddd5;border-radius:14px;overflow:hidden;box-shadow:0 2px 8px #21382c08}
-.region-map-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 14px 0}
-.region-map-heading b{font-size:14px;color:#315d45}.region-map-heading small{font-size:10px;color:#657268}
-.region-map-gesture{touch-action:pan-y pinch-zoom;user-select:none;cursor:grab}.region-map-gesture:active{cursor:grabbing}
-.gyeonggi-map{display:block;width:100%;height:auto;overflow:visible}
-.region-north{--region-fill:#d4e3c5}.region-east{--region-fill:#e0e8d3}.region-south{--region-fill:#c5d8b7}.region-central{--region-fill:#b9d1c3}
-.map-city{cursor:pointer;outline:none}.map-city-fill{fill:var(--region-fill);transition:fill .25s ease}
-.map-city-outline{stroke:#7e9b83;stroke-width:.8;pointer-events:none;stroke-linejoin:round}
-.map-city.is-active .map-city-fill{fill:#176044}.map-city.is-active .map-city-outline{stroke:#92b59c}
-.map-city.is-selected .map-city-fill{fill:#083c29}.map-city.is-selected .map-city-outline{stroke:#b7dbc2;stroke-width:2.5}
-.map-city:focus-visible .map-city-outline{stroke:#17261f;stroke-width:3}
-.map-city-label{cursor:pointer}.map-city-label text{font-size:10px;font-weight:600;fill:#fff;pointer-events:none}
-.map-city-label.is-selected text{font-weight:800;text-decoration:underline;text-underline-offset:3px}
-.map-city-label.is-external text{fill:#176044;paint-order:stroke;stroke:#eef2e9;stroke-width:3px;stroke-linejoin:round}
-.map-label-line{fill:none;stroke:#557d62;stroke-width:.8;pointer-events:none}.map-label-point{fill:#cee4d0;pointer-events:none}
-.map-label-hit{fill:transparent}.map-context-label{fill:#879487;font-size:10px;pointer-events:none}
-.region-current{display:flex;align-items:center;justify-content:center;gap:18px;padding:0 12px}
-.region-current>div{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:115px}.region-current b{font-size:17px;color:#176044}.region-current small{font-size:10px;color:#657268}
-.region-arrow{width:44px;height:44px;border:0;border-radius:50%;background:transparent;color:#176044;font-size:28px;line-height:1}.region-arrow:disabled{opacity:.25;cursor:default}
-.region-indicators{display:flex;justify-content:center;gap:2px;margin:6px 8px 2px}
-.region-key{display:flex;align-items:center;justify-content:center;gap:4px;min-height:44px;padding:0 5px;border:0;background:transparent;color:#657268;font-size:10px;border-radius:8px;white-space:nowrap}
-.region-key span{width:8px;height:8px;border-radius:50%;background:var(--region-fill);border:1px solid #7e9b83}
-.region-key[aria-current=true]{color:#176044;font-weight:700}.region-key[aria-current=true] span{background:#176044;border-color:#176044}
-.region-hint{text-align:center;color:#657268;font-size:10px;margin:0 10px 14px}
-.region-explorer button:focus-visible,.city-mountains button:focus-visible{outline:2px solid #176044;outline-offset:-2px}
-.region-sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-.city-mountains{padding:0 0 10px;margin-top:18px;border-bottom:1px solid #dfe3dc}
-.city-mountains .section-heading{margin:0 0 6px}.city-mountains .section-heading small{font-size:11px;color:#657268}
-.city-mountains-note{font-size:10px;color:#738076;margin:0 0 10px}
-.city-mountains .mountain-card{min-height:76px}.city-mountains .mountain-info{min-width:0}.city-mountains .mountain-info b{overflow-wrap:anywhere}
-.region-mountain-dialog{width:calc(100% - 40px);max-width:360px;border:1px solid #d8ddd5;border-radius:14px;padding:18px;background:#f7f7f1;color:#17261f}
-.region-mountain-dialog::backdrop{background:#17261f66}.region-mountain-dialog .section-heading{margin-top:0}.region-mountain-dialog p{font-size:12px;color:#657268}
-@media(hover:hover){.map-city:hover .map-city-fill{fill:#8eaf96}.map-city.is-active:hover .map-city-fill{fill:#287452}.map-city.is-selected:hover .map-city-fill{fill:#083c29}}
-@media(prefers-reduced-motion:reduce){.map-city-fill{transition:none}}
+.region-explorer {
+  position: relative;
+  background: #eef2e9;
+  border: 1px solid #d8ddd5;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px #21382c08;
+}
+.region-map-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 14px 14px 0;
+}
+.region-map-heading b {
+  font-size: 14px;
+  color: #315d45;
+}
+.region-map-heading small {
+  font-size: 10px;
+  color: #657268;
+}
+.region-map-gesture {
+  touch-action: pan-y pinch-zoom;
+  user-select: none;
+  cursor: grab;
+}
+.region-map-gesture:active {
+  cursor: grabbing;
+}
+.gyeonggi-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.region-north {
+  --region-fill: #d4e3c5;
+}
+.region-east {
+  --region-fill: #e0e8d3;
+}
+.region-south {
+  --region-fill: #c5d8b7;
+}
+.region-central {
+  --region-fill: #b9d1c3;
+}
+.map-city {
+  cursor: pointer;
+  outline: none;
+}
+.map-city-fill {
+  fill: var(--region-fill);
+  transition: fill 0.25s ease;
+}
+.map-city-outline {
+  stroke: #7e9b83;
+  stroke-width: 0.8;
+  pointer-events: none;
+  stroke-linejoin: round;
+}
+.map-city.is-active .map-city-fill {
+  fill: #176044;
+}
+.map-city.is-active .map-city-outline {
+  stroke: #92b59c;
+}
+.map-city.is-selected .map-city-fill {
+  fill: #083c29;
+}
+.map-city.is-selected .map-city-outline {
+  stroke: #b7dbc2;
+  stroke-width: 2.5;
+}
+.map-city:focus-visible .map-city-outline {
+  stroke: #17261f;
+  stroke-width: 3;
+}
+.map-city-label {
+  cursor: pointer;
+}
+.map-city-label text {
+  font-size: 10px;
+  font-weight: 600;
+  fill: #fff;
+  pointer-events: none;
+}
+.map-city-label.is-selected text {
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.map-city-label.is-external text {
+  fill: #176044;
+  paint-order: stroke;
+  stroke: #eef2e9;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.map-label-line {
+  fill: none;
+  stroke: #557d62;
+  stroke-width: 0.8;
+  pointer-events: none;
+}
+.map-label-point {
+  fill: #cee4d0;
+  pointer-events: none;
+}
+.map-label-hit {
+  fill: transparent;
+}
+.map-context-label {
+  fill: #879487;
+  font-size: 10px;
+  pointer-events: none;
+}
+.region-current {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding: 0 12px;
+}
+.region-current > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 115px;
+}
+.region-current b {
+  font-size: 17px;
+  color: #176044;
+}
+.region-current small {
+  font-size: 10px;
+  color: #657268;
+}
+.region-arrow {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #176044;
+  font-size: 28px;
+  line-height: 1;
+}
+.region-arrow:disabled {
+  opacity: 0.25;
+  cursor: default;
+}
+.region-indicators {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin: 6px 8px 2px;
+}
+.region-key {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 0 5px;
+  border: 0;
+  background: transparent;
+  color: #657268;
+  font-size: 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.region-key span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--region-fill);
+  border: 1px solid #7e9b83;
+}
+.region-key[aria-current='true'] {
+  color: #176044;
+  font-weight: 700;
+}
+.region-key[aria-current='true'] span {
+  background: #176044;
+  border-color: #176044;
+}
+.region-hint {
+  text-align: center;
+  color: #657268;
+  font-size: 10px;
+  margin: 0 10px 14px;
+}
+.region-explorer button:focus-visible,
+.city-mountains button:focus-visible {
+  outline: 2px solid #176044;
+  outline-offset: -2px;
+}
+.region-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.city-mountains {
+  padding: 0 0 10px;
+  margin-top: 18px;
+  border-bottom: 1px solid #dfe3dc;
+}
+.city-mountains .section-heading {
+  margin: 0 0 6px;
+}
+.city-mountains .section-heading small {
+  font-size: 11px;
+  color: #657268;
+}
+.region-city-filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 8px;
+  scrollbar-width: none;
+}
+.region-city-filters::-webkit-scrollbar {
+  display: none;
+}
+.region-city-filters button {
+  min-height: 34px;
+  flex: none;
+  padding: 0 10px;
+  border: 1px solid #d6e0d5;
+  border-radius: 18px;
+  background: #fff;
+  color: #57685a;
+  font-size: 10px;
+}
+.region-city-filters button.is-active {
+  border-color: #2d4b39;
+  background: #2d4b39;
+  color: #fff;
+}
+.mountain-dialog-actions {
+  display: flex;
+  gap: 6px;
+}
+.mountain-dialog-actions button {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid #d8e2d7;
+  border-radius: 10px;
+  background: #fff;
+  color: #2d4b39;
+  font-size: 10px;
+}
+.mountain-dialog-actions .mountain-dialog-favorite.is-favorite {
+  border-color: #f0d5d3;
+  background: #fff2f1;
+  color: #bd5858;
+}
+.city-mountains-note {
+  font-size: 10px;
+  color: #738076;
+  margin: 0 0 10px;
+}
+.city-mountains .mountain-card {
+  min-height: 76px;
+}
+.city-mountains .mountain-info {
+  min-width: 0;
+}
+.city-mountains .mountain-info b {
+  overflow-wrap: anywhere;
+}
+.region-mountain-dialog {
+  width: calc(100% - 40px);
+  max-width: 360px;
+  max-height: calc(100dvh - var(--safe-top) - var(--safe-bottom) - 32px);
+  overflow-y: auto;
+  border: 1px solid #d8ddd5;
+  border-radius: 14px;
+  padding: 18px;
+  background: #f7f7f1;
+  color: #17261f;
+}
+.region-mountain-dialog::backdrop {
+  background: #17261f66;
+}
+.region-mountain-dialog .section-heading {
+  margin-top: 0;
+}
+.region-mountain-dialog p {
+  font-size: 12px;
+  color: #657268;
+}
+
+.region-explorer {
+  border-color: #e2e9df;
+  border-radius: 22px;
+  background: linear-gradient(155deg, #fff 5%, #f5f8f2 100%);
+  box-shadow: 0 12px 32px #263b2c0c;
+}
+.region-map-heading {
+  align-items: end;
+  padding: 17px 18px 4px;
+}
+.region-map-heading > div {
+  display: grid;
+  gap: 4px;
+}
+.region-map-heading > div small {
+  color: #87958a;
+  font-size: 9px;
+}
+.region-map-heading > div b {
+  color: #2d4b39;
+  font-size: 24px;
+  letter-spacing: -1px;
+}
+.region-map-heading > span {
+  padding-bottom: 3px;
+  color: #8a988b;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+.region-map-stage {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 1px;
+  padding: 0 6px;
+}
+.region-map-gesture {
+  min-width: 0;
+  touch-action: pan-y pinch-zoom;
+}
+.gyeonggi-map {
+  width: 100%;
+  max-height: 330px;
+  aspect-ratio: 1.14;
+  animation: region-map-enter 300ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+.focused-region-shapes .map-city-fill {
+  fill: #dbe8d9;
+  stroke: #fff;
+  stroke-width: 1.3;
+  outline: none;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition:
+    fill 0.2s ease,
+    filter 0.2s ease;
+}
+.focused-region-shapes .map-city-fill:focus {
+  outline: none;
+}
+.focused-region-shapes .map-city-fill:focus-visible {
+  stroke: #203c2c;
+  stroke-width: 2.5;
+}
+.region-map-north .focused-region-shapes .map-city-fill {
+  fill: #d7e8d2;
+}
+.region-map-east .focused-region-shapes .map-city-fill {
+  fill: #efe8bd;
+}
+.region-map-south .focused-region-shapes .map-city-fill {
+  fill: #f0dfc9;
+}
+.region-map-central .focused-region-shapes .map-city-fill {
+  fill: #d4e2e8;
+}
+.focused-region-shapes .map-city-fill.is-selected {
+  fill: #54745d;
+  filter: drop-shadow(0 2px 3px #203a2a40);
+}
+.focused-region-labels text {
+  fill: #425b48;
+  font-size: 10px;
+  font-weight: 650;
+  paint-order: stroke;
+  stroke: #f5f7f2d9;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.focused-region-labels text.is-selected {
+  fill: #fff;
+  stroke: #54745d;
+  font-weight: 800;
+}
+.region-arrow {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #d8e1d7;
+  background: #ffffffc9;
+  box-shadow: 0 3px 10px #294b3010;
+}
+.region-arrow svg {
+  display: block;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.region-selection-caption {
+  margin: -2px 10px 5px;
+  color: #829084;
+  font-size: 10px;
+  text-align: center;
+}
+.region-indicators {
+  margin: 4px 10px 2px;
+  gap: 4px;
+}
+.region-key {
+  padding: 0 7px;
+}
+.region-hint {
+  margin-bottom: 15px;
+}
+@keyframes region-map-enter {
+  from {
+    opacity: 0.55;
+    transform: translateX(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gyeonggi-map {
+    animation: none;
+  }
+}
+@media (hover: hover) {
+  .map-city:hover .map-city-fill {
+    fill: #8eaf96;
+  }
+  .map-city.is-active:hover .map-city-fill {
+    fill: #287452;
+  }
+  .map-city.is-selected:hover .map-city-fill {
+    fill: #083c29;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-city-fill {
+    transition: none;
+  }
+}

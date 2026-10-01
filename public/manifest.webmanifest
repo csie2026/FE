@@ -1,0 +1,17 @@
+{
+  "name": "To Peak",
+  "short_name": "ToPeak",
+  "description": "나만의 산행을 기록하는 To Peak",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8f9fa",
+  "theme_color": "#2d4b39",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
