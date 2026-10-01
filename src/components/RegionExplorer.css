@@ -221,10 +221,21 @@
 }
 .region-city-filters {
   display: flex;
+  width: 100%;
+  min-width: 0;
   gap: 6px;
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
+  user-select: none;
+  cursor: grab;
   padding: 2px 0 8px;
   scrollbar-width: none;
+}
+.region-city-filters.is-dragging,
+.region-city-filters.is-dragging button {
+  cursor: grabbing;
 }
 .region-city-filters::-webkit-scrollbar {
   display: none;

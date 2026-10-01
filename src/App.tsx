@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
 import MountainCard, { MountainArt } from './components/MountainCard';
 import MyPage from './components/profile/MyPage';
@@ -88,7 +88,7 @@ function localDate() {
 }
 
 function App() {
-  const [screen, setScreen] = useState<Screen>('login');
+  const [screen, setCurrentScreen] = useState<Screen>('login');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -105,6 +105,8 @@ function App() {
   const [date, setDate] = useState(localDate());
   const [journalMountain, setJournalMountain] = useState('');
   const [selected, setSelected] = useState(0);
+  const [exploreRegion, setExploreRegion] = useState(0);
+  const [exploreCity, setExploreCity] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const { ids: favoriteIds, toggle: toggleFavorite } = usePersistentIds(
@@ -139,7 +141,26 @@ function App() {
   );
   const favoriteMountains = mountainCatalog.filter((item) => favoriteIds.includes(item.id));
   const conqueredMountains = mountainCatalog.filter((item) => conqueredIds.includes(item.id));
-  const go = (next: Screen) => {
+  const setScreen = (next: Screen, nextPublicId = publicId, nextMountain = selected) => {
+    const previous = window.history.state;
+    const index = typeof previous?.toPeakIndex === 'number' ? previous.toPeakIndex : 0;
+    const replace = loading || next === 'login';
+    const state = {
+      toPeakScreen: next,
+      toPeakIndex: next === 'login' ? 0 : replace ? index : index + 1,
+      toPeakMountain: nextMountain,
+      toPeakPublicId: nextPublicId,
+    };
+    const url = `${window.location.pathname}${window.location.search}${next === 'publicProfile' && nextPublicId ? `#users/${nextPublicId}` : ''}`;
+    if (replace) window.history.replaceState(state, '', url);
+    else if (
+      previous?.toPeakScreen !== next ||
+      (next === 'publicProfile' && previous?.toPeakPublicId !== nextPublicId)
+    )
+      window.history.pushState(state, '', url);
+    setCurrentScreen(next);
+  };
+  const go = (next: Screen, nextMountain = selected) => {
     setError('');
     if (!me) {
       setScreen('login');
@@ -160,31 +181,76 @@ function App() {
     setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile'].includes(next));
     setJournals([]);
     setPublicProfile(null);
-    setScreen(next);
-    if (next !== 'publicProfile' && window.location.hash)
-      window.history.pushState(null, '', window.location.pathname);
+    setScreen(next, publicId, nextMountain);
   };
-  const fail = (e: unknown) => {
+  const goBack = () => {
+    if (window.history.state?.toPeakIndex > 0) window.history.back();
+    else go('explore');
+  };
+  const fail = useCallback((e: unknown) => {
     setError(e instanceof Error ? e.message : '요청에 실패했습니다.');
     if (e instanceof ApiError && e.status === 401) {
       setMe(null);
-      setScreen('login');
+      window.history.replaceState(
+        { toPeakScreen: 'login', toPeakIndex: 0 },
+        '',
+        `${window.location.pathname}${window.location.search}`,
+      );
+      setCurrentScreen('login');
     }
-  };
+  }, []);
   useEffect(() => {
     let active = true;
+    const initializeScreen = (next: Screen, id: number | null = null, mountainIndex = 0) => {
+      window.history.replaceState(
+        {
+          toPeakScreen: next,
+          toPeakIndex:
+            typeof window.history.state?.toPeakIndex === 'number'
+              ? window.history.state.toPeakIndex
+              : 0,
+          toPeakMountain: mountainIndex,
+          toPeakPublicId: id,
+        },
+        '',
+        `${window.location.pathname}${window.location.search}${next === 'publicProfile' && id ? `#users/${id}` : ''}`,
+      );
+      setCurrentScreen(next);
+    };
     api<Member>('/api/users/me')
       .then((user) => {
         if (!active) return;
         setMe(user);
         setNickname(user.nickname ?? '');
         const match = window.location.hash.match(/^#users\/(\d+)$/);
-        if (!user.profileCompleted) setScreen('setup');
+        if (!user.profileCompleted) initializeScreen('setup');
         else if (match) {
           setBusy(true);
           setPublicId(Number(match[1]));
-          setScreen('publicProfile');
-        } else setScreen('explore');
+          initializeScreen('publicProfile', Number(match[1]));
+        } else {
+          const saved = window.history.state;
+          const screens: Screen[] = [
+            'explore',
+            'detail',
+            'diary',
+            'profile',
+            'settings',
+            'ranking',
+            'setup',
+            'myJournals',
+            'favorites',
+            'conquered',
+          ];
+          if (screens.includes(saved?.toPeakScreen)) {
+            setSelected(
+              typeof saved.toPeakMountain === 'number' && mountains[saved.toPeakMountain]
+                ? saved.toPeakMountain
+                : 0,
+            );
+            initializeScreen(saved.toPeakScreen, null, saved.toPeakMountain ?? 0);
+          } else initializeScreen('explore');
+        }
       })
       .catch((e) => {
         if (active && (!(e instanceof ApiError) || e.status !== 401)) fail(e);
@@ -195,30 +261,47 @@ function App() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [fail]);
   useEffect(() => {
     const back = () => {
       if (!me) {
-        setScreen('login');
+        setCurrentScreen('login');
         return;
       }
       if (!me.profileCompleted) {
-        setScreen('setup');
+        setCurrentScreen('setup');
         return;
       }
+      const state = window.history.state;
       const match = window.location.hash.match(/^#users\/(\d+)$/);
-      if (match) {
-        const id = Number(match[1]);
-        if (screen === 'publicProfile' && publicId === id) return;
-        setBusy(true);
-        setPublicProfile(null);
-        setJournals([]);
-        setPublicId(id);
-        setScreen('publicProfile');
-      } else if (screen !== 'ranking') {
-        setBusy(true);
-        setScreen('ranking');
-      }
+      const screens: Screen[] = [
+        'explore',
+        'detail',
+        'hiking',
+        'diary',
+        'write',
+        'profile',
+        'settings',
+        'ranking',
+        'setup',
+        'myJournals',
+        'publicProfile',
+        'favorites',
+        'conquered',
+      ];
+      const next: Screen = match
+        ? 'publicProfile'
+        : screens.includes(state?.toPeakScreen)
+          ? state.toPeakScreen
+          : 'explore';
+      setError('');
+      setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile'].includes(next));
+      setJournals([]);
+      setPublicProfile(null);
+      setPublicId(match ? Number(match[1]) : (state?.toPeakPublicId ?? null));
+      if (typeof state?.toPeakMountain === 'number' && mountains[state.toPeakMountain])
+        setSelected(state.toPeakMountain);
+      setCurrentScreen(next);
     };
     window.addEventListener('popstate', back);
     return () => window.removeEventListener('popstate', back);
@@ -269,33 +352,16 @@ function App() {
     return () => {
       active = false;
     };
-  }, [screen, publicId, me?.profileCompleted]);
+  }, [screen, publicId, me?.profileCompleted, fail]);
   useEffect(() => {
-    const titles: Record<Screen, string> = {
-      login: '시작',
-      explore: '산 탐색',
-      detail: '산 상세',
-      hiking: '등산 중',
-      diary: '등산일지',
-      write: '일지 작성',
-      profile: '마이페이지',
-      settings: '설정',
-      ranking: '랭킹',
-      setup: '프로필 설정',
-      myJournals: '내 등산일지',
-      publicProfile: '사용자 프로필',
-      favorites: '찜한 산',
-      conquered: '완등한 산',
-    };
-    document.title = `${titles[screen]} | To Peak`;
-  }, [screen]);
+    document.title = 'To Peak';
+  }, []);
   const openProfile = (id: number) => {
-    window.history.pushState({ toPeakProfile: true }, '', `#users/${id}`);
     setBusy(true);
     setPublicProfile(null);
     setJournals([]);
     setPublicId(id);
-    setScreen('publicProfile');
+    setScreen('publicProfile', id);
   };
   const saveMonthlyGoal = (goal: number) => {
     setMonthlyGoalKm(goal);
@@ -323,7 +389,7 @@ function App() {
         birthYear: year,
       });
       setMe(user);
-      setScreen('explore');
+      setScreen(me?.profileCompleted ? 'profile' : 'explore');
     } catch (e) {
       fail(e);
     } finally {
@@ -413,31 +479,20 @@ function App() {
   const header = (title: string, back = false) => (
     <header className="topbar">
       {back ? (
-        <button
-          className="back"
-          onClick={() =>
-            screen === 'publicProfile' && window.history.state?.toPeakProfile
-              ? window.history.back()
-              : go(
-                  screen === 'publicProfile'
-                    ? 'ranking'
-                    : screen === 'myJournals'
-                      ? 'profile'
-                      : screen === 'favorites' || screen === 'conquered'
-                        ? 'profile'
-                        : 'explore',
-                )
-          }
-        >
+        <button className="back" onClick={goBack}>
           ‹ <span>Back</span>
         </button>
       ) : (
         <span className="header-spacer" aria-hidden="true" />
       )}
       <strong>{title}</strong>
-      <button className="icon-button" onClick={() => go('settings')} aria-label="설정">
-        {back ? '☰' : '⋯'}
-      </button>
+      {screen === 'settings' ? (
+        <span className="icon-button" aria-hidden="true" />
+      ) : (
+        <button className="icon-button" onClick={() => go('settings')} aria-label="설정">
+          {back ? '☰' : '⋯'}
+        </button>
+      )}
     </header>
   );
   const tabs = (
@@ -496,7 +551,7 @@ function App() {
       onFavoriteToggle={() => toggleFavorite(mountains[index].id)}
       onClick={() => {
         setSelected(index);
-        go('detail');
+        go('detail', index);
       }}
     />
   );
@@ -569,6 +624,10 @@ function App() {
               }
             >
               <RegionExplorer
+                activeRegionIndex={exploreRegion}
+                onRegionChange={setExploreRegion}
+                selectedCity={exploreCity}
+                onSelectCity={setExploreCity}
                 favoriteIds={favoriteIds}
                 onFavoriteToggle={toggleFavorite}
                 completedIds={conqueredIds}
@@ -685,7 +744,10 @@ function App() {
 
       {screen === 'setup' && (
         <>
-          {header('프로필 설정')}
+          {header(
+            me?.profileCompleted ? '프로필 편집' : '프로필 설정',
+            Boolean(me?.profileCompleted),
+          )}
           <form
             className="scroll-content form-content"
             onSubmit={(e) => {
@@ -721,7 +783,7 @@ function App() {
             </label>
             <p className="muted">출생연도만 입력해주세요.</p>
             <button className="submit" disabled={busy}>
-              시작하기
+              {me?.profileCompleted ? '변경 사항 저장' : '시작하기'}
             </button>
           </form>
         </>
@@ -826,6 +888,11 @@ function App() {
               monthlyGoalKm={monthlyGoalKm}
               onSaveGoal={saveMonthlyGoal}
               onSettings={() => go('settings')}
+              onEditProfile={() => {
+                setNickname(me.nickname);
+                setBirthYear(me.birthYear === null ? '' : String(me.birthYear));
+                go('setup');
+              }}
               onNavigate={go}
             />
           </div>

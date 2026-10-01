@@ -24,6 +24,14 @@ export default function CityMountainList({
   onCompletedToggle,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
+  const filterDrag = useRef<{
+    pointerId: number;
+    startX: number;
+    scrollLeft: number;
+    moved: boolean;
+  } | null>(null);
+  const suppressFilterClick = useRef(false);
+  const [draggingFilters, setDraggingFilters] = useState(false);
   const [viewed, setViewed] = useState<Mountain | null>(null);
   const [viewedCity, setViewedCity] = useState<City | null>(null);
   const visibleCities = selectedCity ? cities.filter((city) => city.id === selectedCity) : cities;
@@ -39,7 +47,55 @@ export default function CityMountainList({
         </b>
         <small>{mountainCount}곳</small>
       </div>
-      <div className="region-city-filters" aria-label="시·군 산 목록 필터">
+      <div
+        className={`region-city-filters${draggingFilters ? ' is-dragging' : ''}`}
+        aria-label="시·군 산 목록 필터, 좌우로 넘겨보세요"
+        onPointerDown={(event) => {
+          suppressFilterClick.current = false;
+          if (event.pointerType !== 'mouse' || event.button !== 0) return;
+          filterDrag.current = {
+            pointerId: event.pointerId,
+            startX: event.clientX,
+            scrollLeft: event.currentTarget.scrollLeft,
+            moved: false,
+          };
+        }}
+        onPointerMove={(event) => {
+          const drag = filterDrag.current;
+          if (!drag || drag.pointerId !== event.pointerId) return;
+          const distance = event.clientX - drag.startX;
+          if (!drag.moved && Math.abs(distance) < 5) return;
+          if (!drag.moved) {
+            drag.moved = true;
+            suppressFilterClick.current = true;
+            setDraggingFilters(true);
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }
+          event.preventDefault();
+          event.currentTarget.scrollLeft = drag.scrollLeft - distance;
+        }}
+        onPointerUp={(event) => {
+          filterDrag.current = null;
+          setDraggingFilters(false);
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            event.currentTarget.releasePointerCapture(event.pointerId);
+        }}
+        onPointerCancel={() => {
+          filterDrag.current = null;
+          setDraggingFilters(false);
+        }}
+        onLostPointerCapture={() => {
+          filterDrag.current = null;
+          setDraggingFilters(false);
+        }}
+        onClickCapture={(event) => {
+          if (suppressFilterClick.current && event.detail !== 0) {
+            event.preventDefault();
+            event.stopPropagation();
+            suppressFilterClick.current = false;
+          }
+        }}
+      >
         <button
           type="button"
           className={!selectedCity ? 'is-active' : ''}

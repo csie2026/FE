@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import type { PointerEvent } from 'react';
 import { regions } from '../data/exploreRegions';
 import CityMountainList from './CityMountainList';
@@ -9,6 +9,10 @@ const regionOrder = ['north', 'east', 'south', 'central'];
 const orderedRegions = regionOrder.map((id) => regions.find((region) => region.id === id)!);
 
 type Props = {
+  activeRegionIndex: number;
+  onRegionChange: (index: number) => void;
+  selectedCity: string | null;
+  onSelectCity: (cityId: string | null) => void;
   favoriteIds: string[];
   onFavoriteToggle: (id: string) => void;
   completedIds: string[];
@@ -16,13 +20,15 @@ type Props = {
 };
 
 export default function RegionExplorer({
+  activeRegionIndex: active,
+  onRegionChange: setActive,
+  selectedCity,
+  onSelectCity: setSelectedCity,
   favoriteIds,
   onFavoriteToggle,
   completedIds,
   onCompletedToggle,
 }: Props) {
-  const [active, setActive] = useState(0);
-  const [selectedCity, setSelectedCity] = useState<string | null>(null);
   const gesture = useRef<{
     id: number;
     x: number;
