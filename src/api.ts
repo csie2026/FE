@@ -4,6 +4,14 @@ export interface PublicProfile {
   profileImageUrl: string | null;
   score: number | null;
 }
+export interface RankingMember {
+  userId: number;
+  nickname: string;
+  profileImageUrl: string | null;
+  score: number;
+}
+
+export const getRankings = () => api<RankingMember[]>('/api/rankings');
 export interface Member extends PublicProfile {
   birthYear: number | null;
   age: number | null;

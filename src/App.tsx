@@ -3,6 +3,7 @@ import './App.css';
 import MountainCard, { MountainArt } from './components/MountainCard';
 import MyPage from './components/profile/MyPage';
 import MountainCollection from './components/profile/MountainCollection';
+import RankingPage from './components/ranking/RankingPage';
 import { regions } from './data/exploreRegions';
 import { usePersistentIds } from './hooks/usePersistentIds';
 import { useMonthlyGoals } from './hooks/useMonthlyGoals';
@@ -102,7 +103,6 @@ function App() {
   const [nickname, setNickname] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [journals, setJournals] = useState<Journal[]>([]);
-  const [ranking, setRanking] = useState<PublicProfile[]>([]);
   const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
   const [publicId, setPublicId] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -327,29 +327,27 @@ function App() {
         ? api<Journal[]>('/api/journals').then(update(setJournals))
         : screen === 'myJournals'
           ? api<Journal[]>('/api/users/me/journals').then(update(setJournals))
-          : screen === 'ranking'
-            ? api<PublicProfile[]>('/api/rankings').then(update(setRanking))
-            : screen === 'publicProfile' && publicId
+          : screen === 'publicProfile' && publicId
+            ? Promise.all([
+                api<PublicProfile>(`/api/users/${publicId}/profile`),
+                api<Journal[]>(`/api/users/${publicId}/journals`),
+              ]).then(([profile, records]) => {
+                if (active) {
+                  setPublicProfile(profile);
+                  setJournals(records);
+                }
+              })
+            : screen === 'profile'
               ? Promise.all([
-                  api<PublicProfile>(`/api/users/${publicId}/profile`),
-                  api<Journal[]>(`/api/users/${publicId}/journals`),
-                ]).then(([profile, records]) => {
+                  api<Member>('/api/users/me'),
+                  api<Journal[]>('/api/users/me/journals'),
+                ]).then(([user, records]) => {
                   if (active) {
-                    setPublicProfile(profile);
+                    setMe(user);
                     setJournals(records);
                   }
                 })
-              : screen === 'profile'
-                ? Promise.all([
-                    api<Member>('/api/users/me'),
-                    api<Journal[]>('/api/users/me/journals'),
-                  ]).then(([user, records]) => {
-                    if (active) {
-                      setMe(user);
-                      setJournals(records);
-                    }
-                  })
-                : Promise.resolve();
+              : Promise.resolve();
     request
       .catch((e) => {
         if (active) fail(e);
@@ -498,7 +496,7 @@ function App() {
     );
 
   const header = (title: string, back = false) => (
-    <header className="topbar">
+    <header className={`topbar${screen === 'ranking' ? ' topbar--ranking' : ''}`}>
       {back ? (
         <button type="button" className="back" onClick={goBack} aria-label="뒤로가기">
           ‹
@@ -995,33 +993,11 @@ function App() {
       {screen === 'ranking' && (
         <>
           {header('랭킹')}
-          <div className="scroll-content">
-            <div className="ranking-hero">
-              <span>산행 랭킹</span>
-              <b>함께 오르는 즐거움</b>
-              <div>🥈　🥇　🥉</div>
-            </div>
-            <h2>등산러</h2>
-            {busy ? (
-              <p role="status">불러오는 중…</p>
-            ) : (
-              ranking.map((user, i) => (
-                <button
-                  className="rank-row"
-                  key={user.userId}
-                  onClick={() => openProfile(user.userId)}
-                >
-                  <strong>{user.score === null ? '—' : i + 1}</strong>
-                  {avatar(user)}
-                  <b>{user.nickname}</b>
-                  <small>{scoreText(user.score)}</small>
-                </button>
-              ))
-            )}
-            {!busy && !ranking.length && <p className="muted">등록된 사용자가 없습니다.</p>}
-            <h3>이달의 추천 산</h3>
-            {mountains.map((_, i) => card(i, true))}
-          </div>
+          <RankingPage
+            currentUserId={me?.userId ?? null}
+            onSelectUser={openProfile}
+            onAuthError={fail}
+          />
         </>
       )}
     </main>
