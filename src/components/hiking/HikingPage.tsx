@@ -67,7 +67,11 @@ export default function HikingPage() {
     <div className="hiking-map" aria-label="등산 경로 선택 영역">
       <div className="hiking-selection">
     {!choosing ? <div className="hiking-welcome">
-      <span className="hiking-welcome-icon" aria-hidden="true">♧</span>
+      <span className="hiking-welcome-icon" aria-hidden="true">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 20 9 6l5 9 3-6 5 11H2Z M7 10l2 2 2-2" />
+        </svg>
+      </span>
       <h1>어느 산에 오를까요?</h1>
       <p>산과 코스를 선택하고 산행을 시작해보세요.</p>
       <button type="button" className="hiking-select-primary" onClick={() => { setError(''); setChoosing(true); setLoading(true); }}>경로 선택하기</button>

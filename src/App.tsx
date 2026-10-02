@@ -8,7 +8,8 @@ import RankingPage from './components/ranking/RankingPage';
 import { regions } from './data/exploreRegions';
 import { usePersistentIds } from './hooks/usePersistentIds';
 import { useMonthlyGoals } from './hooks/useMonthlyGoals';
-import SideDrawer, { type DrawerDestination } from './components/common/SideDrawer';
+import SideDrawer from './components/common/SideDrawer';
+import ComingSoonPage from './components/common/ComingSoonPage';
 import { api, ApiError, scoreText, type Member, type Journal, type PublicProfile } from './api';
 
 const RegionExplorer = lazy(() => import('./components/RegionExplorer'));
@@ -22,15 +23,14 @@ type Screen =
   | 'diary'
   | 'write'
   | 'profile'
-  | 'settings'
+  | 'accountSettings'
+  | 'hikingRecords'
   | 'ranking'
   | 'setup'
   | 'myJournals'
   | 'publicProfile'
   | 'favorites'
   | 'conquered'
-  | 'offline'
-  | 'sensors'
   | 'about';
 
 const mountains = [
@@ -239,14 +239,13 @@ function App() {
             'detail',
             'diary',
             'profile',
-            'settings',
+            'accountSettings',
+            'hikingRecords',
             'ranking',
             'setup',
             'myJournals',
             'favorites',
             'conquered',
-            'offline',
-            'sensors',
             'about',
           ];
           if (screens.includes(saved?.toPeakScreen)) {
@@ -290,15 +289,14 @@ function App() {
         'diary',
         'write',
         'profile',
-        'settings',
+        'accountSettings',
+        'hikingRecords',
         'ranking',
         'setup',
         'myJournals',
         'publicProfile',
         'favorites',
         'conquered',
-        'offline',
-        'sensors',
         'about',
       ];
       const next: Screen = match
@@ -386,13 +384,6 @@ function App() {
     } finally {
       setBusy(false);
     }
-  };
-  const navigateMenu = (destination: DrawerDestination) => {
-    if (destination === 'setup' && me) {
-      setNickname(me.nickname);
-      setBirthYear(me.birthYear === null ? '' : String(me.birthYear));
-    }
-    go(destination);
   };
   const saveProfile = async () => {
     const year = Number(birthYear);
@@ -553,7 +544,7 @@ function App() {
         open={drawerOpen}
         activeScreen={screen}
         onClose={() => setDrawerOpen(false)}
-        onNavigate={navigateMenu}
+        onNavigate={go}
         onLogout={() => void logout()}
         busy={busy}
       />
@@ -946,58 +937,18 @@ function App() {
         </>
       )}
 
-      {screen === 'settings' && (
-        <>
-          {header('설정', true)}
-          <div className="scroll-content settings-content">
-            <h2>계정 설정</h2>
-            <button disabled={busy} onClick={() => void logout()}>
-              로그아웃
-            </button>
-            {['계정 설정', '오프라인 지도 관리', '센서 설정', '앱 정보'].map((x) => (
-              <button
-                key={x}
-                onClick={() =>
-                  navigateMenu(
-                    x === '계정 설정'
-                      ? 'setup'
-                      : x === '오프라인 지도 관리'
-                        ? 'offline'
-                        : x === '센서 설정'
-                          ? 'sensors'
-                          : 'about',
-                  )
-                }
-              >
-                {x}
-                <span>›</span>
-              </button>
-            ))}
-          </div>
-        </>
+      {(screen === 'accountSettings' || screen === 'hikingRecords') && (
+        <ComingSoonPage
+          title={screen === 'accountSettings' ? '계정 설정' : '등산기록'}
+          header={header(screen === 'accountSettings' ? '계정 설정' : '등산기록', true)}
+        />
       )}
-
-      {(screen === 'offline' || screen === 'sensors' || screen === 'about') && (
+      {screen === 'about' && (
         <>
-          {header(
-            screen === 'offline'
-              ? '오프라인 지도 관리'
-              : screen === 'sensors'
-                ? '센서 설정'
-                : '앱 정보',
-            true,
-          )}
+          {header('앱 정보', true)}
           <section className="scroll-content utility-content">
-            <h2>
-              {screen === 'offline' ? '저장한 지도' : screen === 'sensors' ? '산행 센서' : 'ToPeak'}
-            </h2>
-            <p>
-              {screen === 'offline'
-                ? '저장한 지도가 없습니다. 오프라인 지도 저장 기능은 준비 중입니다.'
-                : screen === 'sensors'
-                  ? '센서 연결 기능은 준비 중입니다.'
-                  : '산을 탐색하고, 나만의 산행을 기록하는 아웃도어 서비스입니다.'}
-            </p>
+            <h2>ToPeak</h2>
+            <p>산을 탐색하고, 나만의 산행을 기록하는 아웃도어 서비스입니다.</p>
           </section>
         </>
       )}
