@@ -3,7 +3,7 @@ import type { Coordinate } from './types.ts';
 // 지도 전용 최근접점: 원본 GPS 좌표는 변경하지 않습니다.
 export function nearestCoursePosition(point: Coordinate, path: readonly Coordinate[]) {
   if (!path.length || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return null;
-  const longitudeScale = Math.cos(point.lat * Math.PI / 180);
+  const longitudeScale = Math.cos((point.lat * Math.PI) / 180);
   let closestDistance = Infinity;
   let progress = 0;
   for (let i = 1; i < path.length; i++) {
@@ -26,7 +26,10 @@ export function nearestCoursePosition(point: Coordinate, path: readonly Coordina
   const a = path[index];
   const b = path[Math.min(index + 1, path.length - 1)];
   const t = progress - index;
-  return { coordinate: { lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t }, progress };
+  return {
+    coordinate: { lat: a.lat + (b.lat - a.lat) * t, lng: a.lng + (b.lng - a.lng) * t },
+    progress,
+  };
 }
 
 // 지도 표시 전용: 원본 기록을 변경하지 않고 코스의 가장 멀리 진행한 위치까지 복사합니다.
@@ -46,7 +49,7 @@ export function courseProgressPath(
   }
   if (!furthest) return [];
   const index = Math.floor(furthest);
-  const result = path.slice(0, index + 1).map(point => ({ ...point }));
+  const result = path.slice(0, index + 1).map((point) => ({ ...point }));
   if (index < path.length - 1 && furthest > index) {
     const a = path[index];
     const b = path[index + 1];

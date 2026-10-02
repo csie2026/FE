@@ -1,59 +1,401 @@
-.hiking-page { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; background: #f7f7f1; }
-.hiking-selection { position: absolute; inset: 0; display: flex; flex-direction: column; overflow-y: auto; background: #edf1e6; }
-.hiking-welcome { flex: 1 0 auto; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 36px 24px; text-align: center; }
-.hiking-welcome-icon { display: grid; place-items: center; flex-shrink: 0; width: 80px; height: 80px; border-radius: 50%; background: #e4eddc; color: #31583e; font-size: 44px; }
-.hiking-welcome h1 { margin: 24px 0 8px; font-size: 24px; color: #284633; }
-.hiking-welcome p { margin: 0 0 28px; color: #66745e; font-size: 13px; line-height: 1.6; }
-.hiking-select-primary { width: 100%; max-width: 320px; border: 0; border-radius: 14px; padding: 16px; background: #31583e; color: white; font-size: 15px; font-weight: 700; }
-.hiking-selection-header { padding: 16px 18px 4px; }
-.hiking-selection-header h1 { margin: 16px 0 6px; font-size: 23px; color: #284633; }
-.hiking-selection-header p { color: #66745e; font-size: 13px; }
-.hiking-back { align-self: flex-start; border: 0; background: transparent; padding: 8px 0; color: #31583e; font-size: 13px; font-weight: 700; }
-.hiking-page > .hiking-back { margin: 0 18px 8px; }
-.hiking-search { box-sizing: border-box; width: 100%; border: 1px solid #bacbb1; border-radius: 12px; padding: 13px; background: white; font: inherit; font-size: 14px; }
-.hiking-option-list { padding: 0 18px 24px; display: flex; flex-direction: column; gap: 10px; }
-.hiking-list-caption { margin: 12px 0 2px; color: #66745e; font-size: 12px; }
-.hiking-option { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 16px; border: 1px solid #d7e1cd; border-radius: 14px; background: #fff; text-align: left; color: #536852; font: inherit; font-size: 12px; }
-.hiking-option:hover { border-color: #719268; background: #f3f7ed; }
-.hiking-option-title { display: flex; justify-content: space-between; gap: 12px; width: 100%; color: #284633; font-size: 16px; font-weight: 700; }
-.hiking-option-title > span { font-size: 22px; line-height: 18px; }
-.hiking-option-meta { color: #74816c; line-height: 1.5; }
-.hiking-difficulty { padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: 700; background: #e5efda; color: #35613d; }
-.hiking-difficulty-normal { background: #fff0cd; color: #85621b; }
-.hiking-difficulty-hard { background: #fbe5db; color: #994b30; }
-.hiking-risk { color: #994b30; line-height: 1.5; }
-.hiking-list-message { padding: 20px 18px; color: #536852; font-size: 13px; line-height: 1.7; }
-.hiking-list-message button { border: 1px solid #bacbb1; border-radius: 8px; background: white; color: #31583e; padding: 9px 12px; }
-.hiking-course-heading small { display: block; color: #66745e; font-size: 11px; line-height: 1.5; }
-.hiking-course-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 18px; }
-.hiking-heading-actions { display: flex; flex-shrink: 0; flex-direction: column; align-items: flex-end; }
-.hiking-heading-actions .hiking-back { align-self: flex-end; padding: 4px 0 0; font-size: 11px; }
-.hiking-course-heading h1 { margin: 3px 0; font-size: 21px; }
-.hiking-state { flex-shrink: 0; padding: 6px 9px; border-radius: 20px; background: #e4eddc; color: #35613d; font-size: 11px; font-weight: 700; }
-.hiking-map { position: relative; flex: 1 0 260px; min-height: 260px; background: #e5ebdf; isolation: isolate; }
-.hiking-map-canvas { position: absolute; inset: 0; }
-.hiking-map-message { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 28px; background: #edf1e6; text-align: center; font-size: 13px; z-index: 1; }
-.hiking-map-message p { line-height: 1.7; overflow-wrap: anywhere; font-size: 12px; margin: 12px 0; }
-.hiking-map-message button, .hiking-gps-status button { border: 1px solid #b1c3a7; background: #fff; color: #365440; border-radius: 8px; padding: 8px; font-size: 11px; }
-.hiking-start-marker, .hiking-summit-marker { display: block; padding: 5px 8px; border: 2px solid #fff; box-shadow: 0 2px 5px #233d3033; font-size: 11px; font-weight: 700; line-height: 1.2; white-space: nowrap; pointer-events: none; }
-.hiking-start-marker { border-radius: 14px; background: #fff; color: #285b38; border-color: #285b38; }
-.hiking-summit-marker { border-radius: 5px; background: #285b38; color: #fff; }
-.hiking-progress-marker { display: block; width: 16px; height: 16px; box-sizing: border-box; border: 3px solid #fff; border-radius: 50%; background: #285b38; box-shadow: 0 1px 5px #233d3066; pointer-events: none; }
-.hiking-locate { position: absolute; right: 14px; bottom: 16px; width: 44px; height: 44px; border: 0; border-radius: 50%; background: #fff; color: #285a42; box-shadow: 0 2px 10px #233d3026; font-size: 27px; z-index: 2; }
-.hiking-pause-badge { position: absolute; left: 12px; bottom: 16px; padding: 9px 12px; border-radius: 20px; background: #294c3cef; color: #fff; font-size: 12px; z-index: 2; }
-.hiking-panel { flex: none; padding: 14px 18px 10px; background: #fbfcf7; border-radius: 20px 20px 0 0; z-index: 2; }
-.hiking-gps-status { color: #536852; font-size: 11px; line-height: 1.5; }
-.hiking-gps-status small { display: block; font-size: 10px; }
-.hiking-gps-status button { display: block; margin-top: 7px; }
-.hiking-summit { margin: 8px 0 0; padding: 8px; border-radius: 8px; background: #e5efda; color: #365440; font-size: 12px; }
-.hiking-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; margin: 15px 0; }
-.hiking-stats dt { font-size: 10px; color: #74816c; margin-bottom: 4px; }
-.hiking-stats dd { margin: 0; font-size: clamp(18px, 5.3vw, 23px); font-weight: 800; color: #284633; font-variant-numeric: tabular-nums; }
-.hiking-stats dd small { font-size: 12px; font-weight: 500; }
-.hiking-controls { display: flex; gap: 10px; }
-.hiking-controls button { flex: 1; min-width: 0; min-height: 46px; padding: 10px 6px; border: 1px solid #bacbb1; border-radius: 12px; color: #365440; background: #f3f6ec; font-weight: 700; font-size: 13px; }
-.hiking-controls .hiking-primary { background: #31583e; border-color: #31583e; color: #fff; }
-.hiking-page button:disabled { opacity: .45; cursor: default; }
-.hiking-page button:focus-visible { outline: 2px solid #e48141; outline-offset: 3px; }
-.hiking-note { margin: 9px 0 0; color: #7b8374; font-size: 9px; line-height: 1.5; }
-@media (max-width: 340px) { .hiking-panel, .hiking-course-heading { padding-inline: 12px; } .hiking-state { font-size: 10px; } }
+.hiking-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #f7f7f1;
+}
+.hiking-selection {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #edf1e6;
+}
+.hiking-welcome {
+  flex: 1 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 24px;
+  text-align: center;
+}
+.hiking-welcome-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: #e4eddc;
+  color: #31583e;
+  font-size: 44px;
+}
+.hiking-welcome h1 {
+  margin: 24px 0 8px;
+  font-size: 24px;
+  color: #284633;
+}
+.hiking-welcome p {
+  margin: 0 0 28px;
+  color: #66745e;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.hiking-select-primary {
+  width: 100%;
+  max-width: 320px;
+  border: 0;
+  border-radius: 14px;
+  padding: 16px;
+  background: #31583e;
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+}
+.hiking-selection-header {
+  padding: 16px 18px 4px;
+}
+.hiking-selection-header h1 {
+  margin: 16px 0 6px;
+  font-size: 23px;
+  color: #284633;
+}
+.hiking-selection-header p {
+  color: #66745e;
+  font-size: 13px;
+}
+.hiking-back {
+  align-self: flex-start;
+  border: 0;
+  background: transparent;
+  padding: 8px 0;
+  color: #31583e;
+  font-size: 13px;
+  font-weight: 700;
+}
+.hiking-page > .hiking-back {
+  margin: 0 18px 8px;
+}
+.hiking-search {
+  box-sizing: border-box;
+  width: 100%;
+  border: 1px solid #bacbb1;
+  border-radius: 12px;
+  padding: 13px;
+  background: white;
+  font: inherit;
+  font-size: 14px;
+}
+.hiking-option-list {
+  padding: 0 18px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.hiking-list-caption {
+  margin: 12px 0 2px;
+  color: #66745e;
+  font-size: 12px;
+}
+.hiking-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid #d7e1cd;
+  border-radius: 14px;
+  background: #fff;
+  text-align: left;
+  color: #536852;
+  font: inherit;
+  font-size: 12px;
+}
+.hiking-option:hover {
+  border-color: #719268;
+  background: #f3f7ed;
+}
+.hiking-option-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  color: #284633;
+  font-size: 16px;
+  font-weight: 700;
+}
+.hiking-option-title > span {
+  font-size: 22px;
+  line-height: 18px;
+}
+.hiking-option-meta {
+  color: #74816c;
+  line-height: 1.5;
+}
+.hiking-difficulty {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  background: #e5efda;
+  color: #35613d;
+}
+.hiking-difficulty-normal {
+  background: #fff0cd;
+  color: #85621b;
+}
+.hiking-difficulty-hard {
+  background: #fbe5db;
+  color: #994b30;
+}
+.hiking-risk {
+  color: #994b30;
+  line-height: 1.5;
+}
+.hiking-list-message {
+  padding: 20px 18px;
+  color: #536852;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.hiking-list-message button {
+  border: 1px solid #bacbb1;
+  border-radius: 8px;
+  background: white;
+  color: #31583e;
+  padding: 9px 12px;
+}
+.hiking-course-heading small {
+  display: block;
+  color: #66745e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.hiking-course-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 18px;
+}
+.hiking-heading-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.hiking-heading-actions .hiking-back {
+  align-self: flex-end;
+  padding: 4px 0 0;
+  font-size: 11px;
+}
+.hiking-course-heading h1 {
+  margin: 3px 0;
+  font-size: 21px;
+}
+.hiking-state {
+  flex-shrink: 0;
+  padding: 6px 9px;
+  border-radius: 20px;
+  background: #e4eddc;
+  color: #35613d;
+  font-size: 11px;
+  font-weight: 700;
+}
+.hiking-map {
+  position: relative;
+  flex: 1 0 260px;
+  min-height: 260px;
+  background: #e5ebdf;
+  isolation: isolate;
+}
+.hiking-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+.hiking-map-message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 28px;
+  background: #edf1e6;
+  text-align: center;
+  font-size: 13px;
+  z-index: 1;
+}
+.hiking-map-message p {
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  margin: 12px 0;
+}
+.hiking-map-message button,
+.hiking-gps-status button {
+  border: 1px solid #b1c3a7;
+  background: #fff;
+  color: #365440;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 11px;
+}
+.hiking-start-marker,
+.hiking-summit-marker {
+  display: block;
+  padding: 5px 8px;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 5px #233d3033;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.hiking-start-marker {
+  border-radius: 14px;
+  background: #fff;
+  color: #285b38;
+  border-color: #285b38;
+}
+.hiking-summit-marker {
+  border-radius: 5px;
+  background: #285b38;
+  color: #fff;
+}
+.hiking-progress-marker {
+  display: block;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #285b38;
+  box-shadow: 0 1px 5px #233d3066;
+  pointer-events: none;
+}
+.hiking-locate {
+  position: absolute;
+  right: 14px;
+  bottom: 16px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: #285a42;
+  box-shadow: 0 2px 10px #233d3026;
+  font-size: 27px;
+  z-index: 2;
+}
+.hiking-pause-badge {
+  position: absolute;
+  left: 12px;
+  bottom: 16px;
+  padding: 9px 12px;
+  border-radius: 20px;
+  background: #294c3cef;
+  color: #fff;
+  font-size: 12px;
+  z-index: 2;
+}
+.hiking-panel {
+  flex: none;
+  padding: 14px 18px 10px;
+  background: #fbfcf7;
+  border-radius: 20px 20px 0 0;
+  z-index: 2;
+}
+.hiking-gps-status {
+  color: #536852;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.hiking-gps-status small {
+  display: block;
+  font-size: 10px;
+}
+.hiking-gps-status button {
+  display: block;
+  margin-top: 7px;
+}
+.hiking-summit {
+  margin: 8px 0 0;
+  padding: 8px;
+  border-radius: 8px;
+  background: #e5efda;
+  color: #365440;
+  font-size: 12px;
+}
+.hiking-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+  margin: 15px 0;
+}
+.hiking-stats dt {
+  font-size: 10px;
+  color: #74816c;
+  margin-bottom: 4px;
+}
+.hiking-stats dd {
+  margin: 0;
+  font-size: clamp(18px, 5.3vw, 23px);
+  font-weight: 800;
+  color: #284633;
+  font-variant-numeric: tabular-nums;
+}
+.hiking-stats dd small {
+  font-size: 12px;
+  font-weight: 500;
+}
+.hiking-controls {
+  display: flex;
+  gap: 10px;
+}
+.hiking-controls button {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 6px;
+  border: 1px solid #bacbb1;
+  border-radius: 12px;
+  color: #365440;
+  background: #f3f6ec;
+  font-weight: 700;
+  font-size: 13px;
+}
+.hiking-controls .hiking-primary {
+  background: #31583e;
+  border-color: #31583e;
+  color: #fff;
+}
+.hiking-page button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.hiking-page button:focus-visible {
+  outline: 2px solid #e48141;
+  outline-offset: 3px;
+}
+.hiking-note {
+  margin: 9px 0 0;
+  color: #7b8374;
+  font-size: 9px;
+  line-height: 1.5;
+}
+@media (max-width: 340px) {
+  .hiking-panel,
+  .hiking-course-heading {
+    padding-inline: 12px;
+  }
+  .hiking-state {
+    font-size: 10px;
+  }
+}

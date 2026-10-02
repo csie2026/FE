@@ -17,4 +17,5 @@ export type GpsPoint = Coordinate & {
   speed: number | null;
 };
 export type HikingState = 'READY' | 'TRACKING' | 'PAUSED' | 'COMPLETED';
-export type LocationStatus = 'IDLE' | 'REQUESTING' | 'AVAILABLE' | 'DENIED' | 'UNAVAILABLE' | 'TIMEOUT';
+export type LocationStatus =
+  'IDLE' | 'REQUESTING' | 'AVAILABLE' | 'DENIED' | 'UNAVAILABLE' | 'TIMEOUT';
