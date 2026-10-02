@@ -1,5 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import './App.css';
+import HikingPage from './components/hiking/HikingPage';
 import MountainCard, { MountainArt } from './components/MountainCard';
 import MyPage from './components/profile/MyPage';
 import MountainCollection from './components/profile/MountainCollection';
@@ -17,6 +18,7 @@ type Screen =
   | 'explore'
   | 'detail'
   | 'hiking'
+  | 'hikingTracking'
   | 'diary'
   | 'write'
   | 'profile'
@@ -232,6 +234,7 @@ function App() {
         } else {
           const saved = window.history.state;
           const screens: Screen[] = [
+            'hikingTracking',
             'explore',
             'detail',
             'diary',
@@ -280,6 +283,7 @@ function App() {
       const state = window.history.state;
       const match = window.location.hash.match(/^#users\/(\d+)$/);
       const screens: Screen[] = [
+        'hikingTracking',
         'explore',
         'detail',
         'hiking',
@@ -731,6 +735,13 @@ function App() {
               </button>
             </div>
           </div>
+        </>
+      )}
+
+      {screen === 'hikingTracking' && (
+        <>
+          {header('등산')}
+          <HikingPage />
         </>
       )}
 
