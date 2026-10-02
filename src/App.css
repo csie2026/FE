@@ -744,29 +744,6 @@
   border-radius: 12px;
   text-align: left;
 }
-.settings-content {
-  padding-top: 20px;
-}
-.settings-content h2 {
-  margin: 0 0 14px;
-}
-.settings-content > button {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  padding: 16px 13px;
-  margin: 7px 0;
-  border: 1px solid #e2e5df;
-  border-radius: 12px;
-  background: #fff;
-  text-align: left;
-  font-weight: 600;
-  font-size: 13px;
-}
-.settings-content > button span {
-  font-size: 21px;
-  color: #758076;
-}
 .login-screen {
   height: 100%;
   display: flex;

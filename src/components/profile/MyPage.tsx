@@ -16,7 +16,7 @@ type Props = {
   goalsError: string;
   onSettings: () => void;
   onEditProfile: () => void;
-  onNavigate: (screen: 'myJournals' | 'favorites' | 'conquered' | 'diary') => void;
+  onNavigate: (screen: 'myJournals' | 'favorites' | 'conquered' | 'hikingRecords') => void;
 };
 
 function currentMonthKey() {
@@ -425,7 +425,7 @@ export default function MyPage({
             <b>내가 찜한 산</b>
             <i>›</i>
           </button>
-          <button onClick={() => onNavigate('diary')}>
+          <button onClick={() => onNavigate('hikingRecords')}>
             <span>↗</span>
             <b>등산기록</b>
             <i>›</i>

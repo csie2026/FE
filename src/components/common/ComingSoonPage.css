@@ -1,0 +1,19 @@
+.coming-soon-content {
+  padding-top: 24px;
+}
+.coming-soon-card {
+  padding: 28px 20px;
+  border: 1px solid #d8ddd5;
+  border-radius: 16px;
+  background: #fbfbf7;
+  text-align: center;
+}
+.coming-soon-card h2 {
+  margin: 0 0 12px;
+}
+.coming-soon-card p {
+  margin: 0;
+  color: #617367;
+  font-size: 14px;
+  line-height: 1.6;
+}
