@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import './SideDrawer.css';
 
 export type DrawerDestination =
-  'explore' | 'ranking' | 'diary' | 'profile' | 'setup' | 'offline' | 'sensors' | 'about';
+  'explore' | 'ranking' | 'diary' | 'hikingTracking' | 'profile' | 'setup' | 'offline' | 'sensors' | 'about';
 type Props = {
   open: boolean;
   activeScreen: string;
@@ -15,6 +15,7 @@ const mainMenus: { destination: DrawerDestination; label: string }[] = [
   { destination: 'explore', label: '산탐색' },
   { destination: 'ranking', label: '랭킹' },
   { destination: 'diary', label: '등산일지' },
+  { destination: 'hikingTracking', label: '등산' },
   { destination: 'profile', label: '마이페이지' },
 ];
 const utilities: { destination: DrawerDestination; label: string }[] = [
