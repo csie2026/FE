@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import HikingPage from './components/hiking/HikingPage';
 import MountainCard, { MountainArt } from './components/MountainCard';
@@ -8,7 +8,8 @@ import RankingPage from './components/ranking/RankingPage';
 import { regions } from './data/exploreRegions';
 import { usePersistentIds } from './hooks/usePersistentIds';
 import { useMonthlyGoals } from './hooks/useMonthlyGoals';
-import SideDrawer from './components/common/SideDrawer';
+import { clearLegacyMemberImages } from './utils/memberImages';
+import SideDrawer, { type DrawerDestination } from './components/common/SideDrawer';
 import ComingSoonPage from './components/common/ComingSoonPage';
 import { api, ApiError, scoreText, type Member, type Journal, type PublicProfile } from './api';
 
@@ -102,6 +103,8 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [me, setMe] = useState<Member | null>(null);
+  const accountVersion = useRef(0);
+  const memberImageVersion = useRef(0);
   const [nickname, setNickname] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [journals, setJournals] = useState<Journal[]>([]);
@@ -189,20 +192,35 @@ function App() {
     if (window.history.state?.toPeakIndex > 0) window.history.back();
     else go('explore');
   };
-  const fail = useCallback((e: unknown) => {
-    setError(e instanceof Error ? e.message : '요청에 실패했습니다.');
-    if (e instanceof ApiError && e.status === 401) {
-      setDrawerOpen(false);
-      setMe(null);
-      window.history.replaceState(
-        { toPeakScreen: 'login', toPeakIndex: 0 },
-        '',
-        `${window.location.pathname}${window.location.search}`,
-      );
-      setCurrentScreen('login');
-    }
+  const clearAccount = useCallback(() => {
+    accountVersion.current += 1;
+    clearLegacyMemberImages();
+    setMe(null);
+    setNickname('');
+    setBirthYear('');
+    setJournals([]);
+    setPublicProfile(null);
+    setPublicId(null);
   }, []);
+  const fail = useCallback(
+    (e: unknown) => {
+      setError(e instanceof Error ? e.message : '요청에 실패했습니다.');
+      if (e instanceof ApiError && e.status === 401) {
+        setDrawerOpen(false);
+        clearAccount();
+        window.history.replaceState(
+          { toPeakScreen: 'login', toPeakIndex: 0 },
+          '',
+          `${window.location.pathname}${window.location.search}`,
+        );
+        setCurrentScreen('login');
+      }
+    },
+    [clearAccount],
+  );
   useEffect(() => {
+    clearLegacyMemberImages();
+    const version = accountVersion.current;
     let active = true;
     const initializeScreen = (next: Screen, id: number | null = null, mountainIndex = 0) => {
       window.history.replaceState(
@@ -222,7 +240,7 @@ function App() {
     };
     api<Member>('/api/users/me')
       .then((user) => {
-        if (!active) return;
+        if (!active || version !== accountVersion.current) return;
         setMe(user);
         setNickname(user.nickname ?? '');
         const match = window.location.hash.match(/^#users\/(\d+)$/);
@@ -259,7 +277,12 @@ function App() {
         }
       })
       .catch((e) => {
-        if (active && (!(e instanceof ApiError) || e.status !== 401)) fail(e);
+        if (
+          active &&
+          version === accountVersion.current &&
+          (!(e instanceof ApiError) || e.status !== 401)
+        )
+          fail(e);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -318,11 +341,13 @@ function App() {
   }, [me, screen, publicId]);
   useEffect(() => {
     if (!me?.profileCompleted) return;
+    const version = accountVersion.current;
+    const imageVersion = memberImageVersion.current;
     let active = true;
     const update =
       <T,>(setter: (value: T) => void) =>
       (value: T) => {
-        if (active) setter(value);
+        if (active && version === accountVersion.current) setter(value);
       };
     const request =
       screen === 'diary'
@@ -334,7 +359,7 @@ function App() {
                 api<PublicProfile>(`/api/users/${publicId}/profile`),
                 api<Journal[]>(`/api/users/${publicId}/journals`),
               ]).then(([profile, records]) => {
-                if (active) {
+                if (active && version === accountVersion.current) {
                   setPublicProfile(profile);
                   setJournals(records);
                 }
@@ -344,18 +369,26 @@ function App() {
                   api<Member>('/api/users/me'),
                   api<Journal[]>('/api/users/me/journals'),
                 ]).then(([user, records]) => {
-                  if (active) {
-                    setMe(user);
+                  if (active && version === accountVersion.current) {
+                    setMe((current) =>
+                      current?.userId === user.userId && imageVersion !== memberImageVersion.current
+                        ? {
+                            ...user,
+                            profileImageUrl: current.profileImageUrl,
+                            backgroundImageUrl: current.backgroundImageUrl,
+                          }
+                        : user,
+                    );
                     setJournals(records);
                   }
                 })
               : Promise.resolve();
     request
       .catch((e) => {
-        if (active) fail(e);
+        if (active && version === accountVersion.current) fail(e);
       })
       .finally(() => {
-        if (active) setBusy(false);
+        if (active && version === accountVersion.current) setBusy(false);
       });
     return () => {
       active = false;
@@ -374,11 +407,11 @@ function App() {
   const logout = async () => {
     setDrawerOpen(false);
     setBusy(true);
+    clearAccount();
+    setScreen('login');
+    window.history.replaceState(null, '', '/');
     try {
       await api('/api/logout', 'POST');
-      setMe(null);
-      setScreen('login');
-      window.history.replaceState(null, '', '/');
     } catch (cause) {
       fail(cause);
     } finally {
@@ -386,6 +419,7 @@ function App() {
     }
   };
   const saveProfile = async () => {
+    const version = accountVersion.current;
     const year = Number(birthYear);
     if (!nickname.trim() || nickname.trim().length > 30) {
       setError('닉네임은 1~30자로 입력해주세요.');
@@ -402,6 +436,7 @@ function App() {
         nickname: nickname.trim(),
         birthYear: year,
       });
+      if (version !== accountVersion.current) return;
       setMe(user);
       setScreen(me?.profileCompleted ? 'profile' : 'explore');
     } catch (e) {
@@ -563,6 +598,7 @@ function App() {
           <div className="login-actions">
             <button
               className="social google"
+              disabled={busy}
               onClick={() => window.location.assign('/oauth2/authorization/google')}
             >
               <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -587,6 +623,7 @@ function App() {
             </button>
             <button
               className="social kakao"
+              disabled={busy}
               onClick={() => window.location.assign('/oauth2/authorization/kakao')}
             >
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -872,7 +909,18 @@ function App() {
         <>
           <div className="scroll-content my-page-scroll">
             <MyPage
+              key={me.userId}
               member={me}
+              onMemberUpdated={(updated, kind) => {
+                memberImageVersion.current += 1;
+                const imageKey = kind === 'profile' ? 'profileImageUrl' : 'backgroundImageUrl';
+                setMe((current) =>
+                  current?.userId === updated.userId
+                    ? { ...current, [imageKey]: updated[imageKey] }
+                    : current,
+                );
+              }}
+              onAuthError={fail}
               journals={journals}
               completedCount={conqueredMountains.length}
               totalDistanceKm={0}

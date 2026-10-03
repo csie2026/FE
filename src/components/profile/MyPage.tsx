@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import type { Member, Journal } from '../../api';
+import type { Member, Journal, ApiError, MemberImageKind } from '../../api';
 import { useCustomAvatar } from '../../hooks/useCustomAvatar';
 import { useCustomBanner } from '../../hooks/useCustomBanner';
 import type { MonthlyGoals } from '../../hooks/useMonthlyGoals';
@@ -7,6 +7,8 @@ import './MyPage.css';
 
 type Props = {
   member: Member;
+  onMemberUpdated: (member: Member, kind: MemberImageKind) => void;
+  onAuthError: (error: ApiError) => void;
   journals: Journal[];
   completedCount: number;
   totalDistanceKm: number;
@@ -52,6 +54,8 @@ function OutdoorIcon({ name }: { name: string }) {
 
 export default function MyPage({
   member,
+  onMemberUpdated,
+  onAuthError,
   journals,
   completedCount,
   totalDistanceKm,
@@ -73,7 +77,7 @@ export default function MyPage({
     error: bannerError,
     saveBanner,
     removeBanner,
-  } = useCustomBanner();
+  } = useCustomBanner({ member, onMemberUpdated, onAuthError });
   const [failedBanner, setFailedBanner] = useState<string | null>(null);
   const {
     customAvatar,
@@ -81,7 +85,7 @@ export default function MyPage({
     error: avatarError,
     saveAvatar,
     removeAvatar,
-  } = useCustomAvatar();
+  } = useCustomAvatar({ member, onMemberUpdated, onAuthError });
   const [failedImages, setFailedImages] = useState<string[]>([]);
   const avatarSource =
     customAvatar && !failedImages.includes(customAvatar)
@@ -278,7 +282,7 @@ export default function MyPage({
                 type="button"
                 className="my-avatar-reset"
                 disabled={isSaving}
-                onClick={removeAvatar}
+                onClick={() => void removeAvatar()}
               >
                 기본 프로필로 변경
               </button>
@@ -514,6 +518,7 @@ export default function MyPage({
         <p>나를 닮은 풍경으로 꾸며보세요.</p>
         <button
           type="button"
+          disabled={bannerSaving}
           onClick={() => {
             bannerInputRef.current?.click();
             bannerDialogRef.current?.close();
@@ -523,8 +528,9 @@ export default function MyPage({
         </button>
         <button
           type="button"
+          disabled={bannerSaving}
           onClick={() => {
-            removeBanner();
+            void removeBanner();
             bannerDialogRef.current?.close();
           }}
         >

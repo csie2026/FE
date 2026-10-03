@@ -2,7 +2,16 @@ import { useEffect, useRef } from 'react';
 import './SideDrawer.css';
 
 export type DrawerDestination =
-  'explore' | 'ranking' | 'diary' | 'hikingTracking' | 'profile' | 'accountSettings' | 'about';
+  | 'explore'
+  | 'ranking'
+  | 'diary'
+  | 'hikingTracking'
+  | 'profile'
+  | 'accountSettings'
+  | 'setup'
+  | 'offline'
+  | 'sensors'
+  | 'about';
 type Props = {
   open: boolean;
   activeScreen: string;
