@@ -1,0 +1,551 @@
+.interactive-map {
+  position: relative;
+  color: #203229;
+  padding-bottom: 12px;
+}
+.interactive-map__map-wrap {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid #e1e7dd;
+  border-radius: 18px;
+  background: #f6f8f2;
+  box-shadow: 0 5px 18px #193d2810;
+}
+.interactive-map__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 470px;
+}
+.map-region {
+  cursor: pointer;
+  transition:
+    filter 0.18s,
+    opacity 0.18s,
+    stroke-width 0.18s;
+}
+.map-region--north {
+  fill: #b9dba4;
+}
+.map-region--east {
+  fill: #f3e39c;
+}
+.map-region--central {
+  fill: #b2d5ed;
+}
+.map-region--south {
+  fill: #f4c27d;
+}
+.map-region:hover,
+.map-region.is-selected {
+  filter: url(#regionHoverShadow);
+  stroke: #fff;
+  stroke-width: 6;
+}
+.map-region.is-selected {
+  stroke: #315e43;
+  stroke-width: 4;
+}
+.interactive-map__district-lines path {
+  stroke: #fff;
+  stroke-opacity: 0.9;
+}
+.interactive-map__seoul {
+  fill: #f9fbf7;
+  stroke: #738a78;
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+}
+.interactive-map__seoul-label {
+  font-size: 13px;
+  fill: #415647;
+  font-weight: 700;
+}
+.interactive-map__labels text {
+  font-size: 14px;
+  font-weight: 800;
+  fill: #344b39;
+  paint-order: stroke;
+  stroke: #ffffffd9;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+.mountain-marker {
+  cursor: pointer;
+  outline: none;
+}
+.mountain-marker__dot {
+  fill: #176044;
+  stroke: #fff;
+  stroke-width: 3;
+  transition: r 0.18s;
+}
+.mountain-marker__pulse {
+  fill: #176044;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.mountain-marker:hover .mountain-marker__dot,
+.mountain-marker:focus .mountain-marker__dot,
+.mountain-marker.is-selected .mountain-marker__dot {
+  fill: #e57d38;
+  r: 9;
+}
+.mountain-marker.is-selected .mountain-marker__pulse {
+  opacity: 0.38;
+  animation: mountain-pulse 1.6s ease-out infinite;
+}
+.mountain-marker text {
+  font-size: 11px;
+  font-weight: 700;
+  fill: #243a2d;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.interactive-map__tooltip {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  background: #183f2e;
+  color: white;
+  border-radius: 20px;
+  padding: 8px 13px;
+  box-shadow: 0 5px 16px #162e2240;
+  font-size: 11px;
+}
+.interactive-map__tooltip span {
+  opacity: 0.82;
+}
+.interactive-map__filters {
+  padding: 14px 2px 4px;
+}
+.interactive-map__region-tabs {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 1px 0 9px;
+}
+.interactive-map__region-tabs::-webkit-scrollbar,
+.interactive-map__city-chips::-webkit-scrollbar {
+  display: none;
+}
+.interactive-map__region-tabs button {
+  flex: none;
+  border: 1px solid #dfe5dc;
+  background: #fff;
+  color: #57675b;
+  border-radius: 18px;
+  padding: 8px 12px;
+  font-size: 11px;
+}
+.interactive-map__region-tabs button.is-active {
+  background: #1d6044;
+  border-color: #1d6044;
+  color: #fff;
+  font-weight: 700;
+}
+.interactive-map__city-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 6px 0 9px;
+}
+.interactive-map__city-title b {
+  font-size: 13px;
+}
+.interactive-map__city-title span {
+  font-size: 10px;
+  color: #889188;
+}
+.interactive-map__city-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.interactive-map__city-chips button {
+  border: 1px solid #dce3da;
+  border-radius: 18px;
+  background: #fff;
+  color: #48584d;
+  padding: 7px 10px;
+  font-size: 10px;
+  transition: all 0.14s;
+}
+.interactive-map__city-chips button.is-active {
+  border-color: #286848;
+  background: #e5f0e4;
+  color: #1d6044;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px #286848;
+}
+.interactive-map__results {
+  padding: 12px 0 6px;
+}
+.interactive-map__result-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 7px;
+}
+.interactive-map__result-heading b {
+  font-size: 14px;
+}
+.interactive-map__result-heading span {
+  font-size: 10px;
+  color: #748176;
+  background: #eaf0e7;
+  border-radius: 12px;
+  padding: 4px 8px;
+}
+.interactive-map__mountain-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #e4e8e1;
+  background: #fff;
+  border-radius: 12px;
+  padding: 9px 10px;
+  margin: 6px 0;
+  text-align: left;
+  color: #24352b;
+}
+.interactive-map__mountain-row.is-selected {
+  border-color: #387653;
+  background: #f3f8f1;
+}
+.interactive-map__mountain-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #dcebdd;
+  color: #43805a;
+  font-size: 21px;
+}
+.interactive-map__mountain-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.interactive-map__mountain-copy b {
+  font-size: 12px;
+}
+.interactive-map__mountain-copy small {
+  font-size: 10px;
+  color: #78847a;
+}
+.interactive-map__row-arrow {
+  margin-left: auto;
+  font-size: 24px;
+  color: #879287;
+}
+.interactive-map__empty {
+  padding: 18px;
+  text-align: center;
+  color: #7a867d;
+  font-size: 12px;
+}
+.interactive-map__detail {
+  position: sticky;
+  bottom: 0;
+  z-index: 4;
+  margin-top: 10px;
+  padding: 16px;
+  background: #fff;
+  border: 1px solid #dfe7dd;
+  border-radius: 17px 17px 12px 12px;
+  box-shadow: 0 -5px 24px #263f2c22;
+}
+.interactive-map__detail-close {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f4ef;
+  color: #526157;
+  font-size: 20px;
+}
+.interactive-map__detail-eyebrow {
+  font-size: 10px;
+  color: #6c806e;
+}
+.interactive-map__detail h3 {
+  margin: 5px 0 3px;
+  font-size: 20px;
+}
+.interactive-map__detail-height {
+  color: #456a4f;
+  font-size: 12px;
+}
+.interactive-map__detail-height b {
+  font-size: 18px;
+  color: #203b2b;
+}
+.interactive-map__detail p {
+  margin: 8px 0 0;
+  color: #657168;
+  font-size: 11px;
+  line-height: 1.65;
+}
+@keyframes mountain-pulse {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.48;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+@media (max-width: 360px) {
+  .interactive-map__region-tabs {
+    gap: 5px;
+  }
+  .interactive-map__region-tabs button {
+    padding: 7px 9px;
+  }
+  .interactive-map__svg {
+    min-height: 300px;
+  }
+}
+.map-region {
+  fill-opacity: 0.78;
+  stroke-width: 2;
+  transition:
+    fill-opacity 0.18s,
+    filter 0.18s,
+    stroke-width 0.18s;
+}
+.map-region--north {
+  fill: #86efac;
+  stroke: #22c55e;
+}
+.map-region--east {
+  fill: #fde047;
+  stroke: #eab308;
+}
+.map-region--central {
+  fill: #93c5fd;
+  stroke: #3b82f6;
+}
+.map-region--south {
+  fill: #fdba74;
+  stroke: #f97316;
+}
+.map-region:hover,
+.map-region.is-selected {
+  fill-opacity: 1;
+  filter: url(#regionHoverShadow);
+  stroke-width: 3;
+}
+.map-region.is-selected {
+  stroke-width: 3.5;
+}
+.mountain-marker__symbol {
+  fill: #fff !important;
+  stroke: none !important;
+  font-size: 7px !important;
+  font-weight: 900;
+}
+.interactive-map__seoul {
+  fill: #e5e7eb;
+  fill-opacity: 0.88;
+  stroke: #9ca3af;
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+}
+.interactive-map__svg {
+  max-height: none;
+  aspect-ratio: 10/11;
+}
+.interactive-map__basemap-land {
+  fill: #edf2f7;
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.interactive-map__terrain-contours path {
+  fill: none;
+  stroke: #cbd5e1;
+  stroke-width: 0.8;
+  stroke-opacity: 0.58;
+  stroke-dasharray: 2 5;
+  stroke-linecap: round;
+}
+.interactive-map__waterways path {
+  fill: none;
+  stroke: #93c5fd;
+  stroke-width: 2;
+  stroke-opacity: 0.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.interactive-map__sea-label {
+  fill: #5d88b5;
+  font-size: 11px;
+  font-weight: 600;
+  font-style: italic;
+  opacity: 0.76;
+  pointer-events: none;
+}
+.map-region {
+  fill-opacity: 0.4;
+  stroke-width: 1.5;
+  transition:
+    fill-opacity 0.18s,
+    filter 0.18s,
+    stroke-width 0.18s;
+}
+.map-region--north {
+  fill: #22c55e;
+  stroke: #22c55e;
+}
+.map-region--east {
+  fill: #eab308;
+  stroke: #eab308;
+}
+.map-region--central {
+  fill: #3b82f6;
+  stroke: #3b82f6;
+}
+.map-region--south {
+  fill: #f97316;
+  stroke: #f97316;
+}
+.map-region:hover,
+.map-region.is-selected {
+  fill-opacity: 0.65;
+  filter: url(#regionHoverShadow);
+  stroke-width: 3;
+}
+.map-region.is-selected {
+  stroke-width: 3.5;
+}
+.interactive-map__seoul {
+  fill: #e2e8f0;
+  fill-opacity: 0.7;
+  stroke: #94a3b8;
+  stroke-width: 2;
+  stroke-dasharray: 5 5;
+}
+.map-region {
+  fill-opacity: 1;
+  stroke-width: 1.5;
+  transition:
+    filter 0.16s,
+    stroke-width 0.16s;
+}
+.map-region--north {
+  fill: #dcfce7;
+  stroke: #22c55e;
+}
+.map-region--east {
+  fill: #fef9c3;
+  stroke: #eab308;
+}
+.map-region--central {
+  fill: #e0f2fe;
+  stroke: #3b82f6;
+}
+.map-region--south {
+  fill: #ffedd5;
+  stroke: #f97316;
+}
+.map-region:hover,
+.map-region.is-selected {
+  fill-opacity: 1;
+  filter: brightness(1.035) drop-shadow(0 3px 5px #263b3044);
+  stroke-width: 2.5;
+}
+.map-region.is-selected {
+  stroke-width: 4;
+}
+.interactive-map__mountain-markers {
+  pointer-events: none;
+}
+.interactive-map__mountain-markers .mountain-marker {
+  pointer-events: auto;
+}
+.interactive-map__basemap-land {
+  fill: #edf2f7;
+  stroke: #cbd5e1;
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+.interactive-map__regions {
+  fill-rule: evenodd;
+}
+.map-region {
+  stroke: #fff;
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+  fill-opacity: 1;
+  cursor: pointer;
+  transition:
+    filter 0.16s,
+    stroke-width 0.16s,
+    fill 0.16s;
+}
+.map-region--north {
+  fill: #dcfce7;
+  stroke: #22c55e;
+}
+.map-region--east {
+  fill: #fef9c3;
+  stroke: #eab308;
+}
+.map-region--central {
+  fill: #e0f2fe;
+  stroke: #3b82f6;
+}
+.map-region--south {
+  fill: #ffedd5;
+  stroke: #f97316;
+}
+.map-region:hover,
+.map-region.is-hovered {
+  filter: drop-shadow(0 2px 4px #20372b4a);
+  stroke-width: 1.7;
+}
+.map-region.is-selected {
+  filter: brightness(1.035) drop-shadow(0 2px 5px #20372b55);
+  stroke-width: 2.5;
+}
+.map-region.is-city-selected {
+  filter: brightness(0.97);
+  stroke: #1f2937;
+  stroke-width: 2;
+}
+.interactive-map__attribution {
+  position: absolute;
+  right: 8px;
+  bottom: 7px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: #fffffff0;
+  color: #68766e;
+  font-size: 8px;
+  box-shadow: 0 1px 4px #1e32211a;
+  pointer-events: none;
+}
+.interactive-map__mountain-markers {
+  position: relative;
+  z-index: 5;
+}

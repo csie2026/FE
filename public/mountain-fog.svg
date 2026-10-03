@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="600" y1="0" x2="600" y2="720" gradientUnits="userSpaceOnUse"><stop stop-color="#7B918C"/><stop offset=".48" stop-color="#C2C9BC"/><stop offset="1" stop-color="#344B41"/></linearGradient>
+    <linearGradient id="shade" x1="600" y1="0" x2="600" y2="720" gradientUnits="userSpaceOnUse"><stop stop-color="#172C25" stop-opacity=".12"/><stop offset=".52" stop-color="#172C25" stop-opacity=".16"/><stop offset="1" stop-color="#172C25" stop-opacity=".74"/></linearGradient>
+    <linearGradient id="ridge1" x1="0" y1="300" x2="1200" y2="480" gradientUnits="userSpaceOnUse"><stop stop-color="#526E66"/><stop offset=".55" stop-color="#82938B"/><stop offset="1" stop-color="#596F64"/></linearGradient>
+    <linearGradient id="ridge2" x1="100" y1="380" x2="1040" y2="600" gradientUnits="userSpaceOnUse"><stop stop-color="#52675D"/><stop offset=".5" stop-color="#718176"/><stop offset="1" stop-color="#3F5B4B"/></linearGradient>
+    <filter id="fog" x="-10%" y="-50%" width="120%" height="200%"><feGaussianBlur stdDeviation="24"/></filter>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1200v720H0z"/>
+  <path fill="#DDE0D4" fill-opacity=".34" d="m0 280 130-42 100 30 112-62 105 55 116-29 133 42 116-50 126 43 125-24 137 48v132H0z" filter="url(#fog)"/>
+  <path fill="#AEBBB0" fill-opacity=".66" d="m0 344 119-68 85 28 124-64 116 65 100-35 121 56 125-73 111 42 103-55 120 70 76-30v180H0z"/>
+  <path fill="url(#ridge1)" d="m0 393 101-50 89 24 119-67 111 48 95-29 97 48 114-57 107 39 105-66 107 59 155-29v247H0z"/>
+  <path fill="#DDE1D5" fill-opacity=".3" d="M0 415c142-51 218-12 333-31 112-19 193-51 319-21s203 4 300-22c112-21 172 14 248-6v70c-88 6-146-17-248 11-103 29-211 41-315 12-124-34-213 12-304 25-121 17-198-16-333 26z" filter="url(#fog)"/>
+  <path fill="url(#ridge2)" d="m0 493 121-53 95 33 125-57 102 37 115-62 112 55 99-49 114 47 122-60 100 48 95-32v320H0z"/>
+  <path fill="#2D493B" d="m0 559 102-36 108 29 121-63 124 58 102-40 113 46 121-58 117 48 121-56 111 41 60-20v212H0z"/>
+  <path fill="url(#shade)" d="M0 0h1200v720H0z"/>
+</svg>
