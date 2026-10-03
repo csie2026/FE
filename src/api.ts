@@ -32,6 +32,8 @@ export type JournalInput = Pick<
   Journal,
   'mountainName' | 'title' | 'content' | 'hikingDate' | 'isPublic'
 >;
+export const deleteJournal = (id: number) => api<void>(`/api/journals/${id}`, 'DELETE');
+export const getJournal = (id: number) => api<Journal>(`/api/journals/${id}`);
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {

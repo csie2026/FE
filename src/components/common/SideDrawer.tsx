@@ -9,8 +9,6 @@ export type DrawerDestination =
   | 'profile'
   | 'accountSettings'
   | 'setup'
-  | 'offline'
-  | 'sensors'
   | 'about';
 type Props = {
   open: boolean;
