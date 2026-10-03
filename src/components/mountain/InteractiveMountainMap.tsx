@@ -165,7 +165,9 @@ export default function InteractiveMountainMap({
         {visibleMountains.map((mountain) => (
           <button
             key={mountain.id}
-            className={`interactive-map__mountain-row ${selectedMountain?.id === mountain.id ? 'is-selected' : ''}`}
+            className={`interactive-map__mountain-row ${
+              selectedMountain?.id === mountain.id ? 'is-selected' : ''
+            }`}
             onClick={() => selectMountain(mountain)}
           >
             <span className="interactive-map__mountain-icon">△</span>

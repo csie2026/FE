@@ -344,7 +344,6 @@ export default function MyPage({
         </div>
         <p className="my-stats-note">산행 횟수는 등산일지 기준 · 완등은 직접 등록한 산 기준</p>
       </section>
-
       <section className="monthly-challenge">
         <div className="monthly-challenge__heading">
           <div>
@@ -367,7 +366,8 @@ export default function MyPage({
               <div className="monthly-challenge__content">
                 <strong>{item.label}</strong>
                 <b className="monthly-challenge__amount">
-                  {item.current.toLocaleString()}{' '}
+                  {item.current.toLocaleString()}
+                  {' '}
                   <small>
                     / {item.target?.toLocaleString()} {item.unit}
                   </small>
@@ -404,7 +404,6 @@ export default function MyPage({
           </small>
         )}
       </section>
-
       <section className="my-hiking-menu">
         <div className="my-section-heading">
           <div>
@@ -436,7 +435,6 @@ export default function MyPage({
           </button>
         </div>
       </section>
-
       <dialog
         ref={goalDialogRef}
         className="my-goal-dialog"

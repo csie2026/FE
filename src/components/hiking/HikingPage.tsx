@@ -100,29 +100,77 @@ export default function HikingPage() {
   const filtered = filterMountains(mountains, query);
   return (
     <section className="hiking-page" aria-label="GPS 등산 트래킹">
-    <div className="hiking-course-heading"><div><h1>산행 코스</h1><small>경로를 선택해주세요</small></div><span className="hiking-state">{labels.READY}</span></div>
-    <div className="hiking-map" aria-label="등산 경로 선택 영역">
-      <div className="hiking-selection">
-    {!choosing ? (<div className="hiking-welcome">
-      <span className="hiking-welcome-icon" aria-hidden="true">
-        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M2 20 9 6l5 9 3-6 5 11H2Z M7 10l2 2 2-2" />
-        </svg>
-      </span>
-      <h1>어느 산에 오를까요?</h1>
-      <p>산과 코스를 선택하고 산행을 시작해보세요.</p>
-      <button type="button" className="hiking-select-primary" onClick={() => { setError(''); setChoosing(true); setLoading(true); }}>경로 선택하기</button>
-    </div>) : (<>
-      <div className="hiking-selection-header">
-        <button type="button" className="hiking-back" disabled={loading} onClick={() => {
-          if (mountain) { setMountain(null); setCourses([]); setLoading(true); }
-          else setChoosing(false);
-          setError('');
-        }}>← {mountain ? '산 목록' : '돌아가기'}</button>
-        <h1>{mountain ? mountain.name : '산 선택하기'}</h1>
-        <p>{mountain ? `${mountain.city} · 높이 ${mountain.height.toLocaleString()}m` : '오르고 싶은 산을 선택해주세요.'}</p>
-        {!mountain && <input className="hiking-search" type="search" aria-label="산 이름 또는 시군 검색" placeholder="산 이름 또는 시·군 검색" value={query} onChange={event => setQuery(event.target.value)} />}
+      <div className="hiking-course-heading">
+        <div>
+          <h1>산행 코스</h1>
+          <small>경로를 선택해주세요</small>
+        </div>
+        <span className="hiking-state">{labels.READY}</span>
       </div>
+      <div className="hiking-map" aria-label="등산 경로 선택 영역">
+        <div className="hiking-selection">
+          {!choosing ? (
+            <div className="hiking-welcome">
+              <span className="hiking-welcome-icon" aria-hidden="true">
+                <svg
+                  width="44"
+                  height="44"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M2 20 9 6l5 9 3-6 5 11H2Z M7 10l2 2 2-2" />
+                </svg>
+              </span>
+              <h1>어느 산에 오를까요?</h1>
+              <p>산과 코스를 선택하고 산행을 시작해보세요.</p>
+              <button
+                type="button"
+                className="hiking-select-primary"
+                onClick={() => {
+                  setError('');
+                  setChoosing(true);
+                  setLoading(true);
+                }}
+              >
+                경로 선택하기
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="hiking-selection-header">
+                <button
+                  type="button"
+                  className="hiking-back"
+                  disabled={loading}
+                  onClick={() => {
+                    if (mountain) {
+                      setMountain(null);
+                      setCourses([]);
+                      setLoading(true);
+                    } else setChoosing(false);
+                    setError('');
+                  }}
+                >
+                  ← {mountain ? '산 목록' : '돌아가기'}</button>
+                <h1>{mountain ? mountain.name : '산 선택하기'}</h1>
+                <p>
+                  {mountain
+                    ? `${mountain.city} · 높이 ${mountain.height.toLocaleString()}m`
+                    : '오르고 싶은 산을 선택해주세요.'}
+                </p>
+                {!mountain && <input
+                    className="hiking-search"
+                    type="search"
+                    aria-label="산 이름 또는 시군 검색"
+                    placeholder="산 이름 또는 시·군 검색"
+                    value={query}
+                    onChange={event => setQuery(event.target.value)}
+                  />}
+              </div>
               {loading && (
                 <p className="hiking-list-message" role="status">
                   {mountain ? '코스를 불러오는 중…' : '산 목록을 불러오는 중…'}

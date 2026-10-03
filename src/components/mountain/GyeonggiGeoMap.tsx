@@ -84,7 +84,9 @@ export default function GyeonggiGeoMap({
             <path
               key={feature.properties.SIG_CD}
               d={path(feature) ?? ''}
-              className={`map-region map-region--${cityRegion.toLowerCase()} ${region === cityRegion ? 'is-selected' : ''} ${cities.includes(city) ? 'is-city-selected' : ''}`}
+              className={`map-region map-region--${cityRegion.toLowerCase()} ${
+                region === cityRegion ? 'is-selected' : ''
+              } ${cities.includes(city) ? 'is-city-selected' : ''}`}
               onClick={() => onRegionSelect(cityRegion)}
               role="button"
               tabIndex={0}

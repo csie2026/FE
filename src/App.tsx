@@ -11,7 +11,15 @@ import { useMonthlyGoals } from './hooks/useMonthlyGoals';
 import { clearLegacyMemberImages } from './utils/memberImages';
 import SideDrawer from './components/common/SideDrawer';
 import ComingSoonPage from './components/common/ComingSoonPage';
-import { api, ApiError, deleteJournal, getJournal, scoreText, type Member, type Journal, type PublicProfile } from './api';
+import {
+  api,
+  ApiError,
+  deleteJournal,
+  getJournal,
+  scoreText,
+  type Member,
+  type Journal,
+  type PublicProfile } from './api';
 
 const RegionExplorer = lazy(() => import('./components/RegionExplorer'));
 
@@ -149,7 +157,12 @@ function App() {
   );
   const favoriteMountains = mountainCatalog.filter((item) => favoriteIds.includes(item.id));
   const conqueredMountains = mountainCatalog.filter((item) => conqueredIds.includes(item.id));
-  const setScreen = (next: Screen, nextPublicId = publicId, nextMountain = selected, nextJournalId = journalId, replaceCurrent = false) => {
+  const setScreen = (
+    next: Screen,
+    nextPublicId = publicId,
+    nextMountain = selected,
+    nextJournalId = journalId,
+    replaceCurrent = false) => {
     const previous = window.history.state;
     const index = typeof previous?.toPeakIndex === 'number' ? previous.toPeakIndex : 0;
     const replace = loading || next === 'login' || replaceCurrent;
@@ -160,7 +173,13 @@ function App() {
       toPeakPublicId: nextPublicId,
       toPeakJournalId: nextJournalId,
     };
-    const url = `${window.location.pathname}${window.location.search}${next === 'publicProfile' && nextPublicId ? `#users/${nextPublicId}` : next === 'journalDetail' && nextJournalId ? `#journals/${nextJournalId}` : ''}`;
+    const url = `${window.location.pathname}${window.location.search}${
+      next === 'publicProfile' && nextPublicId
+        ? `#users/${nextPublicId}`
+        : next === 'journalDetail' && nextJournalId
+          ? `#journals/${nextJournalId}`
+          : ''
+    }`;
     if (replace) window.history.replaceState(state, '', url);
     else if (
       previous?.toPeakScreen !== next ||
@@ -196,7 +215,13 @@ function App() {
   };
   const goBack = () => {
     if (window.history.state?.toPeakIndex > 0) window.history.back();
-    else go(screen === 'journalDetail' ? journalDetail?.userId === me?.userId ? 'myJournals' : 'diary' : 'explore');
+    else
+      go(
+        screen === 'journalDetail'
+          ? journalDetail?.userId === me?.userId
+            ? 'myJournals'
+            : 'diary'
+          : 'explore');
   };
   const clearAccount = useCallback(() => {
     accountVersion.current += 1;
@@ -231,7 +256,11 @@ function App() {
     clearLegacyMemberImages();
     const version = accountVersion.current;
     let active = true;
-    const initializeScreen = (next: Screen, id: number | null = null, mountainIndex = 0, detailId: number | null = null) => {
+    const initializeScreen = (
+      next: Screen,
+      id: number | null = null,
+      mountainIndex = 0,
+      detailId: number | null = null) => {
       window.history.replaceState(
         {
           toPeakScreen: next,
@@ -244,7 +273,13 @@ function App() {
           toPeakJournalId: detailId,
         },
         '',
-        `${window.location.pathname}${window.location.search}${next === 'publicProfile' && id ? `#users/${id}` : next === 'journalDetail' && detailId ? `#journals/${detailId}` : ''}`,
+        `${window.location.pathname}${window.location.search}${
+          next === 'publicProfile' && id
+            ? `#users/${id}`
+            : next === 'journalDetail' && detailId
+              ? `#journals/${detailId}`
+              : ''
+        }`,
       );
       setCurrentScreen(next);
     };
@@ -260,8 +295,7 @@ function App() {
           setBusy(true);
           setJournalId(Number(detailMatch[1]));
           initializeScreen('journalDetail', null, 0, Number(detailMatch[1]));
-        }
-        else if (match) {
+        } else if (match) {
           setBusy(true);
           setPublicId(Number(match[1]));
           initializeScreen('publicProfile', Number(match[1]));
@@ -340,13 +374,17 @@ function App() {
         'conquered',
         'about',
       ];
-      const next: Screen = detailMatch ? 'journalDetail' : match
-        ? 'publicProfile'
-        : screens.includes(state?.toPeakScreen)
-          ? state.toPeakScreen
-          : 'explore';
+      const next: Screen = detailMatch
+        ? 'journalDetail'
+        : match
+          ? 'publicProfile'
+          : screens.includes(state?.toPeakScreen)
+            ? state.toPeakScreen
+            : 'explore';
       setError('');
-      setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile', 'journalDetail'].includes(next));
+      setBusy(
+        ['diary', 'myJournals', 'ranking', 'publicProfile', 'profile', 'journalDetail'].includes(
+          next));
       setJournalDetail(null);
       setJournalId(detailMatch ? Number(detailMatch[1]) : (state?.toPeakJournalId ?? null));
       setJournals([]);
@@ -373,38 +411,39 @@ function App() {
       screen === 'journalDetail' && journalId
         ? getJournal(journalId).then(update(setJournalDetail))
         : screen === 'diary'
-        ? api<Journal[]>('/api/journals').then(update(setJournals))
-        : screen === 'myJournals'
-          ? api<Journal[]>('/api/users/me/journals').then(update(setJournals))
-          : screen === 'publicProfile' && publicId
-            ? Promise.all([
-                api<PublicProfile>(`/api/users/${publicId}/profile`),
-                api<Journal[]>(`/api/users/${publicId}/journals`),
-              ]).then(([profile, records]) => {
-                if (active && version === accountVersion.current) {
-                  setPublicProfile(profile);
-                  setJournals(records);
-                }
-              })
-            : screen === 'profile'
+          ? api<Journal[]>('/api/journals').then(update(setJournals))
+          : screen === 'myJournals'
+            ? api<Journal[]>('/api/users/me/journals').then(update(setJournals))
+            : screen === 'publicProfile' && publicId
               ? Promise.all([
-                  api<Member>('/api/users/me'),
-                  api<Journal[]>('/api/users/me/journals'),
-                ]).then(([user, records]) => {
+                  api<PublicProfile>(`/api/users/${publicId}/profile`),
+                  api<Journal[]>(`/api/users/${publicId}/journals`),
+                ]).then(([profile, records]) => {
                   if (active && version === accountVersion.current) {
-                    setMe((current) =>
-                      current?.userId === user.userId && imageVersion !== memberImageVersion.current
-                        ? {
-                            ...user,
-                            profileImageUrl: current.profileImageUrl,
-                            backgroundImageUrl: current.backgroundImageUrl,
-                          }
-                        : user,
-                    );
+                    setPublicProfile(profile);
                     setJournals(records);
                   }
                 })
-              : Promise.resolve();
+              : screen === 'profile'
+                ? Promise.all([
+                    api<Member>('/api/users/me'),
+                    api<Journal[]>('/api/users/me/journals'),
+                  ]).then(([user, records]) => {
+                    if (active && version === accountVersion.current) {
+                      setMe((current) =>
+                        current?.userId === user.userId &&
+                        imageVersion !== memberImageVersion.current
+                          ? {
+                              ...user,
+                              profileImageUrl: current.profileImageUrl,
+                              backgroundImageUrl: current.backgroundImageUrl,
+                            }
+                          : user,
+                      );
+                      setJournals(records);
+                    }
+                  })
+                : Promise.resolve();
     request
       .catch((e) => {
         if (active && version === accountVersion.current) fail(e);
@@ -505,7 +544,8 @@ function App() {
     </span>
   );
   const removeJournal = async (journal: Journal) => {
-    if (screen !== 'journalDetail' || journal.userId !== me?.userId || deletingJournalId !== null) return;
+    if (screen !== 'journalDetail' || journal.userId !== me?.userId || deletingJournalId !== null)
+      return;
     if (!window.confirm('등산일지를 삭제하시겠습니까?')) return;
     const version = accountVersion.current;
     setDeletingJournalId(journal.id);
@@ -515,7 +555,10 @@ function App() {
       if (version === accountVersion.current) {
         setJournals((current) => current.filter((item) => item.id !== journal.id));
         setJournalDetail((current) => current?.id === journal.id ? null : current);
-        if (window.history.state?.toPeakScreen === 'journalDetail' && window.history.state?.toPeakJournalId === journal.id) {
+        if (
+          window.history.state?.toPeakScreen === 'journalDetail' &&
+          window.history.state?.toPeakJournalId === journal.id
+        ) {
           setBusy(true);
           setScreen('myJournals', publicId, selected, null, true);
         }
@@ -697,7 +740,6 @@ function App() {
           </div>
         </section>
       )}
-
       {screen === 'explore' && (
         <>
           {header('산 탐색')}
@@ -723,7 +765,6 @@ function App() {
           </div>
         </>
       )}
-
       {screen === 'detail' && (
         <>
           {header('상세', true)}
@@ -783,7 +824,6 @@ function App() {
           </div>
         </>
       )}
-
       {screen === 'hiking' && (
         <>
           {header('등산 중', true)}
@@ -824,14 +864,12 @@ function App() {
           </div>
         </>
       )}
-
       {screen === 'hikingTracking' && (
         <>
           {header('등산')}
           <HikingPage />
         </>
       )}
-
       {screen === 'setup' && (
         <>
           {header(
@@ -902,16 +940,36 @@ function App() {
                   <span className="badge">{journalDetail.isPublic ? '공개' : '비공개'}</span>
                   <h2>{journalDetail.title}</h2>
                   <dl className="journal-detail__meta">
-                    <div><dt>산 이름</dt><dd>{journalDetail.mountainName}</dd></div>
-                    <div><dt>등산 날짜</dt><dd>{journalDetail.hikingDate}</dd></div>
-                    <div><dt>작성자</dt><dd>{journalDetail.nickname}</dd></div>
+                    <div>
+                      <dt>산 이름</dt>
+                      <dd>{journalDetail.mountainName}</dd>
+                    </div>
+                    <div>
+                      <dt>등산 날짜</dt>
+                      <dd>{journalDetail.hikingDate}</dd>
+                    </div>
+                    <div>
+                      <dt>작성자</dt>
+                      <dd>{journalDetail.nickname}</dd>
+                    </div>
                   </dl>
                   <p className="journal-detail__content">{journalDetail.content}</p>
                 </article>
                 {journalDetail.userId === me?.userId && (
                   <div className="bottom-actions">
-                    <button type="button" className="primary" disabled={deletingJournalId !== null} onClick={() => editJournal(journalDetail)}>수정</button>
-                    <button type="button" disabled={deletingJournalId !== null} onClick={() => void removeJournal(journalDetail)}>
+                    <button
+                      type="button"
+                      className="primary"
+                      disabled={deletingJournalId !== null}
+                      onClick={() => editJournal(journalDetail)}
+                    >
+                      수정
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingJournalId !== null}
+                      onClick={() => void removeJournal(journalDetail)}
+                    >
                       {deletingJournalId === journalDetail.id ? '삭제 중…' : '삭제'}
                     </button>
                   </div>
@@ -1076,7 +1134,6 @@ function App() {
           </div>
         </>
       )}
-
       {(screen === 'accountSettings' || screen === 'hikingRecords') && (
         <ComingSoonPage
           title={screen === 'accountSettings' ? '계정 설정' : '등산기록'}
