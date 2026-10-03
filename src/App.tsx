@@ -9,9 +9,9 @@ import { regions } from './data/exploreRegions';
 import { usePersistentIds } from './hooks/usePersistentIds';
 import { useMonthlyGoals } from './hooks/useMonthlyGoals';
 import { clearLegacyMemberImages } from './utils/memberImages';
-import SideDrawer, { type DrawerDestination } from './components/common/SideDrawer';
+import SideDrawer from './components/common/SideDrawer';
 import ComingSoonPage from './components/common/ComingSoonPage';
-import { api, ApiError, scoreText, type Member, type Journal, type PublicProfile } from './api';
+import { api, ApiError, deleteJournal, getJournal, scoreText, type Member, type Journal, type PublicProfile } from './api';
 
 const RegionExplorer = lazy(() => import('./components/RegionExplorer'));
 
@@ -22,6 +22,7 @@ type Screen =
   | 'hiking'
   | 'hikingTracking'
   | 'diary'
+  | 'journalDetail'
   | 'write'
   | 'profile'
   | 'accountSettings'
@@ -108,6 +109,9 @@ function App() {
   const [nickname, setNickname] = useState('');
   const [birthYear, setBirthYear] = useState('');
   const [journals, setJournals] = useState<Journal[]>([]);
+  const [journalId, setJournalId] = useState<number | null>(null);
+  const [journalDetail, setJournalDetail] = useState<Journal | null>(null);
+  const [deletingJournalId, setDeletingJournalId] = useState<number | null>(null);
   const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
   const [publicId, setPublicId] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -145,21 +149,23 @@ function App() {
   );
   const favoriteMountains = mountainCatalog.filter((item) => favoriteIds.includes(item.id));
   const conqueredMountains = mountainCatalog.filter((item) => conqueredIds.includes(item.id));
-  const setScreen = (next: Screen, nextPublicId = publicId, nextMountain = selected) => {
+  const setScreen = (next: Screen, nextPublicId = publicId, nextMountain = selected, nextJournalId = journalId, replaceCurrent = false) => {
     const previous = window.history.state;
     const index = typeof previous?.toPeakIndex === 'number' ? previous.toPeakIndex : 0;
-    const replace = loading || next === 'login';
+    const replace = loading || next === 'login' || replaceCurrent;
     const state = {
       toPeakScreen: next,
       toPeakIndex: next === 'login' ? 0 : replace ? index : index + 1,
       toPeakMountain: nextMountain,
       toPeakPublicId: nextPublicId,
+      toPeakJournalId: nextJournalId,
     };
-    const url = `${window.location.pathname}${window.location.search}${next === 'publicProfile' && nextPublicId ? `#users/${nextPublicId}` : ''}`;
+    const url = `${window.location.pathname}${window.location.search}${next === 'publicProfile' && nextPublicId ? `#users/${nextPublicId}` : next === 'journalDetail' && nextJournalId ? `#journals/${nextJournalId}` : ''}`;
     if (replace) window.history.replaceState(state, '', url);
     else if (
       previous?.toPeakScreen !== next ||
-      (next === 'publicProfile' && previous?.toPeakPublicId !== nextPublicId)
+      (next === 'publicProfile' && previous?.toPeakPublicId !== nextPublicId) ||
+      (next === 'journalDetail' && previous?.toPeakJournalId !== nextJournalId)
     )
       window.history.pushState(state, '', url);
     setCurrentScreen(next);
@@ -190,7 +196,7 @@ function App() {
   };
   const goBack = () => {
     if (window.history.state?.toPeakIndex > 0) window.history.back();
-    else go('explore');
+    else go(screen === 'journalDetail' ? journalDetail?.userId === me?.userId ? 'myJournals' : 'diary' : 'explore');
   };
   const clearAccount = useCallback(() => {
     accountVersion.current += 1;
@@ -201,6 +207,9 @@ function App() {
     setJournals([]);
     setPublicProfile(null);
     setPublicId(null);
+    setDeletingJournalId(null);
+    setJournalId(null);
+    setJournalDetail(null);
   }, []);
   const fail = useCallback(
     (e: unknown) => {
@@ -222,7 +231,7 @@ function App() {
     clearLegacyMemberImages();
     const version = accountVersion.current;
     let active = true;
-    const initializeScreen = (next: Screen, id: number | null = null, mountainIndex = 0) => {
+    const initializeScreen = (next: Screen, id: number | null = null, mountainIndex = 0, detailId: number | null = null) => {
       window.history.replaceState(
         {
           toPeakScreen: next,
@@ -232,9 +241,10 @@ function App() {
               : 0,
           toPeakMountain: mountainIndex,
           toPeakPublicId: id,
+          toPeakJournalId: detailId,
         },
         '',
-        `${window.location.pathname}${window.location.search}${next === 'publicProfile' && id ? `#users/${id}` : ''}`,
+        `${window.location.pathname}${window.location.search}${next === 'publicProfile' && id ? `#users/${id}` : next === 'journalDetail' && detailId ? `#journals/${detailId}` : ''}`,
       );
       setCurrentScreen(next);
     };
@@ -244,7 +254,13 @@ function App() {
         setMe(user);
         setNickname(user.nickname ?? '');
         const match = window.location.hash.match(/^#users\/(\d+)$/);
+        const detailMatch = window.location.hash.match(/^#journals\/(\d+)$/);
         if (!user.profileCompleted) initializeScreen('setup');
+        else if (detailMatch) {
+          setBusy(true);
+          setJournalId(Number(detailMatch[1]));
+          initializeScreen('journalDetail', null, 0, Number(detailMatch[1]));
+        }
         else if (match) {
           setBusy(true);
           setPublicId(Number(match[1]));
@@ -304,12 +320,14 @@ function App() {
       }
       const state = window.history.state;
       const match = window.location.hash.match(/^#users\/(\d+)$/);
+      const detailMatch = window.location.hash.match(/^#journals\/(\d+)$/);
       const screens: Screen[] = [
         'hikingTracking',
         'explore',
         'detail',
         'hiking',
         'diary',
+        'journalDetail',
         'write',
         'profile',
         'accountSettings',
@@ -322,13 +340,15 @@ function App() {
         'conquered',
         'about',
       ];
-      const next: Screen = match
+      const next: Screen = detailMatch ? 'journalDetail' : match
         ? 'publicProfile'
         : screens.includes(state?.toPeakScreen)
           ? state.toPeakScreen
           : 'explore';
       setError('');
-      setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile'].includes(next));
+      setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile', 'journalDetail'].includes(next));
+      setJournalDetail(null);
+      setJournalId(detailMatch ? Number(detailMatch[1]) : (state?.toPeakJournalId ?? null));
       setJournals([]);
       setPublicProfile(null);
       setPublicId(match ? Number(match[1]) : (state?.toPeakPublicId ?? null));
@@ -350,7 +370,9 @@ function App() {
         if (active && version === accountVersion.current) setter(value);
       };
     const request =
-      screen === 'diary'
+      screen === 'journalDetail' && journalId
+        ? getJournal(journalId).then(update(setJournalDetail))
+        : screen === 'diary'
         ? api<Journal[]>('/api/journals').then(update(setJournals))
         : screen === 'myJournals'
           ? api<Journal[]>('/api/users/me/journals').then(update(setJournals))
@@ -393,7 +415,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [screen, publicId, me?.profileCompleted, fail]);
+  }, [screen, publicId, journalId, me?.profileCompleted, fail]);
   useEffect(() => {
     document.title = 'ToPeak';
   }, []);
@@ -482,12 +504,64 @@ function App() {
       )}
     </span>
   );
+  const removeJournal = async (journal: Journal) => {
+    if (screen !== 'journalDetail' || journal.userId !== me?.userId || deletingJournalId !== null) return;
+    if (!window.confirm('등산일지를 삭제하시겠습니까?')) return;
+    const version = accountVersion.current;
+    setDeletingJournalId(journal.id);
+    setError('');
+    try {
+      await deleteJournal(journal.id);
+      if (version === accountVersion.current) {
+        setJournals((current) => current.filter((item) => item.id !== journal.id));
+        setJournalDetail((current) => current?.id === journal.id ? null : current);
+        if (window.history.state?.toPeakScreen === 'journalDetail' && window.history.state?.toPeakJournalId === journal.id) {
+          setBusy(true);
+          setScreen('myJournals', publicId, selected, null, true);
+        }
+      }
+    } catch (cause) {
+      if (version === accountVersion.current) fail(cause);
+    } finally {
+      if (version === accountVersion.current) setDeletingJournalId(null);
+    }
+  };
+  const openJournal = (id: number) => {
+    setError('');
+    setBusy(true);
+    setJournalDetail(null);
+    setJournalId(id);
+    setScreen('journalDetail', publicId, selected, id);
+  };
+  const editJournal = (journal: Journal) => {
+    if (journal.userId !== me?.userId || deletingJournalId !== null) return;
+    setEditing(journal.id);
+    setTitle(journal.title);
+    setContent(journal.content);
+    setDate(journal.hikingDate);
+    setJournalMountain(journal.mountainName);
+    setIsPublic(journal.isPublic);
+    setScreen('write');
+  };
   const journalList = () =>
     busy ? (
       <p role="status">불러오는 중…</p>
     ) : journals.length ? (
       journals.map((j) => (
-        <article className="diary-card" key={j.id}>
+        <article
+          className="diary-card diary-card--clickable"
+          key={j.id}
+          role="button"
+          tabIndex={0}
+          aria-label={`${j.title} 등산일지 상세 보기`}
+          onClick={() => openJournal(j.id)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              openJournal(j.id);
+            }
+          }}
+        >
           <MountainArt small />
           <div>
             <b>{j.title}</b>
@@ -495,21 +569,6 @@ function App() {
               {j.mountainName} · {j.hikingDate} · {j.nickname}
             </small>
             <p className="journal-content">{j.content}</p>
-            {screen === 'myJournals' && (
-              <button
-                onClick={() => {
-                  setEditing(j.id);
-                  setTitle(j.title);
-                  setContent(j.content);
-                  setDate(j.hikingDate);
-                  setJournalMountain(j.mountainName);
-                  setIsPublic(j.isPublic);
-                  setScreen('write');
-                }}
-              >
-                수정
-              </button>
-            )}
           </div>
           <span className="badge">{j.isPublic ? '공개' : '비공개'}</span>
         </article>
@@ -829,6 +888,39 @@ function App() {
             </div>
             {journalList()}
           </div>
+        </>
+      )}
+      {screen === 'journalDetail' && (
+        <>
+          {header('등산일지', true)}
+          <section className="scroll-content journal-detail">
+            {busy ? (
+              <p role="status">불러오는 중…</p>
+            ) : journalDetail ? (
+              <>
+                <article className="journal-detail__body">
+                  <span className="badge">{journalDetail.isPublic ? '공개' : '비공개'}</span>
+                  <h2>{journalDetail.title}</h2>
+                  <dl className="journal-detail__meta">
+                    <div><dt>산 이름</dt><dd>{journalDetail.mountainName}</dd></div>
+                    <div><dt>등산 날짜</dt><dd>{journalDetail.hikingDate}</dd></div>
+                    <div><dt>작성자</dt><dd>{journalDetail.nickname}</dd></div>
+                  </dl>
+                  <p className="journal-detail__content">{journalDetail.content}</p>
+                </article>
+                {journalDetail.userId === me?.userId && (
+                  <div className="bottom-actions">
+                    <button type="button" className="primary" disabled={deletingJournalId !== null} onClick={() => editJournal(journalDetail)}>수정</button>
+                    <button type="button" disabled={deletingJournalId !== null} onClick={() => void removeJournal(journalDetail)}>
+                      {deletingJournalId === journalDetail.id ? '삭제 중…' : '삭제'}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="muted">등산일지를 확인할 수 없습니다.</p>
+            )}
+          </section>
         </>
       )}
       {screen === 'write' && (

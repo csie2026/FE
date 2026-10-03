@@ -92,7 +92,7 @@ export default function GyeonggiMap({ activeRegion, selectedCity, onSelect }: Pr
               dominantBaseline="central"
               className={selectedCity === city.id ? 'is-selected' : ''}
             >
-              {city.name.replace(/시|군$/, '')}
+              {city.name.replace(/(시|군)$/, '')}
             </text>
           ))}
         </g>
