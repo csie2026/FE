@@ -9,6 +9,7 @@ export function clearLegacyMemberImages() {
   }
 }
 
+// 브라우저에서 크기와 전송량을 줄여 업로드 부담을 낮춘다. 서버의 이미지 검증은 별도로 수행된다.
 export async function prepareMemberImage(
   file: File,
   maxSide: number,

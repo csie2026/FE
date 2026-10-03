@@ -15,6 +15,7 @@ type MapObjects = {
   marker: InstanceType<KakaoMaps['CustomOverlay']>;
   progress: InstanceType<KakaoMaps['Polyline']>;
 };
+// 지도 표시용 코스 진행선과 원본 GPS 기록을 구분하며, 지도 객체는 코스 변경 시 정리한다.
 export default function HikingMap({ course, position, segments, state }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const objects = useRef<MapObjects | null>(null);

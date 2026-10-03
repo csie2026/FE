@@ -4,6 +4,7 @@ Run from the repository root: python scripts/generate-gyeonggi-map.py
 Shared district edges within each city are omitted from the city outline.
 No administrative boundaries are drawn by hand.
 """
+# 행정경계 GeoJSON을 도시별 SVG 경로와 라벨 위치로 변환해 FE의 정적 지도 데이터를 생성한다.
 import collections
 import json
 import math
@@ -63,6 +64,7 @@ for name, features in groups.items():
         for ring in polygon:
             for a, b in zip(ring, ring[1:]):
                 edges[tuple(sorted((tuple(a), tuple(b))))] += 1
+    # 서로 맞닿은 행정구가 공유하는 변을 제외해 도시 내부 경계가 외곽선으로 그려지지 않게 한다.
     outline = [edge for edge, count in edges.items() if count == 1]
     all_points = [point for polygon in projected for ring in polygon for point in ring]
     # Interior anchor: maximize distance from city outline on a 2px grid.

@@ -52,6 +52,7 @@ function OutdoorIcon({ name }: { name: string }) {
   );
 }
 
+// 회원·본인 일지는 상위 화면에서 공급하고, 이미지 변경 결과도 상위 회원 상태에 반영한다.
 export default function MyPage({
   member,
   onMemberUpdated,
@@ -104,6 +105,7 @@ export default function MyPage({
     const timer = window.setInterval(() => setMonthKey(currentMonthKey()), 60_000);
     return () => window.clearInterval(timer);
   }, []);
+  // 월간 산행 횟수는 일지 날짜로 집계하며, 거리 값은 부모가 전달하는 별도 지표를 사용한다.
   const monthlyHikes = journals.filter((journal) => journal.hikingDate.startsWith(monthKey)).length;
   const stats: {
     label: string;

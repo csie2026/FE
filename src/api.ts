@@ -41,6 +41,7 @@ export class ApiError extends Error {
     this.status = status;
   }
 }
+// 세션 쿠키와 서버 오류 상태를 모든 도메인 요청에서 일관되게 다루는 공통 진입점이다.
 export async function api<T>(
   path: string,
   method = 'GET',
@@ -49,6 +50,8 @@ export async function api<T>(
 ): Promise<T> {
   const headers: Record<string, string> = {};
   const multipart = body instanceof FormData;
+  // 변경 요청은 현재 세션의 CSRF 토큰과 헤더 이름을 서버에서 받아 사용한다.
+  // FormData는 브라우저가 multipart 경계를 지정해야 하므로 Content-Type을 직접 설정하지 않는다.
   if (method !== 'GET') {
     const csrfResponse = await fetch('/api/csrf', {
       credentials: 'include',
@@ -73,6 +76,7 @@ export async function api<T>(
     const error = (await response.json().catch(() => ({}))) as { message?: string };
     throw new ApiError(response.status, error.message ?? '요청을 처리할 수 없습니다.');
   }
+  // 삭제·로그아웃의 빈 응답을 JSON으로 읽지 않아 정상 처리 후 파싱 오류가 발생하지 않게 한다.
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
 }
 
@@ -84,6 +88,7 @@ export function uploadMemberImage(kind: MemberImageKind, file: File, signal?: Ab
   body.append('file', file);
   return api<Member>(`/api/users/me/images/${kind}`, 'PUT', body, signal);
 }
+// 삭제 응답에는 회원 정보가 없으므로 다시 조회해 기본 프로필 이미지로의 복귀까지 반영한다.
 export async function deleteMemberImage(kind: MemberImageKind, signal?: AbortSignal) {
   await api<void>(`/api/users/me/images/${kind}`, 'DELETE', undefined, signal);
   return getCurrentMember(signal);

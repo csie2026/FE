@@ -9,6 +9,7 @@ const readIds = (key: string): string[] => {
   }
 };
 
+// 관심·완등 표시를 브라우저 저장소에 유지하는 UI 상태이며 회원별 서버 기록과는 별개다.
 export function usePersistentIds(key: string) {
   const [ids, setIds] = useState<string[]>(() => readIds(key));
 

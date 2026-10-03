@@ -11,6 +11,7 @@ export type Region = { id: string; name: string; cities: City[] };
 
 // 권역/시·군 분류: reference/경기도 권역.jpg (5 + 7 + 8 + 11 = 31).
 // 산 이름, 높이, 코스 거리, 난이도는 UI 검증용 mock이며 실제 산행 정보가 아니다.
+// 이 문자열 ID는 탐색용 mock 목록의 식별자이며, 산행 API의 숫자형 DB ID와 구분한다.
 function city(name: string, mountainNames: string[]): City {
   return {
     id: name,
