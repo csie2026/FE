@@ -16,6 +16,10 @@ import {
   ApiError,
   deleteJournal,
   getJournal,
+  getHikingRecords,
+  createJournal,
+  updateJournal,
+  type HikingActivity,
   scoreText,
   type Member,
   type Journal,
@@ -100,11 +104,6 @@ function BrandMark() {
   );
 }
 
-function localDate() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 // 화면 상태와 회원 상태를 한곳에서 조율하며, history/hash를 통해 뒤로 가기와 상세 링크를 복원한다.
 function App() {
   const [screen, setCurrentScreen] = useState<Screen>('login');
@@ -126,7 +125,11 @@ function App() {
   const [editing, setEditing] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [date, setDate] = useState(localDate());
+  const [date, setDate] = useState('');
+  const [hikingRecords, setHikingRecords] = useState<HikingActivity[]>([]);
+  const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
+  const selectedRecord = hikingRecords.find(record => record.id === selectedRecordId);
+  const availableRecords = hikingRecords.filter(record => record.journalId === null);
   const [journalMountain, setJournalMountain] = useState('');
   const [selected, setSelected] = useState(0);
   const [exploreRegion, setExploreRegion] = useState(0);
@@ -209,10 +212,13 @@ function App() {
       setTitle('');
       setContent('');
       setJournalMountain('');
+      setDate('');
+      setSelectedRecordId(null);
+      setHikingRecords([]);
       setIsPublic(false);
     }
     if (next === screen) return;
-    setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile'].includes(next));
+    setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile', 'write', 'hikingRecords'].includes(next));
     setJournals([]);
     setPublicProfile(null);
     setScreen(next, publicId, nextMountain);
@@ -240,6 +246,9 @@ function App() {
     setDeletingJournalId(null);
     setJournalId(null);
     setJournalDetail(null);
+    setHikingRecords([]);
+    setSelectedRecordId(null);
+    setEditing(null);
   }, []);
   const fail = useCallback(
     (e: unknown) => {
@@ -391,7 +400,7 @@ function App() {
             : 'explore';
       setError('');
       setBusy(
-        ['diary', 'myJournals', 'ranking', 'publicProfile', 'profile', 'journalDetail'].includes(
+        ['diary', 'myJournals', 'ranking', 'publicProfile', 'profile', 'journalDetail', 'write', 'hikingRecords'].includes(
           next));
       setJournalDetail(null);
       setJournalId(detailMatch ? Number(detailMatch[1]) : (state?.toPeakJournalId ?? null));
@@ -453,7 +462,9 @@ function App() {
                       setJournals(records);
                     }
                   })
-                : Promise.resolve();
+                : (screen === 'write' && !editing) || screen === 'hikingRecords'
+                  ? getHikingRecords().then(update(setHikingRecords))
+                  : Promise.resolve();
     request
       .catch((e) => {
         if (active && version === accountVersion.current) fail(e);
@@ -464,7 +475,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [screen, publicId, journalId, me?.profileCompleted, fail]);
+  }, [screen, publicId, journalId, editing, me?.profileCompleted, fail]);
   useEffect(() => {
     document.title = 'ToPeak';
   }, []);
@@ -519,25 +530,30 @@ function App() {
   };
   // 같은 작성 폼을 신규 작성과 수정에 사용하고, 저장 뒤 본인 목록을 다시 조회하도록 전환한다.
   const saveJournal = async () => {
-    if (!title.trim() || !date || date > localDate()) {
-      setError('제목과 올바른 등산 날짜를 입력해주세요.');
+    if (busy) return;
+    const version = accountVersion.current;
+    if (!title.trim() || (!editing && (!selectedRecord || selectedRecord.journalId !== null))) {
+      setError('등산기록을 선택하고 제목을 입력해주세요.');
       return;
     }
     setBusy(true);
     setError('');
     try {
-      await api(`/api/journals${editing ? `/${editing}` : ''}`, editing ? 'PATCH' : 'POST', {
-        mountainName: journalMountain || mountain.name,
-        title,
-        content,
-        hikingDate: date,
-        isPublic,
-      });
+      const input = { title, content, isPublic };
+      if (editing) await updateJournal(editing, input);
+      else await createJournal({ ...input, hikingRecordId: selectedRecord!.id });
+      if (version !== accountVersion.current) return;
       setJournals([]);
       setScreen('myJournals');
     } catch (e) {
+      if (version !== accountVersion.current) return;
       fail(e);
       setBusy(false);
+      if (e instanceof ApiError && e.status === 409) {
+        getHikingRecords().then(records => {
+          if (version === accountVersion.current) setHikingRecords(records);
+        }).catch(fail);
+      }
     }
   };
   const avatar = (profile: PublicProfile) => (
@@ -831,7 +847,7 @@ function App() {
                 className="primary"
                 onClick={() => {
                   setStarted(true);
-                  go('hiking');
+                  go('hikingTracking');
                 }}
               >
                 등산 앱과 연동하기
@@ -873,8 +889,8 @@ function App() {
               <button onClick={() => setStarted(!started)}>
                 {started ? 'Ⅱ 일시정지' : '▶ 계속하기'}
               </button>
-              <button className="primary" onClick={() => go('write')}>
-                ■ 등산 완료
+              <button className="primary" onClick={() => go('hikingTracking')}>
+                실제 산행 시작하기
               </button>
             </div>
           </div>
@@ -883,7 +899,7 @@ function App() {
       {screen === 'hikingTracking' && (
         <>
           {header('등산')}
-          <HikingPage />
+          <HikingPage onWriteJournal={(record) => { go('write'); setSelectedRecordId(record.id); }} />
         </>
       )}
       {screen === 'setup' && (
@@ -938,7 +954,7 @@ function App() {
           <div className="scroll-content">
             <div className="section-heading">
               <b>{screen === 'diary' ? '등산일지' : '내 등산일지'}</b>
-              <button onClick={() => go('write')}>기록 작성 ＋</button>
+              <button onClick={() => go('write')}>등산일지 작성 ＋</button>
             </div>
             {journalList()}
           </div>
@@ -1009,30 +1025,32 @@ function App() {
           >
             <h2>오늘의 산행을 기록해요</h2>
             <p className="muted">멋있었던 순간을 남겨보세요</p>
-            <label>
-              산 선택
-              <select
-                value={journalMountain || mountain.name}
-                onChange={(e) => setJournalMountain(e.target.value)}
-              >
-                {!mountains.some((m) => m.name === journalMountain) && journalMountain && (
-                  <option>{journalMountain}</option>
-                )}
-                {mountains.map((m) => (
-                  <option key={m.name}>{m.name}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              등산 날짜
-              <input
-                type="date"
-                value={date}
-                max={localDate()}
-                onChange={(e) => setDate(e.target.value)}
-                required
-              />
-            </label>
+            {!editing && <>
+              <label>
+                내 등산기록 선택
+                <select value={selectedRecordId ?? ''} disabled={busy}
+                  onChange={(e) => setSelectedRecordId(e.target.value ? Number(e.target.value) : null)} required>
+                  <option value="">등산기록을 선택해주세요</option>
+                  {availableRecords.map(record => <option key={record.id} value={record.id}>
+                    {record.mountainName} · {record.hikingDate} · {(record.distanceMeters / 1000).toFixed(1)}km · {Math.floor(record.elapsedMs / 60000)}분
+                  </option>)}
+                </select>
+              </label>
+              {busy ? <p role="status">등산기록을 불러오는 중…</p> : availableRecords.length === 0 &&
+                <p className="muted">작성 가능한 등산기록이 없습니다. 산행을 마치고 기록을 저장해주세요.</p>}
+            </>}
+            {(editing || selectedRecord) && (
+              <dl className="journal-write-summary" aria-label="산행 정보">
+                <div>
+                  <dt>산</dt>
+                  <dd>{editing ? journalMountain : selectedRecord?.mountainName}</dd>
+                </div>
+                <div>
+                  <dt>등산 날짜</dt>
+                  <dd>{editing ? date : selectedRecord?.hikingDate}</dd>
+                </div>
+              </dl>
+            )}
             <label>
               제목
               <input
@@ -1065,8 +1083,8 @@ function App() {
                 <span />
               </button>
             </div>
-            <button className="submit" disabled={busy}>
-              기록 저장하기
+            <button className="submit" disabled={busy || (!editing && (!selectedRecord || selectedRecord.journalId !== null))}>
+              일지 저장하기
             </button>
           </form>
         </>
@@ -1150,11 +1168,23 @@ function App() {
           </div>
         </>
       )}
-      {(screen === 'accountSettings' || screen === 'hikingRecords') && (
-        <ComingSoonPage
-          title={screen === 'accountSettings' ? '계정 설정' : '등산기록'}
-          header={header(screen === 'accountSettings' ? '계정 설정' : '등산기록', true)}
-        />
+      {screen === 'hikingRecords' && <>
+        {header('등산기록', true)}
+        <section className="scroll-content utility-content">
+          {busy ? <p role="status">불러오는 중…</p> : hikingRecords.length ? hikingRecords.map(record => (
+            <article className="profile-summary" key={record.id}>
+              <div><b>{record.mountainName}</b><p>{record.hikingDate}</p>
+                <p>{(record.distanceMeters / 1000).toFixed(1)}km · {Math.floor(record.elapsedMs / 60000)}분 · {record.completed ? '완등' : '산행 종료'}</p>
+                {record.journalId !== null
+                  ? <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
+                  : <button onClick={() => { go('write'); setSelectedRecordId(record.id); }}>등산일지 작성</button>}
+              </div>
+            </article>
+          )) : <p>저장된 등산기록이 없습니다.</p>}
+        </section>
+      </>}
+      {screen === 'accountSettings' && (
+        <ComingSoonPage title="계정 설정" header={header('계정 설정', true)} />
       )}
       {screen === 'about' && (
         <>

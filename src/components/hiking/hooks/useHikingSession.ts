@@ -4,6 +4,9 @@ import { acceptTrackPoint, hasReachedSummit, trackDistance } from '../trackUtils
 import type { GpsPoint, HikingCourse, HikingState } from '../types';
 
 type Session = {
+  startedAt: number | null;
+  endedAt: number | null;
+  clientRequestId: string | null;
   state: HikingState;
   segments: GpsPoint[][];
   activeSince: number | null;
@@ -11,6 +14,9 @@ type Session = {
   reachedSummit: boolean;
 };
 const initialSession = (): Session => ({
+  startedAt: null,
+  endedAt: null,
+  clientRequestId: null,
   state: 'READY',
   segments: [],
   activeSince: null,
@@ -49,7 +55,9 @@ export function useHikingSession(course: HikingCourse) {
   );
   const start = () => {
     if (sessionRef.current.state !== 'READY') return;
-    publish({ ...initialSession(), state: 'TRACKING', activeSince: Date.now(), segments: [[]] });
+    const startedAt = Date.now();
+    publish({ ...initialSession(), state: 'TRACKING', activeSince: startedAt, startedAt,
+      clientRequestId: crypto.randomUUID(), segments: [[]] });
   };
   const pause = () => {
     const current = sessionRef.current;
@@ -75,12 +83,14 @@ export function useHikingSession(course: HikingCourse) {
   const complete = () => {
     const current = sessionRef.current;
     if (current.state !== 'TRACKING' && current.state !== 'PAUSED') return;
+    const endedAt = Date.now();
     publish({
       ...current,
       state: 'COMPLETED',
+      endedAt,
       accumulatedMs:
         current.accumulatedMs +
-        (current.activeSince === null ? 0 : Date.now() - current.activeSince),
+        (current.activeSince === null ? 0 : endedAt - current.activeSince),
       activeSince: null,
     });
   };

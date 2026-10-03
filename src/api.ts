@@ -19,6 +19,7 @@ export interface Member extends PublicProfile {
   profileCompleted: boolean;
 }
 export interface Journal {
+  hikingRecordId: number | null;
   id: number;
   userId: number;
   nickname: string;
@@ -28,10 +29,30 @@ export interface Journal {
   hikingDate: string;
   isPublic: boolean;
 }
-export type JournalInput = Pick<
-  Journal,
-  'mountainName' | 'title' | 'content' | 'hikingDate' | 'isPublic'
->;
+export type JournalInput = Pick<Journal, 'title' | 'content' | 'isPublic'> & { hikingRecordId: number };
+export type JournalUpdate = Pick<Journal, 'title' | 'content' | 'isPublic'>;
+export interface HikingActivity {
+  id: number;
+  mountainId: number;
+  mountainName: string;
+  courseId: number | null;
+  startedAt: string;
+  endedAt: string;
+  hikingDate: string;
+  distanceMeters: number;
+  elapsedMs: number;
+  completed: boolean;
+  journalId: number | null;
+}
+export type HikingActivityInput = Pick<HikingActivity,
+  'mountainId' | 'courseId' | 'startedAt' | 'endedAt' | 'distanceMeters' | 'elapsedMs' | 'completed'
+> & { clientRequestId: string };
+export const getHikingRecords = () => api<HikingActivity[]>('/api/users/me/hiking-records');
+export const saveHikingRecord = (input: HikingActivityInput) =>
+  api<HikingActivity>('/api/users/me/hiking-records', 'POST', input);
+export const createJournal = (input: JournalInput) => api<Journal>('/api/journals', 'POST', input);
+export const updateJournal = (id: number, input: JournalUpdate) =>
+  api<Journal>(`/api/journals/${id}`, 'PATCH', input);
 export const deleteJournal = (id: number) => api<void>(`/api/journals/${id}`, 'DELETE');
 export const getJournal = (id: number) => api<Journal>(`/api/journals/${id}`);
 export class ApiError extends Error {

@@ -584,6 +584,33 @@
   font-weight: 700;
   margin: 14px 0;
 }
+.journal-write-summary {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #eef2e9;
+}
+.journal-write-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+.journal-write-summary dt {
+  flex-shrink: 0;
+  color: #748379;
+  font-size: 12px;
+}
+.journal-write-summary dd {
+  margin: 0;
+  color: #294833;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
 .form-content input,
 .form-content select,
 .form-content textarea {
