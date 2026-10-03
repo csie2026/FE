@@ -1,7 +1,7 @@
 import HikingMap from './HikingMap';
 import HikingControls from './HikingControls';
-import { useEffect, useState } from 'react';
-import { ApiError } from '../../api';
+import { useEffect, useRef, useState } from 'react';
+import { ApiError, saveHikingRecord, type HikingActivity } from '../../api';
 import { filterMountains } from './services/mountainSearch';
 import {
   getMountains,
@@ -32,7 +32,7 @@ const labels = {
   COMPLETED: '산행 완료',
 };
 // 실제 DB 산 목록에서 산·코스를 고른 뒤 상세 경로를 검증해 화면 내 GPS 기록 세션으로 연결한다.
-export default function HikingPage() {
+export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record: HikingActivity) => void }) {
   const [choosing, setChoosing] = useState(false);
   const [mountains, setMountains] = useState<MountainOption[]>([]);
   const [mountain, setMountain] = useState<MountainOption | null>(null);
@@ -91,6 +91,7 @@ export default function HikingPage() {
       <ActiveHike
         key={selected.courseId}
         course={selected}
+        onWriteJournal={onWriteJournal}
         onChangeCourse={() => {
           setSelected(null);
           setError('');
@@ -314,18 +315,42 @@ export default function HikingPage() {
 }
 
 // 위치 수신과 기록 상태를 분리해 일시정지 중에는 기록 누적을 멈추고 완료 시 위치 감시도 종료한다.
-// 이 세션은 화면 내 상태이며 서버의 등산일지 저장과 자동으로 연결되지 않는다.
+// 종료한 세션의 요약을 저장한 뒤 사용자가 일지 작성을 선택한다.
 function ActiveHike({
   course,
   onChangeCourse,
+  onWriteJournal,
 }: {
   course: HikingCourse;
   onChangeCourse: () => void;
+  onWriteJournal: (record: HikingActivity) => void;
 }) {
   const session = useHikingSession(course);
   const gps = useGeolocation(session.state !== 'COMPLETED', session.onPosition);
   const usable = gps.status === 'AVAILABLE' && gps.position && isUsablePoint(gps.position);
   const remaining = usable ? distanceMeters(gps.position!, course.summitPoint) : null;
+  const [saved, setSaved] = useState<HikingActivity | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [saveAttempt, setSaveAttempt] = useState(0);
+  const pending = useRef(false);
+  useEffect(() => {
+    if (session.state !== 'COMPLETED' || saved || pending.current ||
+        session.startedAt === null || session.endedAt === null || !session.clientRequestId) return;
+    pending.current = true;
+    setSaving(true);
+    setSaveError('');
+    saveHikingRecord({
+      mountainId: Number(course.mountainId), courseId: Number(course.courseId),
+      startedAt: new Date(session.startedAt).toISOString(),
+      endedAt: new Date(session.endedAt).toISOString(), distanceMeters: session.distance,
+      elapsedMs: session.accumulatedMs, completed: session.reachedSummit,
+      clientRequestId: session.clientRequestId,
+    }).then(setSaved).catch((cause: unknown) => {
+      setSaveError(cause instanceof Error ? cause.message : '등산기록을 저장하지 못했습니다.');
+    }).finally(() => { pending.current = false; setSaving(false); });
+  }, [session.state, session.startedAt, session.endedAt, session.clientRequestId,
+      session.distance, session.accumulatedMs, session.reachedSummit, course, saved, saveAttempt]);
   return (
     <section className="hiking-page" aria-label="GPS 등산 트래킹">
       <div className="hiking-course-heading">
@@ -335,7 +360,7 @@ function ActiveHike({
         </div>
         <div className="hiking-heading-actions">
           <span className="hiking-state">{labels[session.state]}</span>
-          {(session.state === 'READY' || session.state === 'COMPLETED') && (
+          {(session.state === 'READY' || (session.state === 'COMPLETED' && saved)) && (
             <button type="button" className="hiking-back" onClick={onChangeCourse}>
               경로 변경
             </button>
@@ -351,7 +376,7 @@ function ActiveHike({
       <div className="hiking-panel">
         <div className="hiking-gps-status" role="status">
           {session.state === 'COMPLETED'
-            ? 'GPS 추적 종료 · 기록은 이 화면에서만 유지됩니다.'
+            ? saved ? 'GPS 추적 종료 · 등산기록이 저장되었습니다.' : 'GPS 추적 종료 · 등산기록을 저장해주세요.'
             : messages[gps.status]}
           {session.state !== 'COMPLETED' && gps.status === 'AVAILABLE' && gps.position && (
             <small>
@@ -393,9 +418,21 @@ function ActiveHike({
             </dd>
           </div>
         </dl>
-        <HikingControls {...session} canStart={Boolean(usable)} />
+        {session.state !== 'COMPLETED' ? (
+          <HikingControls {...session} canStart={Boolean(usable)} />
+        ) : (
+          <div className="hiking-controls">
+            {saving && <p role="status">등산기록 저장 중…</p>}
+            {saveError && <p role="alert">{saveError}</p>}
+            {!saved && !saving && <button type="button" onClick={() => setSaveAttempt(value => value + 1)}>저장 다시 시도</button>}
+            {saved && <>
+              <button type="button" className="hiking-primary" onClick={() => onWriteJournal(saved)}>등산일지 작성</button>
+              <button type="button" onClick={() => { setSaved(null); setSaveError(''); session.reset(); }}>새 산행 준비</button>
+            </>}
+          </div>
+        )}
         <p className="hiking-note">
-          화면을 켠 상태에서 이용해주세요. 화면 이탈·새로고침 시 기록이 사라집니다. 화면이
+          화면을 켠 상태에서 이용해주세요. 저장 전 화면 이탈·새로고침 시 기록이 사라집니다. 화면이
           비활성화되면 자동 일시정지됩니다.
         </p>
       </div>
