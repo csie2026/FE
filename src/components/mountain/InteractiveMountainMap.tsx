@@ -56,6 +56,7 @@ interface InteractiveMountainMapProps {
   onMountainSelect?: (mountain: Mountain) => void;
 }
 
+// 권역·시군 필터와 지도·목록의 산 선택 상태를 공유한다. 전달된 산 목록이 없으면 샘플 데이터를 사용한다.
 export default function InteractiveMountainMap({
   mountains = sampleMountains,
   onMountainSelect,

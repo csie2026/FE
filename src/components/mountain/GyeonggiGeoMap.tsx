@@ -41,6 +41,7 @@ const project = (lat: number, lng: number) => {
   return point ? { x: point[0], y: point[1] } : { x: 0, y: 0 };
 };
 
+// 행정경계와 산 좌표에 같은 투영을 적용해 지도 영역 선택과 산 마커 선택을 연결한다.
 export default function GyeonggiGeoMap({
   region,
   cities,

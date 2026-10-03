@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { GpsPoint, LocationStatus } from '../types';
 
+// GPS 수신 권한·오류 상태를 기록 로직과 분리하고, 감시 종료 후 콜백이 화면 상태를 바꾸지 않게 한다.
 export function useGeolocation(enabled: boolean, onPosition: (point: GpsPoint) => void) {
   const [position, setPosition] = useState<GpsPoint | null>(null);
   const [status, setStatus] = useState<LocationStatus>('IDLE');

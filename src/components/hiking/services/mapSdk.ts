@@ -23,6 +23,7 @@ declare global {
   }
 }
 let pending: Promise<KakaoMaps> | null = null;
+// 여러 지도에서 하나의 SDK 로딩 작업을 공유하고, 실패 시 공유 Promise를 해제해 재시도할 수 있게 한다.
 export function loadMapSdk(): Promise<KakaoMaps> {
   if (pending) return pending;
   const key = import.meta.env.VITE_KAKAO_MAP_JAVASCRIPT_KEY?.trim();

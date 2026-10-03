@@ -3,6 +3,7 @@ import type { Coordinate } from './types.ts';
 // 지도 전용 최근접점: 원본 GPS 좌표는 변경하지 않습니다.
 export function nearestCoursePosition(point: Coordinate, path: readonly Coordinate[]) {
   if (!path.length || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return null;
+  // 위도에 따른 경도 길이 차이를 보정한 뒤 코스 선분에 투영해 표시 위치를 구한다.
   const longitudeScale = Math.cos((point.lat * Math.PI) / 180);
   let closestDistance = Infinity;
   let progress = 0;

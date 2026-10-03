@@ -14,6 +14,7 @@ export interface MemberImageOptions {
   onAuthError: (error: ApiError) => void;
 }
 
+// 프로필·배경 업로드를 공통 처리하며 계정 변경·화면 이탈 시 진행 중인 요청을 취소한다.
 export function useMemberImage(kind: MemberImageKind, options: MemberImageOptions) {
   const { member, onMemberUpdated, onAuthError } = options;
   const [isSaving, setIsSaving] = useState(false);
@@ -48,6 +49,7 @@ export function useMemberImage(kind: MemberImageKind, options: MemberImageOption
         updated = await deleteMemberImage(kind, controller.signal);
       }
       if (controller.signal.aborted) return;
+      // 요청 중 서버 세션의 계정이 바뀌어도 다른 회원의 이미지 상태가 현재 화면에 섞이지 않게 한다.
       if (updated.userId !== member.userId)
         throw new ApiError(401, '로그인 계정이 변경되었어요. 다시 로그인해 주세요.');
       onMemberUpdated(updated, kind);

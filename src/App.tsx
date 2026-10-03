@@ -105,6 +105,7 @@ function localDate() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// 화면 상태와 회원 상태를 한곳에서 조율하며, history/hash를 통해 뒤로 가기와 상세 링크를 복원한다.
 function App() {
   const [screen, setCurrentScreen] = useState<Screen>('login');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -157,6 +158,8 @@ function App() {
   );
   const favoriteMountains = mountainCatalog.filter((item) => favoriteIds.includes(item.id));
   const conqueredMountains = mountainCatalog.filter((item) => conqueredIds.includes(item.id));
+  // 상세 링크에는 대상 ID를, history에는 화면과 선택 산을 저장한다.
+  // 초기화·로그인·삭제 후 이동은 replace로 처리해 불필요하거나 유효하지 않은 이력을 남기지 않는다.
   const setScreen = (
     next: Screen,
     nextPublicId = publicId,
@@ -189,6 +192,7 @@ function App() {
       window.history.pushState(state, '', url);
     setCurrentScreen(next);
   };
+  // 일반 메뉴 이동은 세션과 프로필 완료 여부를 먼저 확인하고, 이전 화면의 조회 결과를 비운다.
   const go = (next: Screen, nextMountain = selected) => {
     setDrawerOpen(false);
     setError('');
@@ -223,6 +227,7 @@ function App() {
             : 'diary'
           : 'explore');
   };
+  // 계정 세대를 증가시켜 로그아웃 이전의 비동기 응답이 새 회원 상태에 반영되지 않게 한다.
   const clearAccount = useCallback(() => {
     accountVersion.current += 1;
     clearLegacyMemberImages();
@@ -252,6 +257,7 @@ function App() {
     },
     [clearAccount],
   );
+  // 첫 진입 시 서버 세션을 확인한 뒤 프로필 설정, 상세 hash, 저장된 화면 순서로 진입 위치를 결정한다.
   useEffect(() => {
     clearLegacyMemberImages();
     const version = accountVersion.current;
@@ -341,6 +347,8 @@ function App() {
       active = false;
     };
   }, [fail]);
+  // 브라우저 뒤로 가기는 새 이력을 만들지 않고 기존 화면과 대상 ID를 복원한다.
+  // 복원할 화면도 현재 로그인·프로필 상태의 제한을 따른다.
   useEffect(() => {
     const back = () => {
       setDrawerOpen(false);
@@ -397,9 +405,11 @@ function App() {
     window.addEventListener('popstate', back);
     return () => window.removeEventListener('popstate', back);
   }, [me, screen, publicId]);
+  // 화면별로 본인 일지·공개 일지·타인 프로필을 조회하고, 화면 이탈이나 계정 변경 뒤의 응답은 버린다.
   useEffect(() => {
     if (!me?.profileCompleted) return;
     const version = accountVersion.current;
+    // 마이페이지 조회 중 이미지가 갱신되면 늦게 도착한 회원 응답이 최신 이미지 URL을 덮어쓰지 않게 한다.
     const imageVersion = memberImageVersion.current;
     let active = true;
     const update =
@@ -479,6 +489,7 @@ function App() {
       setBusy(false);
     }
   };
+  // 프로필 저장 응답을 회원 상태에 반영한 뒤, 최초 설정과 기존 프로필 편집의 복귀 화면을 구분한다.
   const saveProfile = async () => {
     const version = accountVersion.current;
     const year = Number(birthYear);
@@ -506,6 +517,7 @@ function App() {
       setBusy(false);
     }
   };
+  // 같은 작성 폼을 신규 작성과 수정에 사용하고, 저장 뒤 본인 목록을 다시 조회하도록 전환한다.
   const saveJournal = async () => {
     if (!title.trim() || !date || date > localDate()) {
       setError('제목과 올바른 등산 날짜를 입력해주세요.');
@@ -543,6 +555,8 @@ function App() {
       )}
     </span>
   );
+  // 화면에서 중복 삭제와 타인 일지 삭제를 막고, 실제 소유권은 서버가 다시 검증한다.
+  // 삭제한 상세 화면은 history에서 교체해 뒤로 가기로 같은 항목을 다시 열지 않게 한다.
   const removeJournal = async (journal: Journal) => {
     if (screen !== 'journalDetail' || journal.userId !== me?.userId || deletingJournalId !== null)
       return;
@@ -569,6 +583,7 @@ function App() {
       if (version === accountVersion.current) setDeletingJournalId(null);
     }
   };
+  // 목록의 ID로 상세 API를 다시 조회하므로 본문과 접근 권한은 서버의 최신 상태를 따른다.
   const openJournal = (id: number) => {
     setError('');
     setBusy(true);
@@ -576,6 +591,7 @@ function App() {
     setJournalId(id);
     setScreen('journalDetail', publicId, selected, id);
   };
+  // 본인 일지의 값과 ID를 작성 폼에 넘겨 신규 작성 대신 기존 일지를 수정하게 한다.
   const editJournal = (journal: Journal) => {
     if (journal.userId !== me?.userId || deletingJournalId !== null) return;
     setEditing(journal.id);

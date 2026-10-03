@@ -5,6 +5,7 @@ import CityMountainList from './CityMountainList';
 import GyeonggiMap from './GyeonggiMap';
 import './RegionExplorer.css';
 
+// 화면의 권역 순서는 데이터 배열 순서와 별도로 관리하며 지도 선택과 스와이프가 같은 순서를 따른다.
 const regionOrder = ['north', 'east', 'south', 'central'];
 const orderedRegions = regionOrder.map((id) => regions.find((region) => region.id === id)!);
 
@@ -39,6 +40,7 @@ export default function RegionExplorer({
   const suppressClick = useRef(false);
   const region = orderedRegions[active];
 
+  // 권역을 바꾸면 이전 시·군 필터를 해제해 새 권역의 산이 잘못 숨겨지지 않게 한다.
   function changeRegion(index: number) {
     const next = Math.max(0, Math.min(orderedRegions.length - 1, index));
     if (next !== active) {
@@ -64,6 +66,8 @@ export default function RegionExplorer({
     };
   }
 
+  // 세로 스크롤은 그대로 허용하고 가로 제스처가 확정될 때만 포인터를 잡는다.
+  // 스와이프 직후 발생하는 클릭은 별도로 억제해 지도가 함께 선택되지 않게 한다.
   function onPointerMove(event: PointerEvent<HTMLDivElement>) {
     const current = gesture.current;
     if (!current || current.id !== event.pointerId) return;

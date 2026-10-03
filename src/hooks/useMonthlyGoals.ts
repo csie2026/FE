@@ -23,6 +23,7 @@ function readGoals(): MonthlyGoals {
         };
       }
     }
+    // 새 목표 형식이 없으면 기존 거리 목표를 읽어 브라우저에 남아 있는 설정을 이어받는다.
     const legacyGoal = Number(localStorage.getItem('topeak.monthlyGoalKm'));
     return { distanceKm: isGoal(legacyGoal) ? legacyGoal : null, hikeCount: null };
   } catch {

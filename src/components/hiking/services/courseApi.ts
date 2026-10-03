@@ -29,6 +29,8 @@ export const getMountains = () => api<MountainOption[]>('/api/mountains');
 export const getCourses = (id: number) => api<CourseOption[]>(`/api/mountains/${id}/courses`);
 export const getCourse = (id: number) => api<CourseDetail>(`/api/courses/${id}`);
 
+// 선택한 산과 코스의 DB 관계를 확인하고 GeoJSON의 [경도, 위도]를 지도용 좌표 객체로 바꾼다.
+// 문자열 ID로 변환해도 원래 산·코스 ID의 연결은 유지한다.
 export function toHikingCourse(mountain: MountainOption, detail: CourseDetail): HikingCourse {
   if (
     detail.course.mountainId !== mountain.id ||

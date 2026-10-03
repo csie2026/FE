@@ -2,6 +2,7 @@ import { GPS_FILTER, SUMMIT_RADIUS_METERS } from './config.ts';
 import type { Coordinate, GpsPoint } from './types.ts';
 
 const radians = (degrees: number) => (degrees * Math.PI) / 180;
+// 위경도 차이를 지표면 거리로 바꾸는 구면 계산이며 결과 단위는 미터다.
 export function distanceMeters(a: Coordinate, b: Coordinate): number {
   const h =
     Math.sin(radians(b.lat - a.lat) / 2) ** 2 +
@@ -22,6 +23,7 @@ export function isUsablePoint(point: GpsPoint, now = Date.now()): boolean {
     point.timestamp <= now
   );
 }
+// 오래된·부정확한 표본과 불가능한 속도·시간 역전을 걸러 GPS 흔들림이 산행 거리로 누적되는 것을 줄인다.
 export function acceptTrackPoint(point: GpsPoint, previous?: GpsPoint): boolean {
   if (!isUsablePoint(point)) return false;
   if (!previous) return true;

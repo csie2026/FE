@@ -16,6 +16,7 @@ const allFeatures = (mapData as unknown as FeatureCollection<Geometry, DistrictP
 const gyeonggiFeatures = allFeatures.filter(
   (feature) => feature.properties.CTPRVN_CD === '41' && feature.properties.SIG_CD.startsWith('41'),
 );
+// 하나의 시가 여러 행정구 폴리곤으로 나뉠 수 있어 시·군 이름으로 묶어 목록 필터와 연결한다.
 const cityOf = (feature: District) => feature.properties.SIG_KOR_NM.split(' ')[0];
 
 type Props = {

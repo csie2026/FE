@@ -42,12 +42,14 @@ function points(member: RankingMember) {
   return `${(Number.isFinite(member.score) ? member.score : 0).toLocaleString()}점`;
 }
 
+// 서버가 정렬한 공개 회원 목록을 사용하고, 사용자 선택은 상위 화면의 타인 프로필 이동으로 연결한다.
 export default function RankingPage({ currentUserId, onSelectUser, onAuthError }: Props) {
   const [members, setMembers] = useState<RankingMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
 
+  // 화면 이탈 후 응답은 반영하지 않고, 세션 만료는 상위 화면의 공통 인증 처리에 전달한다.
   useEffect(() => {
     let active = true;
     getRankings()

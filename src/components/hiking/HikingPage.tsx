@@ -31,6 +31,7 @@ const labels = {
   PAUSED: '일시정지',
   COMPLETED: '산행 완료',
 };
+// 실제 DB 산 목록에서 산·코스를 고른 뒤 상세 경로를 검증해 화면 내 GPS 기록 세션으로 연결한다.
 export default function HikingPage() {
   const [choosing, setChoosing] = useState(false);
   const [mountains, setMountains] = useState<MountainOption[]>([]);
@@ -41,6 +42,7 @@ export default function HikingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  // 산 선택에 따라 산 목록 또는 해당 산의 코스를 조회하며, 선택 변경 뒤 이전 응답은 반영하지 않는다.
   useEffect(() => {
     if (!choosing || selected) return;
     let active = true;
@@ -311,6 +313,8 @@ export default function HikingPage() {
   );
 }
 
+// 위치 수신과 기록 상태를 분리해 일시정지 중에는 기록 누적을 멈추고 완료 시 위치 감시도 종료한다.
+// 이 세션은 화면 내 상태이며 서버의 등산일지 저장과 자동으로 연결되지 않는다.
 function ActiveHike({
   course,
   onChangeCourse,
