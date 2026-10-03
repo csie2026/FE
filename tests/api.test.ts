@@ -88,15 +88,25 @@ test('failed journal deletion preserves the server error', async () => {
       ? new Response(JSON.stringify({ headerName: 'X-CSRF-TOKEN', token: 'csrf' }))
       : new Response(JSON.stringify({ message: '삭제 요청 실패' }), { status: 404 });
   try {
-    await assert.rejects(deleteJournal(42), (cause) =>
-      cause instanceof ApiError && cause.status === 404 && cause.message === '삭제 요청 실패');
+    await assert.rejects(
+      deleteJournal(42),
+      (cause) =>
+        cause instanceof ApiError && cause.status === 404 && cause.message === '삭제 요청 실패');
   } finally {
     globalThis.fetch = original;
   }
 });
 test('journal detail fetches the full record with session credentials', async () => {
   const original = globalThis.fetch;
-  const journal = { id: 42, userId: 7, nickname: '작성자', mountainName: '소래산', title: '산행', content: '첫째 줄\n둘째 줄', hikingDate: '2020-01-01', isPublic: false };
+  const journal = {
+    id: 42,
+    userId: 7,
+    nickname: '작성자',
+    mountainName: '소래산',
+    title: '산행',
+    content: '첫째 줄\n둘째 줄',
+    hikingDate: '2020-01-01',
+    isPublic: false };
   globalThis.fetch = async (input, init) => {
     assert.equal(String(input), '/api/journals/42');
     assert.equal(init?.method, 'GET');
@@ -111,9 +121,12 @@ test('journal detail fetches the full record with session credentials', async ()
 });
 test('inaccessible journal detail preserves the server rejection', async () => {
   const original = globalThis.fetch;
-  globalThis.fetch = async () => new Response(JSON.stringify({ message: '조회할 수 없습니다.' }), { status: 404 });
+  globalThis.fetch = async () =>
+    new Response(JSON.stringify({ message: '조회할 수 없습니다.' }), { status: 404 });
   try {
-    await assert.rejects(getJournal(42), (cause) => cause instanceof ApiError && cause.status === 404);
+    await assert.rejects(
+      getJournal(42),
+      (cause) => cause instanceof ApiError && cause.status === 404);
   } finally {
     globalThis.fetch = original;
   }

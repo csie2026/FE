@@ -154,7 +154,9 @@ export default function CityMountainList({
               <div className="mountain-dialog-actions">
                 <button
                   type="button"
-                  className={`mountain-dialog-favorite ${favoriteIds.includes(viewed.id) ? 'is-favorite' : ''}`}
+                  className={`mountain-dialog-favorite ${
+                    favoriteIds.includes(viewed.id) ? 'is-favorite' : ''
+                  }`}
                   onClick={() => onFavoriteToggle(viewed.id)}
                   aria-pressed={favoriteIds.includes(viewed.id)}
                 >

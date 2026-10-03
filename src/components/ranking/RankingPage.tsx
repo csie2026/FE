@@ -159,7 +159,9 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
                     <li key={member.userId}>
                       <button
                         type="button"
-                        className={`leaderboard-row${member.userId === currentUserId ? ' is-mine' : ''}`}
+                        className={`leaderboard-row${
+                          member.userId === currentUserId ? ' is-mine' : ''
+                        }`}
                         onClick={() => onSelectUser(member.userId)}
                       >
                         <span className="leaderboard-position">{index + 4}</span>
