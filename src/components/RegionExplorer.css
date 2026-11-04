@@ -471,3 +471,18 @@
     transition: none;
   }
 }
+
+.explore-search {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  font-size: 13px;
+}
+.explore-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #cbd9ce;
+  border-radius: 10px;
+  font: inherit;
+}

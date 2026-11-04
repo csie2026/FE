@@ -1,11 +1,18 @@
+import { useCompletedHikes } from './hooks/useCompletedHikes';
+import {
+  readHikingSelection,
+  type HikingSelection,
+} from './components/hiking/services/hikingNavigation';
+import logo from './assets/topeak-logo.svg';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
 import HikingPage from './components/hiking/HikingPage';
-import MountainCard, { MountainArt } from './components/MountainCard';
+import MountainCourseInfo from './components/MountainCourseInfo';
 import MyPage from './components/profile/MyPage';
 import MountainCollection from './components/profile/MountainCollection';
 import RankingPage from './components/ranking/RankingPage';
-import { regions } from './data/exploreRegions';
+import { groupExploreMountains } from './services/exploreMountains';
+import { useExploreMountains } from './hooks/useExploreMountains';
 import { usePersistentIds } from './hooks/usePersistentIds';
 import { useMonthlyGoals } from './hooks/useMonthlyGoals';
 import { clearLegacyMemberImages } from './utils/memberImages';
@@ -23,7 +30,8 @@ import {
   scoreText,
   type Member,
   type Journal,
-  type PublicProfile } from './api';
+  type PublicProfile,
+} from './api';
 
 const RegionExplorer = lazy(() => import('./components/RegionExplorer'));
 
@@ -47,58 +55,10 @@ type Screen =
   | 'conquered'
   | 'about';
 
-const mountains = [
-  {
-    id: 'featured:천안산',
-    name: '천안산',
-    area: '경기도 남양주시 서쪽',
-    height: '812m',
-    distance: '3.8km',
-    time: '2시간 10분',
-    color: 'sage',
-  },
-  {
-    id: 'featured:운길산',
-    name: '운길산',
-    area: '경기도 남양주시 조안면',
-    height: '610m',
-    distance: '2.1km',
-    time: '1시간 25분',
-    color: 'mint',
-  },
-  {
-    id: 'featured:축령산',
-    name: '축령산',
-    area: '경기도 남양주시 수동면',
-    height: '886m',
-    distance: '5.2km',
-    time: '3시간 20분',
-    color: 'olive',
-  },
-];
-
 function BrandMark() {
   return (
     <div className="brand-mark" aria-label="ToPeak 로고">
-      <svg viewBox="0 0 160 130" role="img">
-        <path d="M8 119 63 22l18 34 18-48 53 111H8Z" fill="#155b43" />
-        <path d="m36 119 45-70 15 23 19-36 31 83H36Z" fill="#34825e" />
-        <path
-          d="M77 29c-4 15 17 20 7 31-7 8-23 10-26 24-2 11 6 19 17 25"
-          fill="none"
-          stroke="#f8f6e9"
-          strokeWidth="7"
-          strokeLinecap="round"
-        />
-        <path
-          d="m69 105 8 8 4-12"
-          fill="none"
-          stroke="#f8f6e9"
-          strokeWidth="5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <img src={logo} alt="" />
       <strong>ToPeak</strong>
     </div>
   );
@@ -128,10 +88,11 @@ function App() {
   const [date, setDate] = useState('');
   const [hikingRecords, setHikingRecords] = useState<HikingActivity[]>([]);
   const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
-  const selectedRecord = hikingRecords.find(record => record.id === selectedRecordId);
-  const availableRecords = hikingRecords.filter(record => record.journalId === null);
+  const selectedRecord = hikingRecords.find((record) => record.id === selectedRecordId);
+  const availableRecords = hikingRecords.filter((record) => record.journalId === null);
   const [journalMountain, setJournalMountain] = useState('');
-  const [selected, setSelected] = useState(0);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [hikingSelection, setHikingSelection] = useState<HikingSelection | null>(null);
   const [exploreRegion, setExploreRegion] = useState(0);
   const [exploreCity, setExploreCity] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
@@ -139,28 +100,19 @@ function App() {
   const { ids: favoriteIds, toggle: toggleFavorite } = usePersistentIds(
     'topeak.favoriteMountainIds',
   );
-  const { ids: conqueredIds, toggle: toggleConquered } = usePersistentIds(
-    'topeak.completedMountainIds',
-  );
   const { goals: monthlyGoals, saveGoals, error: goalsError } = useMonthlyGoals();
-  const mountain = mountains[selected];
-  const mountainCatalog = useMemo(
-    () => [
-      ...regions.flatMap((region) =>
-        region.cities.flatMap((city) =>
-          city.mountains.map((item) => ({
-            ...item,
-            city: city.name,
-            region: region.name,
-          })),
-        ),
-      ),
-      ...mountains.map((item) => ({ ...item, city: item.area, region: '추천 산' })),
-    ],
-    [],
-  );
+  const explore = useExploreMountains(me?.profileCompleted ? me.userId : null);
+  const mountainCatalog = explore.items;
+  const exploreRegions = useMemo(() => groupExploreMountains(mountainCatalog), [mountainCatalog]);
+  const mountain = mountainCatalog.find((item) => item.id === selected);
   const favoriteMountains = mountainCatalog.filter((item) => favoriteIds.includes(item.id));
-  const conqueredMountains = mountainCatalog.filter((item) => conqueredIds.includes(item.id));
+  const completedHikes = useCompletedHikes(
+    me?.profileCompleted ? me.userId : null,
+    screen === 'profile' || screen === 'conquered',
+  );
+  const conqueredMountains = mountainCatalog.filter((item) =>
+    completedHikes.mountainIds.has(item.id),
+  );
   // 상세 링크에는 대상 ID를, history에는 화면과 선택 산을 저장한다.
   // 초기화·로그인·삭제 후 이동은 replace로 처리해 불필요하거나 유효하지 않은 이력을 남기지 않는다.
   const setScreen = (
@@ -168,16 +120,20 @@ function App() {
     nextPublicId = publicId,
     nextMountain = selected,
     nextJournalId = journalId,
-    replaceCurrent = false) => {
+    replaceCurrent = false,
+    nextHike: HikingSelection | null = null,
+  ) => {
     const previous = window.history.state;
     const index = typeof previous?.toPeakIndex === 'number' ? previous.toPeakIndex : 0;
     const replace = loading || next === 'login' || replaceCurrent;
     const state = {
       toPeakScreen: next,
       toPeakIndex: next === 'login' ? 0 : replace ? index : index + 1,
-      toPeakMountain: nextMountain,
+      toPeakMountainId: nextMountain,
       toPeakPublicId: nextPublicId,
       toPeakJournalId: nextJournalId,
+      toPeakHikingSelection: next === 'hikingTracking' ? nextHike : null,
+      toPeakHikingUserId: next === 'hikingTracking' && nextHike ? me?.userId : null,
     };
     const url = `${window.location.pathname}${window.location.search}${
       next === 'publicProfile' && nextPublicId
@@ -190,10 +146,34 @@ function App() {
     else if (
       previous?.toPeakScreen !== next ||
       (next === 'publicProfile' && previous?.toPeakPublicId !== nextPublicId) ||
-      (next === 'journalDetail' && previous?.toPeakJournalId !== nextJournalId)
+      (next === 'journalDetail' && previous?.toPeakJournalId !== nextJournalId) ||
+      (next === 'hikingTracking' &&
+        (previous?.toPeakHikingSelection?.mountainId !== nextHike?.mountainId ||
+          previous?.toPeakHikingSelection?.courseId !== nextHike?.courseId))
     )
       window.history.pushState(state, '', url);
+    setHikingSelection(next === 'hikingTracking' ? nextHike : null);
     setCurrentScreen(next);
+  };
+  const openHikingCourse = (selection: HikingSelection) => {
+    if (!me?.profileCompleted) return;
+    setSelected(String(selection.mountainId));
+    setScreen(
+      'hikingTracking',
+      publicId,
+      String(selection.mountainId),
+      journalId,
+      false,
+      selection,
+    );
+  };
+  const clearHikingSelection = () => {
+    setHikingSelection(null);
+    window.history.replaceState(
+      { ...window.history.state, toPeakHikingSelection: null, toPeakHikingUserId: null },
+      '',
+      window.location.href,
+    );
   };
   // 일반 메뉴 이동은 세션과 프로필 완료 여부를 먼저 확인하고, 이전 화면의 조회 결과를 비운다.
   const go = (next: Screen, nextMountain = selected) => {
@@ -218,7 +198,17 @@ function App() {
       setIsPublic(false);
     }
     if (next === screen) return;
-    setBusy(['diary', 'myJournals', 'ranking', 'publicProfile', 'profile', 'write', 'hikingRecords'].includes(next));
+    setBusy(
+      [
+        'diary',
+        'myJournals',
+        'ranking',
+        'publicProfile',
+        'profile',
+        'write',
+        'hikingRecords',
+      ].includes(next),
+    );
     setJournals([]);
     setPublicProfile(null);
     setScreen(next, publicId, nextMountain);
@@ -231,13 +221,15 @@ function App() {
           ? journalDetail?.userId === me?.userId
             ? 'myJournals'
             : 'diary'
-          : 'explore');
+          : 'explore',
+      );
   };
   // 계정 세대를 증가시켜 로그아웃 이전의 비동기 응답이 새 회원 상태에 반영되지 않게 한다.
   const clearAccount = useCallback(() => {
     accountVersion.current += 1;
     clearLegacyMemberImages();
     setMe(null);
+    setHikingSelection(null);
     setNickname('');
     setBirthYear('');
     setJournals([]);
@@ -274,8 +266,11 @@ function App() {
     const initializeScreen = (
       next: Screen,
       id: number | null = null,
-      mountainIndex = 0,
-      detailId: number | null = null) => {
+      mountainId: string | null = null,
+      detailId: number | null = null,
+      linkedHike: HikingSelection | null = null,
+      linkedUserId: number | null = null,
+    ) => {
       window.history.replaceState(
         {
           toPeakScreen: next,
@@ -283,9 +278,11 @@ function App() {
             typeof window.history.state?.toPeakIndex === 'number'
               ? window.history.state.toPeakIndex
               : 0,
-          toPeakMountain: mountainIndex,
+          toPeakMountainId: mountainId,
           toPeakPublicId: id,
           toPeakJournalId: detailId,
+          toPeakHikingSelection: linkedHike,
+          toPeakHikingUserId: linkedUserId,
         },
         '',
         `${window.location.pathname}${window.location.search}${
@@ -309,7 +306,7 @@ function App() {
         else if (detailMatch) {
           setBusy(true);
           setJournalId(Number(detailMatch[1]));
-          initializeScreen('journalDetail', null, 0, Number(detailMatch[1]));
+          initializeScreen('journalDetail', null, null, Number(detailMatch[1]));
         } else if (match) {
           setBusy(true);
           setPublicId(Number(match[1]));
@@ -332,12 +329,22 @@ function App() {
             'about',
           ];
           if (screens.includes(saved?.toPeakScreen)) {
-            setSelected(
-              typeof saved.toPeakMountain === 'number' && mountains[saved.toPeakMountain]
-                ? saved.toPeakMountain
-                : 0,
+            const mountainId =
+              typeof saved.toPeakMountainId === 'string' ? saved.toPeakMountainId : null;
+            setSelected(mountainId);
+            const linked =
+              saved.toPeakScreen === 'hikingTracking' && saved.toPeakHikingUserId === user.userId
+                ? readHikingSelection(saved.toPeakHikingSelection)
+                : null;
+            setHikingSelection(linked);
+            initializeScreen(
+              saved.toPeakScreen,
+              null,
+              mountainId,
+              null,
+              linked,
+              linked ? user.userId : null,
             );
-            initializeScreen(saved.toPeakScreen, null, saved.toPeakMountain ?? 0);
           } else initializeScreen('explore');
         }
       })
@@ -400,15 +407,28 @@ function App() {
             : 'explore';
       setError('');
       setBusy(
-        ['diary', 'myJournals', 'ranking', 'publicProfile', 'profile', 'journalDetail', 'write', 'hikingRecords'].includes(
-          next));
+        [
+          'diary',
+          'myJournals',
+          'ranking',
+          'publicProfile',
+          'profile',
+          'journalDetail',
+          'write',
+          'hikingRecords',
+        ].includes(next),
+      );
       setJournalDetail(null);
       setJournalId(detailMatch ? Number(detailMatch[1]) : (state?.toPeakJournalId ?? null));
       setJournals([]);
       setPublicProfile(null);
       setPublicId(match ? Number(match[1]) : (state?.toPeakPublicId ?? null));
-      if (typeof state?.toPeakMountain === 'number' && mountains[state.toPeakMountain])
-        setSelected(state.toPeakMountain);
+      setSelected(typeof state?.toPeakMountainId === 'string' ? state.toPeakMountainId : null);
+      setHikingSelection(
+        next === 'hikingTracking' && state?.toPeakHikingUserId === me?.userId
+          ? readHikingSelection(state?.toPeakHikingSelection)
+          : null,
+      );
       setCurrentScreen(next);
     };
     window.addEventListener('popstate', back);
@@ -550,9 +570,11 @@ function App() {
       fail(e);
       setBusy(false);
       if (e instanceof ApiError && e.status === 409) {
-        getHikingRecords().then(records => {
-          if (version === accountVersion.current) setHikingRecords(records);
-        }).catch(fail);
+        getHikingRecords()
+          .then((records) => {
+            if (version === accountVersion.current) setHikingRecords(records);
+          })
+          .catch(fail);
       }
     }
   };
@@ -584,7 +606,7 @@ function App() {
       await deleteJournal(journal.id);
       if (version === accountVersion.current) {
         setJournals((current) => current.filter((item) => item.id !== journal.id));
-        setJournalDetail((current) => current?.id === journal.id ? null : current);
+        setJournalDetail((current) => (current?.id === journal.id ? null : current));
         if (
           window.history.state?.toPeakScreen === 'journalDetail' &&
           window.history.state?.toPeakJournalId === journal.id
@@ -637,8 +659,7 @@ function App() {
             }
           }}
         >
-          <MountainArt small />
-          <div>
+          <div className="diary-card__body">
             <b>{j.title}</b>
             <small>
               {j.mountainName} · {j.hikingDate} · {j.nickname}
@@ -692,19 +713,6 @@ function App() {
         <span aria-hidden="true" />
       )}
     </header>
-  );
-  const card = (index: number, compact = false) => (
-    <MountainCard
-      key={mountains[index].name}
-      mountain={mountains[index]}
-      compact={compact}
-      isFavorite={favoriteIds.includes(mountains[index].id)}
-      onFavoriteToggle={() => toggleFavorite(mountains[index].id)}
-      onClick={() => {
-        setSelected(index);
-        go('detail', index);
-      }}
-    />
   );
 
   return (
@@ -784,28 +792,48 @@ function App() {
               }
             >
               <RegionExplorer
+                onSelectCourse={openHikingCourse}
+                regions={exploreRegions}
+                loading={explore.loading}
+                error={explore.error}
+                onRetry={explore.retry}
                 activeRegionIndex={exploreRegion}
                 onRegionChange={setExploreRegion}
                 selectedCity={exploreCity}
                 onSelectCity={setExploreCity}
                 favoriteIds={favoriteIds}
                 onFavoriteToggle={toggleFavorite}
-                completedIds={conqueredIds}
-                onCompletedToggle={toggleConquered}
               />
             </Suspense>
           </div>
         </>
       )}
-      {screen === 'detail' && (
+      {screen === 'detail' && !mountain && (
+        <>
+          {header('상세', true)}
+          <div className="scroll-content">
+            {explore.loading ? (
+              <p role="status">산 정보를 불러오는 중…</p>
+            ) : explore.error ? (
+              <div role="alert">
+                <p>{explore.error}</p>
+                <button onClick={explore.retry}>다시 시도</button>
+              </div>
+            ) : (
+              <p>선택한 산을 찾을 수 없습니다. 산 탐색에서 다시 선택해주세요.</p>
+            )}
+            <button onClick={() => go('explore')}>산 탐색으로</button>
+          </div>
+        </>
+      )}
+      {screen === 'detail' && mountain && (
         <>
           {header('상세', true)}
           <div className="scroll-content detail-content">
-            <MountainArt />
             <div className="detail-title">
               <div>
                 <h1>{mountain.name}</h1>
-                <small>{mountain.area}</small>
+                <small>{mountain.city}</small>
               </div>
               <button
                 className={`heart ${favoriteIds.includes(mountain.id) ? 'is-favorite' : ''}`}
@@ -819,28 +847,22 @@ function App() {
             <div className="stats">
               <div>
                 <b>{mountain.height}</b>
-                <small>세로 높지</small>
+                <small>높이</small>
               </div>
               <div>
                 <b>{mountain.distance}</b>
-                <small>거리 코스</small>
+                <small>코스 거리</small>
               </div>
               <div>
-                <b>보통</b>
+                <b>코스별 확인</b>
                 <small>난이도</small>
               </div>
             </div>
-            <button
-              type="button"
-              className="collection-dialog-complete"
-              aria-pressed={conqueredIds.includes(mountain.id)}
-              onClick={() => toggleConquered(mountain.id)}
-            >
-              {conqueredIds.includes(mountain.id) ? '완등 기록 해제' : '완등으로 기록'}
-            </button>
-            <h3>다른 사람들의 공개 기록</h3>
-            {card(0, true)}
-            {card(1, true)}
+            <MountainCourseInfo
+              key={mountain.id}
+              mountainId={mountain.id}
+              onSelectCourse={openHikingCourse}
+            />
             <div className="bottom-actions">
               <button onClick={() => go('diary')}>등산 기록하기</button>
               <button
@@ -898,8 +920,32 @@ function App() {
       )}
       {screen === 'hikingTracking' && (
         <>
-          {header('등산')}
-          <HikingPage onWriteJournal={(record) => { go('write'); setSelectedRecordId(record.id); }} />
+          {header('등산', hikingSelection !== null)}
+          <HikingPage
+            onOpenRecords={() => go('hikingRecords')}
+            key={me?.userId}
+            userId={me!.userId}
+            onRestoreSelection={(selection) => {
+              setSelected(String(selection.mountainId));
+              setHikingSelection(selection);
+              window.history.replaceState(
+                {
+                  ...window.history.state,
+                  toPeakMountainId: String(selection.mountainId),
+                  toPeakHikingSelection: selection,
+                  toPeakHikingUserId: me!.userId,
+                },
+                '',
+                window.location.href,
+              );
+            }}
+            initialSelection={hikingSelection}
+            onClearSelection={clearHikingSelection}
+            onWriteJournal={(record) => {
+              go('write');
+              setSelectedRecordId(record.id);
+            }}
+          />
         </>
       )}
       {screen === 'setup' && (
@@ -1025,20 +1071,39 @@ function App() {
           >
             <h2>오늘의 산행을 기록해요</h2>
             <p className="muted">멋있었던 순간을 남겨보세요</p>
-            {!editing && <>
-              <label>
-                내 등산기록 선택
-                <select value={selectedRecordId ?? ''} disabled={busy}
-                  onChange={(e) => setSelectedRecordId(e.target.value ? Number(e.target.value) : null)} required>
-                  <option value="">등산기록을 선택해주세요</option>
-                  {availableRecords.map(record => <option key={record.id} value={record.id}>
-                    {record.mountainName} · {record.hikingDate} · {(record.distanceMeters / 1000).toFixed(1)}km · {Math.floor(record.elapsedMs / 60000)}분
-                  </option>)}
-                </select>
-              </label>
-              {busy ? <p role="status">등산기록을 불러오는 중…</p> : availableRecords.length === 0 &&
-                <p className="muted">작성 가능한 등산기록이 없습니다. 산행을 마치고 기록을 저장해주세요.</p>}
-            </>}
+            {!editing && (
+              <>
+                <label>
+                  내 등산기록 선택
+                  <select
+                    value={selectedRecordId ?? ''}
+                    disabled={busy}
+                    onChange={(e) =>
+                      setSelectedRecordId(e.target.value ? Number(e.target.value) : null)
+                    }
+                    required
+                  >
+                    <option value="">등산기록을 선택해주세요</option>
+                    {availableRecords.map((record) => (
+                      <option key={record.id} value={record.id}>
+                        {record.mountainName} · {record.hikingDate} ·{' '}
+                        {(record.distanceMeters / 1000).toFixed(1)}km ·{' '}
+                        {Math.floor(record.elapsedMs / 60000)}분
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {busy ? (
+                  <p role="status">등산기록을 불러오는 중…</p>
+                ) : (
+                  availableRecords.length === 0 && (
+                    <p className="muted">
+                      작성 가능한 등산기록이 없습니다. 산행을 마치고 기록을 저장해주세요.
+                    </p>
+                  )
+                )}
+              </>
+            )}
             {(editing || selectedRecord) && (
               <dl className="journal-write-summary" aria-label="산행 정보">
                 <div>
@@ -1083,7 +1148,12 @@ function App() {
                 <span />
               </button>
             </div>
-            <button className="submit" disabled={busy || (!editing && (!selectedRecord || selectedRecord.journalId !== null))}>
+            <button
+              className="submit"
+              disabled={
+                busy || (!editing && (!selectedRecord || selectedRecord.journalId !== null))
+              }
+            >
               일지 저장하기
             </button>
           </form>
@@ -1092,6 +1162,19 @@ function App() {
       {screen === 'profile' && me && (
         <>
           <div className="scroll-content my-page-scroll">
+            {completedHikes.loading && (
+              <p role="status" className="completion-message">
+                완등 기록을 불러오는 중…
+              </p>
+            )}
+            {completedHikes.error && (
+              <div role="alert" className="completion-message">
+                <p>{completedHikes.error}</p>
+                <button type="button" onClick={completedHikes.retry}>
+                  다시 시도
+                </button>
+              </div>
+            )}
             <MyPage
               key={me.userId}
               member={me}
@@ -1106,7 +1189,9 @@ function App() {
               }}
               onAuthError={fail}
               journals={journals}
-              completedCount={conqueredMountains.length}
+              completedCount={
+                completedHikes.loading || completedHikes.error ? null : completedHikes.count
+              }
               totalDistanceKm={0}
               monthlyDistanceKm={0}
               monthlyGoals={monthlyGoals}
@@ -1127,20 +1212,38 @@ function App() {
         <>
           {header(screen === 'favorites' ? '찜한 산' : '완등한 산', true)}
           <div className="scroll-content collection-scroll">
-            <MountainCollection
-              mode={screen}
-              title={screen === 'favorites' ? '내가 찜한 산' : '완등한 산'}
-              description={
-                screen === 'favorites'
-                  ? '마음에 담아둔 산을 모아봤어요.'
-                  : '나의 산행을 완등 기록으로 남겨보세요.'
-              }
-              items={screen === 'favorites' ? favoriteMountains : conqueredMountains}
-              favoriteIds={favoriteIds}
-              completedIds={conqueredIds}
-              onFavoriteToggle={toggleFavorite}
-              onCompletedToggle={toggleConquered}
-            />
+            {explore.loading || (screen === 'conquered' && completedHikes.loading) ? (
+              <p role="status">
+                {screen === 'conquered' ? '완등한 산을 불러오는 중…' : '산 목록을 불러오는 중…'}
+              </p>
+            ) : screen === 'conquered' && completedHikes.error ? (
+              <div role="alert">
+                <p>{completedHikes.error}</p>
+                <button type="button" onClick={completedHikes.retry}>
+                  다시 시도
+                </button>
+              </div>
+            ) : explore.error ? (
+              <div role="alert">
+                <p>{explore.error}</p>
+                <button onClick={explore.retry}>다시 시도</button>
+              </div>
+            ) : (
+              <MountainCollection
+                onSelectCourse={openHikingCourse}
+                mode={screen}
+                title={screen === 'favorites' ? '내가 찜한 산' : '완등한 산'}
+                description={
+                  screen === 'favorites'
+                    ? '마음에 담아둔 산을 모아봤어요.'
+                    : 'GPS 산행 활동에서 정상 도달로 저장된 산을 모았어요.'
+                }
+                items={screen === 'favorites' ? favoriteMountains : conqueredMountains}
+                favoriteIds={favoriteIds}
+
+                onFavoriteToggle={toggleFavorite}
+              />
+            )}
           </div>
         </>
       )}
@@ -1168,21 +1271,44 @@ function App() {
           </div>
         </>
       )}
-      {screen === 'hikingRecords' && <>
-        {header('등산기록', true)}
-        <section className="scroll-content utility-content">
-          {busy ? <p role="status">불러오는 중…</p> : hikingRecords.length ? hikingRecords.map(record => (
-            <article className="profile-summary" key={record.id}>
-              <div><b>{record.mountainName}</b><p>{record.hikingDate}</p>
-                <p>{(record.distanceMeters / 1000).toFixed(1)}km · {Math.floor(record.elapsedMs / 60000)}분 · {record.completed ? '완등' : '산행 종료'}</p>
-                {record.journalId !== null
-                  ? <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
-                  : <button onClick={() => { go('write'); setSelectedRecordId(record.id); }}>등산일지 작성</button>}
-              </div>
-            </article>
-          )) : <p>저장된 등산기록이 없습니다.</p>}
-        </section>
-      </>}
+      {screen === 'hikingRecords' && (
+        <>
+          {header('등산기록', true)}
+          <section className="scroll-content utility-content">
+            {busy ? (
+              <p role="status">불러오는 중…</p>
+            ) : hikingRecords.length ? (
+              hikingRecords.map((record) => (
+                <article className="profile-summary" key={record.id}>
+                  <div>
+                    <b>{record.mountainName}</b>
+                    <p>{record.hikingDate}</p>
+                    <p>
+                      {(record.distanceMeters / 1000).toFixed(1)}km ·{' '}
+                      {Math.floor(record.elapsedMs / 60000)}분 ·{' '}
+                      {record.completed ? '완등' : '산행 종료'}
+                    </p>
+                    {record.journalId !== null ? (
+                      <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          go('write');
+                          setSelectedRecordId(record.id);
+                        }}
+                      >
+                        등산일지 작성
+                      </button>
+                    )}
+                  </div>
+                </article>
+              ))
+            ) : (
+              <p>저장된 등산기록이 없습니다.</p>
+            )}
+          </section>
+        </>
+      )}
       {screen === 'accountSettings' && (
         <ComingSoonPage title="계정 설정" header={header('계정 설정', true)} />
       )}

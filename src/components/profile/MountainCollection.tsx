@@ -1,5 +1,7 @@
+import type { HikingSelection } from '../hiking/services/hikingNavigation';
 import { useRef, useState } from 'react';
 import MountainCard from '../MountainCard';
+import MountainCourseInfo from '../MountainCourseInfo';
 
 export interface CollectionMountain {
   id: string;
@@ -11,24 +13,22 @@ export interface CollectionMountain {
 }
 
 type Props = {
+  onSelectCourse: (selection: HikingSelection) => void;
   title: string;
   description: string;
   items: CollectionMountain[];
   favoriteIds: string[];
-  completedIds: string[];
   onFavoriteToggle: (id: string) => void;
-  onCompletedToggle: (id: string) => void;
   mode: 'favorites' | 'conquered';
 };
 
 export default function MountainCollection({
+  onSelectCourse,
   title,
   description,
   items,
   favoriteIds,
-  completedIds,
   onFavoriteToggle,
-  onCompletedToggle,
   mode,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
@@ -55,14 +55,6 @@ export default function MountainCollection({
                 {item.city} · {item.region}
               </small>
             </MountainCard>
-            {mode === 'conquered' && (
-              <button
-                className={`collection-complete ${completedIds.includes(item.id) ? 'is-complete' : ''}`}
-                onClick={() => onCompletedToggle(item.id)}
-              >
-                {completedIds.includes(item.id) ? '✓ 완등 기록됨' : '완등 기록하기'}
-              </button>
-            )}
           </div>
         ))
       ) : (
@@ -73,11 +65,12 @@ export default function MountainCollection({
           <span>
             {mode === 'favorites'
               ? '산 탐색에서 하트를 눌러 저장해보세요.'
-              : '산 탐색에서 산 상세를 열어 완등으로 기록해보세요.'}
+              : 'GPS 산행에서 정상 도달 후 저장한 기록이 여기에 표시됩니다.'}
           </span>
         </div>
       )}
       <dialog
+        onClose={() => setSelected(null)}
         className="region-mountain-dialog"
         ref={dialog}
         onClick={(event) => {
@@ -103,14 +96,14 @@ export default function MountainCollection({
                 <small>코스 거리</small>
               </div>
             </div>
-            <button
-              type="button"
-              className="collection-dialog-complete"
-              aria-pressed={completedIds.includes(selected.id)}
-              onClick={() => onCompletedToggle(selected.id)}
-            >
-              {completedIds.includes(selected.id) ? '완등 기록 해제' : '완등으로 기록'}
-            </button>
+            <MountainCourseInfo
+              key={selected.id}
+              mountainId={selected.id}
+              onSelectCourse={(selection) => {
+                dialog.current?.close();
+                onSelectCourse(selection);
+              }}
+            />
           </>
         )}
       </dialog>

@@ -1,34 +1,40 @@
+import type { HikingSelection } from './hiking/services/hikingNavigation';
 import { useRef } from 'react';
 import type { PointerEvent } from 'react';
-import { regions } from '../data/exploreRegions';
+import type { Region } from '../data/exploreRegions';
 import CityMountainList from './CityMountainList';
 import GyeonggiMap from './GyeonggiMap';
 import './RegionExplorer.css';
 
 // 화면의 권역 순서는 데이터 배열 순서와 별도로 관리하며 지도 선택과 스와이프가 같은 순서를 따른다.
 const regionOrder = ['north', 'east', 'south', 'central'];
-const orderedRegions = regionOrder.map((id) => regions.find((region) => region.id === id)!);
 
 type Props = {
+  onSelectCourse: (selection: HikingSelection) => void;
+  regions: Region[];
+  loading: boolean;
+  error: string;
+  onRetry: () => void;
   activeRegionIndex: number;
   onRegionChange: (index: number) => void;
   selectedCity: string | null;
   onSelectCity: (cityId: string | null) => void;
   favoriteIds: string[];
   onFavoriteToggle: (id: string) => void;
-  completedIds: string[];
-  onCompletedToggle: (id: string) => void;
 };
 
 export default function RegionExplorer({
+  onSelectCourse,
+  regions,
+  loading,
+  error,
+  onRetry,
   activeRegionIndex: active,
   onRegionChange: setActive,
   selectedCity,
   onSelectCity: setSelectedCity,
   favoriteIds,
   onFavoriteToggle,
-  completedIds,
-  onCompletedToggle,
 }: Props) {
   const gesture = useRef<{
     id: number;
@@ -38,7 +44,10 @@ export default function RegionExplorer({
     horizontal: boolean;
   } | null>(null);
   const suppressClick = useRef(false);
-  const region = orderedRegions[active];
+  const orderedRegions = [...regionOrder, 'other'].flatMap((id) =>
+    regions.filter((region) => region.id === id),
+  );
+  const region = orderedRegions[active] ?? orderedRegions[0];
 
   // 권역을 바꾸면 이전 시·군 필터를 해제해 새 권역의 산이 잘못 숨겨지지 않게 한다.
   function changeRegion(index: number) {
@@ -50,7 +59,8 @@ export default function RegionExplorer({
   }
 
   function selectOnMap(regionId: string, cityId: string) {
-    if (regionId !== region.id) changeRegion(regionOrder.indexOf(regionId));
+    if (regionId !== region.id)
+      changeRegion(orderedRegions.findIndex((item) => item.id === regionId));
     else setSelectedCity(cityId);
   }
 
@@ -105,7 +115,9 @@ export default function RegionExplorer({
             <small>경기도 권역 탐색</small>
             <b>{region.name}</b>
           </div>
-          <span>{String(active + 1).padStart(2, '0')} / 04</span>
+          <span>
+            {String(active + 1).padStart(2, '0')} / {String(orderedRegions.length).padStart(2, '0')}
+          </span>
         </div>
         <div className="region-map-stage">
           <button
@@ -136,12 +148,16 @@ export default function RegionExplorer({
               }
             }}
           >
-            <GyeonggiMap
-              key={region.id}
-              activeRegion={region.id}
-              selectedCity={selectedCity}
-              onSelect={selectOnMap}
-            />
+            {region.id === 'other' ? (
+              <p>기타 지역의 산은 아래 목록에서 확인하세요.</p>
+            ) : (
+              <GyeonggiMap
+                key={region.id}
+                activeRegion={region.id}
+                selectedCity={selectedCity}
+                onSelect={selectOnMap}
+              />
+            )}
           </div>
           <button
             className="region-arrow"
@@ -184,14 +200,17 @@ export default function RegionExplorer({
         </span>
       </section>
       <CityMountainList
+        onSelectCourse={onSelectCourse}
+        loading={loading}
+        error={error}
+        onRetry={onRetry}
+        key={region.id}
         cities={region.cities}
         regionName={region.name}
         selectedCity={selectedCity}
         onSelectCity={setSelectedCity}
         favoriteIds={favoriteIds}
         onFavoriteToggle={onFavoriteToggle}
-        completedIds={completedIds}
-        onCompletedToggle={onCompletedToggle}
       />
     </>
   );

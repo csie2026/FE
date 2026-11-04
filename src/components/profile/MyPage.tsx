@@ -10,7 +10,7 @@ type Props = {
   onMemberUpdated: (member: Member, kind: MemberImageKind) => void;
   onAuthError: (error: ApiError) => void;
   journals: Journal[];
-  completedCount: number;
+  completedCount: number | null;
   totalDistanceKm: number;
   monthlyDistanceKm: number;
   monthlyGoals: MonthlyGoals;
@@ -109,7 +109,7 @@ export default function MyPage({
   const monthlyHikes = journals.filter((journal) => journal.hikingDate.startsWith(monthKey)).length;
   const stats: {
     label: string;
-    value: number;
+    value: number | null;
     unit: string;
     icon: string;
     goal?: number | null;
@@ -316,9 +316,9 @@ export default function MyPage({
             <div key={label}>
               <OutdoorIcon name={icon} />
               <strong>
-                {value.toLocaleString()}
+                {value?.toLocaleString() ?? '—'}
                 <small> {unit}</small>
-                {goal != null && (
+                {goal != null && value !== null && (
                   <small>
                     {' '}
                     / {goal.toLocaleString()} {unit}
@@ -326,7 +326,7 @@ export default function MyPage({
                 )}
               </strong>
               <span>{label}</span>
-              {goal != null && (
+              {goal != null && value !== null && (
                 <div className="stat-goal">
                   <div
                     className="stat-goal__bar"
@@ -344,7 +344,9 @@ export default function MyPage({
             </div>
           ))}
         </div>
-        <p className="my-stats-note">산행 횟수는 등산일지 기준 · 완등은 직접 등록한 산 기준</p>
+        <p className="my-stats-note">
+          산행 횟수는 등산일지 기준 · 완등 횟수는 정상 도달로 저장된 GPS 산행 활동 기준
+        </p>
       </section>
       <section className="monthly-challenge">
         <div className="monthly-challenge__heading">
@@ -368,8 +370,7 @@ export default function MyPage({
               <div className="monthly-challenge__content">
                 <strong>{item.label}</strong>
                 <b className="monthly-challenge__amount">
-                  {item.current.toLocaleString()}
-                  {' '}
+                  {item.current.toLocaleString()}{' '}
                   <small>
                     / {item.target?.toLocaleString()} {item.unit}
                   </small>

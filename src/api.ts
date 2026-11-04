@@ -29,7 +29,9 @@ export interface Journal {
   hikingDate: string;
   isPublic: boolean;
 }
-export type JournalInput = Pick<Journal, 'title' | 'content' | 'isPublic'> & { hikingRecordId: number };
+export type JournalInput = Pick<Journal, 'title' | 'content' | 'isPublic'> & {
+  hikingRecordId: number;
+};
 export type JournalUpdate = Pick<Journal, 'title' | 'content' | 'isPublic'>;
 export interface HikingActivity {
   id: number;
@@ -44,12 +46,33 @@ export interface HikingActivity {
   completed: boolean;
   journalId: number | null;
 }
-export type HikingActivityInput = Pick<HikingActivity,
+export type HikingActivityInput = Pick<
+  HikingActivity,
   'mountainId' | 'courseId' | 'startedAt' | 'endedAt' | 'distanceMeters' | 'elapsedMs' | 'completed'
 > & { clientRequestId: string };
-export const getHikingRecords = () => api<HikingActivity[]>('/api/users/me/hiking-records');
-export const saveHikingRecord = (input: HikingActivityInput) =>
-  api<HikingActivity>('/api/users/me/hiking-records', 'POST', input);
+export const getHikingRecords = (signal?: AbortSignal) =>
+  api<HikingActivity[]>('/api/users/me/hiking-records', 'GET', undefined, signal);
+export const saveHikingRecord = (
+  input: HikingActivityInput,
+  signal?: AbortSignal,
+  expectedUserId?: number,
+) =>
+  api<HikingActivity>(
+    '/api/users/me/hiking-records',
+    'POST',
+    input,
+    signal,
+    expectedUserId === undefined
+      ? undefined
+      : async () => {
+          const member = await getCurrentMember(signal);
+          if (member.userId !== expectedUserId)
+            throw new ApiError(
+              401,
+              '산행을 기록한 회원과 현재 로그인한 회원이 다릅니다. 같은 회원으로 로그인해주세요.',
+            );
+        },
+  );
 export const createJournal = (input: JournalInput) => api<Journal>('/api/journals', 'POST', input);
 export const updateJournal = (id: number, input: JournalUpdate) =>
   api<Journal>(`/api/journals/${id}`, 'PATCH', input);
@@ -68,6 +91,7 @@ export async function api<T>(
   method = 'GET',
   body?: unknown,
   signal?: AbortSignal,
+  beforeSend?: () => Promise<void>,
 ): Promise<T> {
   const headers: Record<string, string> = {};
   const multipart = body instanceof FormData;
@@ -85,6 +109,9 @@ export async function api<T>(
     headers[csrf.headerName] = csrf.token;
     if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   }
+  // Activity retries recheck the member after CSRF retrieval, immediately before sending.
+  if (beforeSend) await beforeSend();
+  if (signal?.aborted) throw new DOMException('요청이 취소되었습니다.', 'AbortError');
   const response = await fetch(path, {
     method,
     headers,

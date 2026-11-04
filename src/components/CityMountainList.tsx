@@ -1,28 +1,35 @@
+import type { HikingSelection } from './hiking/services/hikingNavigation';
 import { useRef, useState } from 'react';
 import type { City, Mountain } from '../data/exploreRegions';
 import MountainCard from './MountainCard';
+import MountainCourseInfo from './MountainCourseInfo';
+import { matchesMountain } from '../services/exploreMountains';
 
 type Props = {
+  onSelectCourse: (selection: HikingSelection) => void;
+  loading: boolean;
+  error: string;
+  onRetry: () => void;
   cities: City[];
   regionName: string;
   selectedCity: string | null;
   onSelectCity: (cityId: string | null) => void;
   favoriteIds: string[];
   onFavoriteToggle: (id: string) => void;
-  completedIds: string[];
-  onCompletedToggle: (id: string) => void;
 };
 
 // 상위 탐색 화면의 시·군 선택과 브라우저에 저장된 산 ID를 받아 목록·상세 모달을 연결한다.
 export default function CityMountainList({
+  onSelectCourse,
+  loading,
+  error,
+  onRetry,
   cities,
   regionName,
   selectedCity,
   onSelectCity,
   favoriteIds,
   onFavoriteToggle,
-  completedIds,
-  onCompletedToggle,
 }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const filterDrag = useRef<{
@@ -33,9 +40,15 @@ export default function CityMountainList({
   } | null>(null);
   const suppressFilterClick = useRef(false);
   const [draggingFilters, setDraggingFilters] = useState(false);
+  const [query, setQuery] = useState('');
   const [viewed, setViewed] = useState<Mountain | null>(null);
   const [viewedCity, setViewedCity] = useState<City | null>(null);
-  const visibleCities = selectedCity ? cities.filter((city) => city.id === selectedCity) : cities;
+  const visibleCities = (
+    selectedCity ? cities.filter((city) => city.id === selectedCity) : cities
+  ).map((city) => ({
+    ...city,
+    mountains: city.mountains.filter((mountain) => matchesMountain(mountain, query)),
+  }));
   const mountainCount = visibleCities.reduce((count, city) => count + city.mountains.length, 0);
 
   return (
@@ -44,9 +57,9 @@ export default function CityMountainList({
         <b id="city-mountains-title">
           {selectedCity
             ? `${cities.find((city) => city.id === selectedCity)?.name}의 산`
-            : `${regionName} 추천 코스`}
+            : `${regionName}의 산`}
         </b>
-        <small>{mountainCount}곳</small>
+        <small>{loading || error ? '—' : `${mountainCount}곳`}</small>
       </div>
       <div
         className={`region-city-filters${draggingFilters ? ' is-dragging' : ''}`}
@@ -115,8 +128,28 @@ export default function CityMountainList({
           </button>
         ))}
       </div>
-      <p className="city-mountains-note">산행 정보는 미리보기용 예시입니다.</p>
-      {mountainCount ? (
+      <label className="explore-search">
+        산 이름 또는 시·군 검색
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="선택한 권역에서 검색"
+        />
+      </label>
+      <p className="city-mountains-note">거리와 난이도는 산 상세의 등산로별 정보를 확인해주세요.</p>
+      {loading ? (
+        <p className="region-loading" role="status">
+          산 목록을 불러오는 중…
+        </p>
+      ) : error ? (
+        <div className="region-hint" role="alert">
+          <p>{error}</p>
+          <button type="button" onClick={onRetry}>
+            다시 시도
+          </button>
+        </div>
+      ) : mountainCount ? (
         visibleCities.flatMap((city) =>
           city.mountains.map((mountain) => (
             <MountainCard
@@ -132,19 +165,27 @@ export default function CityMountainList({
               }}
             >
               <small>
-                {city.name} · 난이도 {mountain.difficulty}
+                {city.name} · 등산로 {mountain.courseCount}개
               </small>
             </MountainCard>
           )),
         )
       ) : (
-        <p className="region-hint">아직 등록된 산이 없어요.</p>
+        <p className="region-hint">
+          {query.trim()
+            ? '검색 결과가 없어요. 검색어나 지역 필터를 바꿔보세요.'
+            : '아직 등록된 산이 없어요.'}
+        </p>
       )}
       <dialog
         className="region-mountain-dialog"
         ref={dialog}
         onClick={(event) => {
           if (event.target === event.currentTarget) dialog.current?.close();
+        }}
+        onClose={() => {
+          setViewed(null);
+          setViewedCity(null);
         }}
         aria-labelledby="region-mountain-title"
       >
@@ -168,30 +209,26 @@ export default function CityMountainList({
                 </button>
               </div>
             </div>
-            <p>{viewedCity.name} · 산행 미리보기</p>
+            <p>{viewedCity.name}</p>
             <div className="stats">
               <div>
                 <b>{viewed.height}</b>
                 <small>높이</small>
               </div>
-              <div>
-                <b>{viewed.distance}</b>
-                <small>코스 거리</small>
-              </div>
-              <div>
-                <b>{viewed.difficulty}</b>
-                <small>난이도</small>
-              </div>
             </div>
-            <button
-              type="button"
-              className="collection-dialog-complete"
-              aria-pressed={completedIds.includes(viewed.id)}
-              onClick={() => onCompletedToggle(viewed.id)}
-            >
-              {completedIds.includes(viewed.id) ? '완등 기록 해제' : '완등으로 기록'}
-            </button>
-            <small className="city-mountains-note">실제 산행 정보는 추후 제공됩니다.</small>
+            {viewed.lat !== null && viewed.lng !== null && (
+              <p>
+                정상 좌표: {viewed.lat}, {viewed.lng}
+              </p>
+            )}
+            <MountainCourseInfo
+              key={viewed.id}
+              mountainId={viewed.id}
+              onSelectCourse={(selection) => {
+                dialog.current?.close();
+                onSelectCourse(selection);
+              }}
+            />
           </>
         )}
       </dialog>
