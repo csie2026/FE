@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GPS_FILTER } from '../config';
-import { acceptTrackPoint, hasReachedSummit, trackDistance } from '../trackUtils';
+import { trackDistance } from '../trackUtils';
 import type { GpsPoint, HikingCourse } from '../types';
+import {
+  assertTrackingCapacity,
+  recordTrackPoint,
+  resumeSession,
+  stopTracking,
+} from '../services/sessionTracking';
 import {
   initialSession,
   pauseSession,
@@ -26,6 +31,7 @@ export function useHikingSession(
     recovery ? sessionFromDraft(recovery.draft) : initialSession(),
   );
   const sessionRef = useRef(session);
+  const lastCommitted = useRef(session);
   const [ownerToken] = useState(() => recovery?.ownerToken ?? crypto.randomUUID());
   const retired = useRef(false);
   const [storageError, setStorageError] = useState('');
@@ -37,14 +43,25 @@ export function useHikingSession(
     setSession(next);
     setNow(Date.now());
   }, []);
+  const persist = useCallback(
+    (next: Session, mode: 'create' | 'update' = 'update') => {
+      if (retired.current || !next.clientRequestId) throw new Error('Session is no longer active');
+      const timestamp = Date.now();
+      assertTrackingCapacity(next, course, userId, ownerToken, timestamp);
+      const draft = draftFromSession(next, course, userId, ownerToken, timestamp);
+      writeRecovery(draft, mode);
+      lastCommitted.current = sessionFromDraft(draft);
+      lastCheckpoint.current = timestamp;
+      setStorageError('');
+      setDurable(next.state === 'COMPLETED');
+    },
+    [course, userId, ownerToken],
+  );
   const checkpoint = useCallback(
     (next: Session, mode: 'create' | 'update' = 'update') => {
       if (retired.current || !next.clientRequestId) return false;
       try {
-        writeRecovery(draftFromSession(next, course, userId, ownerToken), mode);
-        lastCheckpoint.current = Date.now();
-        setStorageError('');
-        setDurable(next.state === 'COMPLETED');
+        persist(next, mode);
         return true;
       } catch (cause) {
         setDurable(false);
@@ -56,28 +73,24 @@ export function useHikingSession(
         return false;
       }
     },
-    [course, userId, ownerToken],
+    [persist],
   );
   const onPosition = useCallback(
     (point: GpsPoint) => {
-      const current = sessionRef.current;
-      if (current.state !== 'TRACKING' || point.timestamp < current.activeSince!) return;
-      const lastSegment = current.segments.at(-1) ?? [];
-      const previous = lastSegment.at(-1);
-      const gap = previous && point.timestamp - previous.timestamp > GPS_FILTER.maxGapMs;
-      if (!acceptTrackPoint(point, gap ? undefined : previous)) return;
-      const segments = gap
-        ? [...current.segments, [point]]
-        : [...current.segments.slice(0, -1), [...lastSegment, point]];
-      const next = {
-        ...current,
-        segments,
-        reachedSummit: current.reachedSummit || hasReachedSummit(point, course.summitPoint),
-      };
-      publish(next);
-      if (!checkpoint(next)) publish(pauseSession(next));
+      const result = recordTrackPoint(
+        sessionRef.current,
+        point,
+        course,
+        persist,
+        lastCommitted.current,
+      );
+      if (result.session !== sessionRef.current) publish(result.session);
+      if (result.error) {
+        setStorageError(result.error);
+        setDurable(false);
+      }
     },
-    [course, publish, checkpoint],
+    [course, publish, persist],
   );
   const start = () => {
     if (sessionRef.current.state !== 'READY') return;
@@ -100,18 +113,13 @@ export function useHikingSession(
     const current = sessionRef.current;
     if (current.state !== 'TRACKING') return;
     const next = pauseSession(current);
-    publish(next);
-    checkpoint(next);
+    if (checkpoint(next)) publish(next);
+    else publish(stopTracking(lastCommitted.current, 'storage-error'));
   }, [publish, checkpoint]);
   const resume = () => {
     const current = sessionRef.current;
-    if (current.state !== 'PAUSED') return;
-    const next: Session = {
-      ...current,
-      state: 'TRACKING',
-      activeSince: Date.now(),
-      segments: [...current.segments, []],
-    };
+    const next = resumeSession(current);
+    if (next === current) return;
     if (checkpoint(next)) publish(next);
   };
   const complete = () => {
@@ -126,7 +134,7 @@ export function useHikingSession(
     const timer = window.setInterval(() => {
       setNow(Date.now());
       if (Date.now() - lastCheckpoint.current >= 5000 && !checkpoint(sessionRef.current))
-        publish(pauseSession(sessionRef.current));
+        publish(stopTracking(lastCommitted.current, 'storage-error'));
     }, 1000);
     return () => window.clearInterval(timer);
   }, [session.state, checkpoint, publish]);
@@ -156,16 +164,13 @@ export function useHikingSession(
       const current = sessionRef.current;
       if (!retired.current && current.clientRequestId) {
         try {
-          writeRecovery(
-            draftFromSession(pauseSession(current), course, userId, ownerToken),
-            'update',
-          );
+          persist(pauseSession(current));
         } catch {
           /* The last successful checkpoint is retained; storage errors are shown while mounted. */
         }
       }
     };
-  }, [course, userId, ownerToken, pause, onRecoveryRequired]);
+  }, [userId, ownerToken, pause, persist, onRecoveryRequired]);
   const markSaved = useCallback(() => {
     retired.current = true;
     try {
@@ -214,7 +219,14 @@ export function useHikingSession(
         markSaved();
         return true;
       }
-      return checkpoint(sessionRef.current);
+      const current = sessionRef.current;
+      const next =
+        current.trackingStopReason === 'storage-error'
+          ? { ...current, trackingStopReason: null }
+          : current;
+      if (!checkpoint(next)) return false;
+      publish(next);
+      return true;
     },
   };
 }

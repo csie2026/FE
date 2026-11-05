@@ -37,7 +37,7 @@ export function confirmsSavedActivity(
     sameInstant(record.endedAt, input.endedAt) &&
     record.distanceMeters === input.distanceMeters &&
     record.elapsedMs === input.elapsedMs &&
-    record.completed === input.completed &&
+    typeof record.completed === 'boolean' &&
     typeof record.mountainName === 'string' &&
     record.mountainName.length > 0 &&
     typeof record.hikingDate === 'string' &&
@@ -48,6 +48,18 @@ export function confirmsSavedActivity(
 export function describeSaveFailure(cause: unknown): ActivitySaveFailure {
   if (cause instanceof ActivitySaveFailure) return cause;
   if (cause instanceof ApiError) {
+    if (cause.status === 413)
+      return new ActivitySaveFailure('rejected', 'GPS 요청이 2MiB 한도를 초과했습니다. 증거는 보존됩니다.');
+    if (cause.status === 400)
+      return new ActivitySaveFailure(
+        'rejected',
+        'GPS 요청 구조나 시각이 유효하지 않습니다. 구버전 종료 기록은 GPS 증거가 유실되어 새로 저장할 수 없습니다. 임시 기록은 보존됩니다.',
+      );
+    if (cause.status === 409 && cause.code === 'duplicate_hiking_activity')
+      return new ActivitySaveFailure(
+        'conflict',
+        '같은 시간의 산행이 이미 저장되어 있습니다. 저장된 기록을 확인해 주세요. 임시 기록은 보존됩니다.',
+      );
     if (cause.status === 409)
       return new ActivitySaveFailure(
         'conflict',
@@ -74,9 +86,10 @@ export async function submitPendingActivity(
   userId: number,
   signal?: AbortSignal,
   timeoutMs = ACTIVITY_SAVE_TIMEOUT_MS,
+  allowLegacy = false,
 ): Promise<HikingActivity> {
   if (!positiveId(userId)) throw describeSaveFailure(new ApiError(401, '계정 확인 필요'));
-  if (!isValidActivityInput(input))
+  if (!isValidActivityInput(input, Date.now(), allowLegacy))
     throw new ActivitySaveFailure(
       'rejected',
       '산행 기록의 시각·거리·시간 또는 산·코스 정보를 확인할 수 없어 전송하지 않았습니다. 임시 기록은 보관 중입니다.',

@@ -1,12 +1,14 @@
+import { isValidActivityInput } from './activityValidation.ts';
 import type { HikingActivityInput } from '../../../api.ts';
 import type { GpsPoint, HikingCourse } from '../types.ts';
 import { trackDistance } from '../trackUtils.ts';
 
-export const RECOVERY_VERSION = 1;
+export const RECOVERY_VERSION = 2;
 export const RECOVERY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_RECOVERY_POINTS = 10_000;
 export const MAX_RECOVERY_BYTES = 1_000_000;
 export const recoveryKey = (userId: number) => `topeak.hikingSession.v1.${userId}`;
+export type TrackingStopReason = 'point-limit' | 'capacity-limit' | 'storage-error';
 export type Session = {
   startedAt: number | null;
   endedAt: number | null;
@@ -17,10 +19,11 @@ export type Session = {
   accumulatedMs: number;
   reachedSummit: boolean;
   pendingInput: HikingActivityInput | null;
+  trackingStopReason?: TrackingStopReason | null;
 };
 type CompactPoint = [number, number, number, number, number | null, number | null];
 export type RecoveryDraft = {
-  version: 1;
+  version: 1 | 2;
   userId: number;
   updatedAt: number;
   ownerToken: string;
@@ -36,7 +39,8 @@ export type RecoveryDraft = {
   reachedSummit: boolean;
   distanceMeters: number;
   segments: CompactPoint[][];
-  pendingInput: HikingActivityInput | null;
+  pendingInput: Omit<HikingActivityInput, 'gpsSegments'> | null;
+  trackingStopReason?: TrackingStopReason | null;
 };
 export type RecoveryRead =
   { kind: 'none' } | { kind: 'ready'; draft: RecoveryDraft } | { kind: 'error'; message: string };
@@ -77,6 +81,7 @@ export function activityInput(
     elapsedMs: session.accumulatedMs,
     completed: session.reachedSummit,
     clientRequestId: session.clientRequestId!,
+    gpsSegments: evidence(session.segments),
   };
 }
 export function completeSession(
@@ -86,10 +91,12 @@ export function completeSession(
 ): Session {
   if (session.state !== 'TRACKING' && session.state !== 'PAUSED') return session;
   const ended = { ...pauseSession(session, now), state: 'COMPLETED' as const, endedAt: now };
-  return { ...ended, pendingInput: activityInput(ended, course) };
+  const pendingInput = activityInput(ended, course);
+  freezeEvidence(pendingInput);
+  return { ...ended, pendingInput };
 }
 export function sessionFromDraft(draft: RecoveryDraft): Session {
-  return {
+  const restored: Session = {
     startedAt: draft.startedAt,
     endedAt: draft.endedAt,
     clientRequestId: draft.clientRequestId,
@@ -97,7 +104,20 @@ export function sessionFromDraft(draft: RecoveryDraft): Session {
     activeSince: null,
     accumulatedMs: draft.accumulatedMs,
     reachedSummit: draft.reachedSummit,
-    pendingInput: draft.pendingInput,
+    trackingStopReason:
+      draft.trackingStopReason ??
+      (draft.state === 'PAUSED' &&
+      draft.segments.reduce((n, s) => n + s.length, 0) >= MAX_RECOVERY_POINTS
+        ? 'point-limit'
+        : null),
+    pendingInput:
+      draft.pendingInput &&
+      (draft.version === 1
+        ? draft.pendingInput
+        : {
+            ...draft.pendingInput,
+            gpsSegments: evidenceFromCompact(draft.segments),
+          }),
     segments: draft.segments.map((segment) =>
       segment.map(([lat, lng, timestamp, accuracy, altitude, speed]) => ({
         lat,
@@ -111,6 +131,8 @@ export function sessionFromDraft(draft: RecoveryDraft): Session {
       })),
     ),
   };
+  if (restored.pendingInput) freezeEvidence(restored.pendingInput);
+  return restored;
 }
 export function draftFromSession(
   session: Session,
@@ -121,7 +143,7 @@ export function draftFromSession(
 ): RecoveryDraft {
   const paused = pauseSession(session, now);
   return {
-    version: 1,
+    version: paused.state === 'COMPLETED' && paused.pendingInput?.gpsSegments === undefined ? 1 : 2,
     userId,
     updatedAt: now,
     ownerToken,
@@ -136,13 +158,11 @@ export function draftFromSession(
     accumulatedMs: paused.accumulatedMs,
     reachedSummit: paused.reachedSummit,
     distanceMeters: paused.pendingInput?.distanceMeters ?? trackDistance(paused.segments),
-    pendingInput: paused.pendingInput,
-    segments:
-      paused.state === 'COMPLETED'
-        ? []
-        : paused.segments.map((segment) =>
-            segment.map((p) => [p.lat, p.lng, p.timestamp, p.accuracy, p.altitude, p.speed]),
-          ),
+    pendingInput: paused.pendingInput ? summaryOnly(paused.pendingInput) : null,
+    ...(paused.trackingStopReason ? { trackingStopReason: paused.trackingStopReason } : {}),
+    segments: paused.segments.map((segment) =>
+      segment.map((p) => [p.lat, p.lng, p.timestamp, p.accuracy, p.altitude, p.speed]),
+    ),
   };
 }
 export function validateDraft(
@@ -153,7 +173,7 @@ export function validateDraft(
   if (!value || typeof value !== 'object') return false;
   const d = value as RecoveryDraft;
   if (
-    d.version !== RECOVERY_VERSION ||
+    ![1, RECOVERY_VERSION].includes(d.version) ||
     d.userId !== userId ||
     !id(d.userId) ||
     !id(d.mountainId) ||
@@ -178,6 +198,10 @@ export function validateDraft(
     !finite(d.distanceMeters) ||
     d.distanceMeters < 0 ||
     !['PAUSED', 'COMPLETED'].includes(d.state) ||
+    !(
+      d.trackingStopReason == null ||
+      ['point-limit', 'capacity-limit', 'storage-error'].includes(d.trackingStopReason)
+    ) ||
     !Array.isArray(d.segments) ||
     d.segments.length > MAX_RECOVERY_POINTS
   )
@@ -201,7 +225,6 @@ export function validateDraft(
         p[2] > d.updatedAt ||
         !finite(p[3]) ||
         p[3] < 0 ||
-        p[3] > 50 ||
         !(p[4] === null || finite(p[4])) ||
         !(p[5] === null || finite(p[5]))
       )
@@ -235,10 +258,11 @@ export function validateDraft(
   const body = d.pendingInput;
   return (
     !!body &&
+    (d.version === 1 ||
+      isValidActivityInput({ ...body, gpsSegments: evidenceFromCompact(d.segments) }, now)) &&
     Object.keys(body).length === Object.keys(expected).length &&
     Object.keys(expected).every(
-      (key) =>
-        body[key as keyof HikingActivityInput] === expected[key as keyof HikingActivityInput],
+      (key) => body[key as keyof typeof body] === expected[key as keyof HikingActivityInput],
     )
   );
 }
@@ -247,7 +271,7 @@ export function readRecovery(userId: number, now = Date.now(), storage?: Storage
     storage = storage ?? localStorage;
     const text = storage.getItem(recoveryKey(userId));
     if (text === null) return { kind: 'none' };
-    if (text.length > MAX_RECOVERY_BYTES) throw new Error('oversize');
+    if (new TextEncoder().encode(text).length > MAX_RECOVERY_BYTES) throw new Error('oversize');
     const draft: unknown = JSON.parse(text);
     if (!validateDraft(draft, userId, now))
       return {
@@ -256,8 +280,11 @@ export function readRecovery(userId: number, now = Date.now(), storage?: Storage
           '산행 임시 기록이 손상되었거나 형식이 맞지 않습니다. 해당 임시 기록을 삭제한 뒤 다시 시작해주세요.',
       };
     if (now - draft.updatedAt > RECOVERY_TTL_MS) {
-      storage.removeItem(recoveryKey(userId));
-      return { kind: 'error', message: '마지막 저장 후 7일이 지난 산행 임시 기록을 정리했습니다.' };
+      return {
+        kind: 'error',
+        message:
+          '마지막 저장 후 7일이 지나 자동 복구할 수 없습니다. 임시 기록은 삭제하지 않고 보존했습니다.',
+      };
     }
     return { kind: 'ready', draft };
   } catch {
@@ -288,7 +315,8 @@ export function writeRecovery(
     current.kind === 'ready' &&
     current.draft.state === 'COMPLETED' &&
     (draft.state !== 'COMPLETED' ||
-      JSON.stringify(draft.pendingInput) !== JSON.stringify(current.draft.pendingInput))
+      JSON.stringify(draft.pendingInput) !== JSON.stringify(current.draft.pendingInput) ||
+      JSON.stringify(draft.segments) !== JSON.stringify(current.draft.segments))
   )
     throw new Error(
       '종료된 산행은 다시 진행하거나 저장 내용을 변경할 수 없습니다. 저장 재시도를 선택해주세요.',
@@ -322,4 +350,38 @@ export function removeRecovery(
   if (draft.clientRequestId !== clientRequestId || (ownerToken && draft.ownerToken !== ownerToken))
     throw new Error('다른 산행 기록이므로 삭제하지 않았습니다. 등산 메뉴에서 다시 확인해주세요.');
   storage.removeItem(recoveryKey(userId));
+}
+
+function evidence(segments: GpsPoint[][]) {
+  return segments.map((segment) =>
+    segment.map((p) => ({
+      lat: p.lat,
+      lng: p.lng,
+      measuredAt: new Date(p.timestamp).toISOString(),
+      accuracyMeters: p.accuracy,
+    })),
+  );
+}
+function evidenceFromCompact(segments: CompactPoint[][]) {
+  return segments.map((segment) =>
+    segment.map(([lat, lng, timestamp, accuracyMeters]) => ({
+      lat,
+      lng,
+      measuredAt: new Date(timestamp).toISOString(),
+      accuracyMeters,
+    })),
+  );
+}
+function summaryOnly(input: HikingActivityInput) {
+  const { gpsSegments: _gps, ...summary } = input;
+  return summary;
+}
+
+function freezeEvidence(input: HikingActivityInput) {
+  input.gpsSegments?.forEach((segment) => {
+    segment.forEach(Object.freeze);
+    Object.freeze(segment);
+  });
+  if (input.gpsSegments) Object.freeze(input.gpsSegments);
+  Object.freeze(input);
 }

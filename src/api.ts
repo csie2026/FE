@@ -45,11 +45,18 @@ export interface HikingActivity {
   elapsedMs: number;
   completed: boolean;
   journalId: number | null;
+  gpsValidationVersion?: number | null;
 }
 export type HikingActivityInput = Pick<
   HikingActivity,
   'mountainId' | 'courseId' | 'startedAt' | 'endedAt' | 'distanceMeters' | 'elapsedMs' | 'completed'
-> & { clientRequestId: string };
+> & { clientRequestId: string; gpsSegments?: GpsEvidencePoint[][] };
+export type GpsEvidencePoint = {
+  lat: number;
+  lng: number;
+  measuredAt: string;
+  accuracyMeters: number;
+};
 export const getHikingRecords = (signal?: AbortSignal) =>
   api<HikingActivity[]>('/api/users/me/hiking-records', 'GET', undefined, signal);
 export const saveHikingRecord = (
@@ -80,9 +87,11 @@ export const deleteJournal = (id: number) => api<void>(`/api/journals/${id}`, 'D
 export const getJournal = (id: number) => api<Journal>(`/api/journals/${id}`);
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 // 세션 쿠키와 서버 오류 상태를 모든 도메인 요청에서 일관되게 다루는 공통 진입점이다.
@@ -121,8 +130,8 @@ export async function api<T>(
     body: multipart ? body : body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
-    const error = (await response.json().catch(() => ({}))) as { message?: string };
-    throw new ApiError(response.status, error.message ?? '요청을 처리할 수 없습니다.');
+    const error = (await response.json().catch(() => ({}))) as { message?: string; error?: string };
+    throw new ApiError(response.status, error.message ?? '요청을 처리할 수 없습니다.', error.error);
   }
   // 삭제·로그아웃의 빈 응답을 JSON으로 읽지 않아 정상 처리 후 파싱 오류가 발생하지 않게 한다.
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);

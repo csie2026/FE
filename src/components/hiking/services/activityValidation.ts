@@ -19,6 +19,7 @@ const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export function isValidActivityInput(
   value: unknown,
   now = Date.now(),
+  allowLegacy = false,
 ): value is HikingActivityInput {
   if (!value || typeof value !== 'object') return false;
   const input = value as Partial<HikingActivityInput>;
@@ -40,5 +41,34 @@ export function isValidActivityInput(
     return false;
   const start = Date.parse(input.startedAt!);
   const end = Date.parse(input.endedAt!);
-  return start <= end && end <= now && input.elapsedMs <= end - start;
+  if (!(start <= end && end <= now && input.elapsedMs <= end - start)) return false;
+  if (jsonBytes(input) > MAX_ACTIVITY_BYTES) return false;
+  if (allowLegacy && input.gpsSegments === undefined) return true;
+  if (!Array.isArray(input.gpsSegments) || input.gpsSegments.length > 10_000) return false;
+  let count = 0,
+    previous = start;
+  for (const segment of input.gpsSegments) {
+    if (!Array.isArray(segment) || (count += segment.length) > 10_000) return false;
+    for (const p of segment) {
+      if (
+        !p ||
+        typeof p !== 'object' ||
+        !Number.isFinite(p.lat) ||
+        Math.abs(p.lat) > 90 ||
+        !Number.isFinite(p.lng) ||
+        Math.abs(p.lng) > 180 ||
+        !Number.isFinite(p.accuracyMeters) ||
+        p.accuracyMeters < 0 ||
+        !instant(p.measuredAt)
+      )
+        return false;
+      const time = Date.parse(p.measuredAt);
+      if (time < previous || time > end) return false;
+      previous = time;
+    }
+  }
+  return true;
 }
+
+export const MAX_ACTIVITY_BYTES = 2 * 1024 * 1024;
+export const jsonBytes = (value: unknown) => new TextEncoder().encode(JSON.stringify(value)).length;
