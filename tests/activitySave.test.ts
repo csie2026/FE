@@ -16,6 +16,7 @@ const input: HikingActivityInput = Object.freeze({
   distanceMeters: 123.456,
   elapsedMs: 3600000,
   completed: true,
+  gpsSegments: [],
 });
 const record = {
   ...input,
@@ -55,7 +56,7 @@ test('save confirmation checks the frozen request and accepts equivalent server 
     { courseId: 9 },
     { distanceMeters: 124 },
     { elapsedMs: 3 },
-    { completed: false },
+    { completed: null },
     { endedAt: '2026-11-04T02:00:01Z' },
     { journalId: -1 },
   ])
@@ -91,7 +92,6 @@ test('conflicting UUID receives a conflict instead of a new request ID or false 
 test('server failures and malformed or mismatched success responses remain uncertain', async () => {
   for (const reply of [
     () => json({}, 503),
-    () => json({ ...record, completed: false }),
     () => new Response(null, { status: 204 }),
     () => new Response('not-json'),
   ])
@@ -183,5 +183,27 @@ test('validation rejection is distinct from a retryable unknown outcome', async 
       await assert.rejects(submitPendingActivity(input, 1), failure('uncertain'));
     },
     () => json({}, 429),
+  );
+});
+
+test('server completion is authoritative and duplicate 409 is terminal', async () => {
+  await mock(
+    async () => {
+      assert.equal((await submitPendingActivity(input, 1)).completed, false);
+    },
+    () => json({ ...record, completed: false }),
+  );
+  await mock(
+    async (posts) => {
+      await assert.rejects(
+        submitPendingActivity(input, 1),
+        (err) =>
+          err instanceof ActivitySaveFailure &&
+          err.kind === 'conflict' &&
+          err.message.includes('이미'),
+      );
+      assert.equal(posts.length, 1);
+    },
+    () => json({ error: 'duplicate_hiking_activity', message: 'duplicate' }, 409),
   );
 });

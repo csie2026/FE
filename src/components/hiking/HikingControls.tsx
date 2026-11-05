@@ -1,7 +1,9 @@
 import type { HikingState } from './types';
+import type { TrackingStopReason } from './services/sessionRecovery';
 type Props = {
   state: HikingState;
   canStart: boolean;
+  trackingStopReason?: TrackingStopReason | null;
   start: () => void;
   pause: () => void;
   resume: () => void;
@@ -11,6 +13,7 @@ type Props = {
 export default function HikingControls({
   state,
   canStart,
+  trackingStopReason,
   start,
   pause,
   resume,
@@ -30,7 +33,7 @@ export default function HikingControls({
         </button>
       )}
       {state === 'PAUSED' && (
-        <button type="button" onClick={resume}>
+        <button type="button" onClick={resume} disabled={Boolean(trackingStopReason)}>
           ▶ 계속하기
         </button>
       )}

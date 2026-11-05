@@ -112,12 +112,12 @@ test('pause checkpoints are idempotent and resuming a new segment never connects
   );
   assert.ok(draft.distanceMeters < 12);
 });
-test('ended recovery retains a frozen request body and drops precise GPS coordinates', () => {
+test('ended recovery retains a frozen request body and preserves precise GPS coordinates', () => {
   const now = Date.now();
   const ended = completeSession(running(now), course, now);
   const draft = draftFromSession(ended, course, 1, crypto.randomUUID(), now);
   assert.equal(validateDraft(draft, 1, now), true);
-  assert.deepEqual(draft.segments, []);
+  assert.equal(draft.segments[0].length, 2);
   const restored = sessionFromDraft(draft);
   const retry = draftFromSession(restored, course, 1, crypto.randomUUID(), now + 60_000);
   assert.deepEqual(retry.pendingInput, draft.pendingInput);
@@ -176,7 +176,7 @@ test('expired drafts are cleaned on read without clearing other browser data', (
   writeRecovery(draft, 'create', store);
   store.setItem('other', 'keep');
   assert.equal(readRecovery(1, now + RECOVERY_TTL_MS + 1, store).kind, 'error');
-  assert.equal(store.getItem(recoveryKey(1)), null);
+  assert.ok(store.getItem(recoveryKey(1)));
   assert.equal(store.getItem('other'), 'keep');
 });
 test('malformed or inconsistent snapshots are rejected instead of inventing session values', () => {
@@ -185,7 +185,7 @@ test('malformed or inconsistent snapshots are rejected instead of inventing sess
   for (const invalid of [
     { ...draft, accumulatedMs: -1 },
     { ...draft, distanceMeters: 500 },
-    { ...draft, version: 2 },
+    { ...draft, version: 3 },
     { ...draft, ownerToken: 'bad' },
     { ...draft, mountainId: 0 },
     { ...draft, segments: [[[91, 127, now, 5, null, null]]] },
@@ -222,8 +222,8 @@ test('point limits do not silently truncate distance; ending stores a compact im
     crypto.randomUUID(),
     now,
   );
-  assert.equal(validateDraft(ended, 1, now), true);
-  assert.deepEqual(ended.segments, []);
+  assert.equal(validateDraft(ended, 1, now), false);
+  assert.equal(ended.segments[0].length, MAX_RECOVERY_POINTS + 1);
 });
 test('the serialized byte budget is enforced without a partial write', () => {
   const now = Date.now(),
@@ -245,4 +245,41 @@ test('the serialized byte budget is enforced without a partial write', () => {
   assert.ok(new TextEncoder().encode(JSON.stringify(draft)).length > MAX_RECOVERY_BYTES);
   assert.throws(() => writeRecovery(draft, 'create', store), /용량 한도/);
   assert.equal(store.getItem(recoveryKey(1)), null);
+});
+
+test('GPS segments preserve boundaries and exact samples through completed reload and failed retry', () => {
+  const now = Date.now(),
+    session = running(now);
+  session.segments.push([], [{ ...session.segments[0][1], timestamp: now }]);
+  const ended = completeSession(session, course, now);
+  const draft = draftFromSession(ended, course, 1, crypto.randomUUID(), now);
+  assert.equal('gpsSegments' in draft.pendingInput!, false);
+  const restored = sessionFromDraft(JSON.parse(JSON.stringify(draft)));
+  assert.deepEqual(restored.pendingInput, ended.pendingInput);
+  assert.deepEqual(
+    restored.pendingInput!.gpsSegments!.map((s) => s.length),
+    [2, 0, 1],
+  );
+  assert.equal(restored.pendingInput!.gpsSegments![0][0].accuracyMeters, 5);
+  assert.equal(Object.isFrozen(restored.pendingInput!.gpsSegments![0][0]), true);
+});
+test('legacy paused evidence migrates, legacy ended evidence stays absent for UUID lookup', () => {
+  const now = Date.now(),
+    session = running(now),
+    owner = crypto.randomUUID();
+  const oldPaused = { ...draftFromSession(session, course, 1, owner, now), version: 1 as const };
+  assert.equal(validateDraft(oldPaused, 1, now), true);
+  const migrated = draftFromSession(sessionFromDraft(oldPaused), course, 1, owner, now);
+  assert.equal(migrated.version, 2);
+  assert.deepEqual(migrated.segments, oldPaused.segments);
+  const oldEnded = {
+    ...draftFromSession(completeSession(session, course, now), course, 1, owner, now),
+    version: 1 as const,
+    segments: [],
+  };
+  assert.equal(validateDraft(oldEnded, 1, now), true);
+  const restored = sessionFromDraft(oldEnded);
+  assert.equal(restored.pendingInput!.gpsSegments, undefined);
+  assert.equal(restored.clientRequestId, session.clientRequestId);
+  assert.equal(draftFromSession(restored, course, 1, owner, now).version, 1);
 });
