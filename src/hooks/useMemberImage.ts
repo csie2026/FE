@@ -44,9 +44,9 @@ export function useMemberImage(kind: MemberImageKind, options: MemberImageOption
           kind === 'profile' ? 0.85 : 0.75,
         );
         if (controller.signal.aborted) return;
-        updated = await uploadMemberImage(kind, prepared, controller.signal);
+        updated = await uploadMemberImage(kind, prepared, controller.signal, member.userId);
       } else {
-        updated = await deleteMemberImage(kind, controller.signal);
+        updated = await deleteMemberImage(kind, controller.signal, member.userId);
       }
       if (controller.signal.aborted) return;
       // 요청 중 서버 세션의 계정이 바뀌어도 다른 회원의 이미지 상태가 현재 화면에 섞이지 않게 한다.

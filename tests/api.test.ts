@@ -133,6 +133,6 @@ test('inaccessible journal detail preserves the server rejection', async () => {
 });
 test('score distinguishes an uncalculated score from zero', () => {
   assert.equal(scoreText(null), '점수 미산정');
-  assert.equal(scoreText(0), '0 P');
-  assert.equal(scoreText(1250), '1,250 P');
+  assert.equal(scoreText(0), '0점');
+  assert.equal(scoreText(1250), '1,250점');
 });

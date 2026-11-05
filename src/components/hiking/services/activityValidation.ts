@@ -14,6 +14,26 @@ const instant = (value: unknown) => {
 };
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+export function hasValidGpsEvidence(input: HikingActivityInput): boolean {
+  const e = input.gpsEvidence;
+  return (
+    !!e &&
+    typeof e === 'object' &&
+    typeof e.latitude === 'number' &&
+    Number.isFinite(e.latitude) &&
+    Math.abs(e.latitude) <= 90 &&
+    typeof e.longitude === 'number' &&
+    Number.isFinite(e.longitude) &&
+    Math.abs(e.longitude) <= 180 &&
+    typeof e.accuracyMeters === 'number' &&
+    Number.isFinite(e.accuracyMeters) &&
+    e.accuracyMeters >= 0 &&
+    e.accuracyMeters <= 50 &&
+    instant(e.recordedAt) &&
+    Date.parse(e.recordedAt) >= Date.parse(input.startedAt) &&
+    Date.parse(e.recordedAt) <= Date.parse(input.endedAt)
+  );
+}
 // Local consistency guard only. An API caller can bypass FE validation; BE must validate independently.
 // Zero distance/time and repeated hikes remain allowed: no new completion policy is added here.
 export function isValidActivityInput(
@@ -40,5 +60,10 @@ export function isValidActivityInput(
     return false;
   const start = Date.parse(input.startedAt!);
   const end = Date.parse(input.endedAt!);
-  return start <= end && end <= now && input.elapsedMs <= end - start;
+  return (
+    start <= end &&
+    end <= now &&
+    input.elapsedMs <= end - start &&
+    (input.gpsEvidence === undefined || hasValidGpsEvidence(input as HikingActivityInput))
+  );
 }

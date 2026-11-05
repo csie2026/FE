@@ -8,10 +8,18 @@ export interface RankingMember {
   userId: number;
   nickname: string;
   profileImageUrl: string | null;
-  score: number;
+  score: number | null;
+  rank: number;
 }
 
-export const getRankings = () => api<RankingMember[]>('/api/rankings');
+export const getRankings = () => api<PublicProfile[]>('/api/rankings');
+export interface RankingSummary {
+  members: RankingMember[];
+  mine: RankingMember | null;
+  totalMembers: number;
+}
+export const getRankingSummary = (signal?: AbortSignal) =>
+  api<RankingSummary>('/api/rankings/summary', 'GET', undefined, signal);
 export interface Member extends PublicProfile {
   backgroundImageUrl: string | null;
   birthYear: number | null;
@@ -33,6 +41,19 @@ export type JournalInput = Pick<Journal, 'title' | 'content' | 'isPublic'> & {
   hikingRecordId: number;
 };
 export type JournalUpdate = Pick<Journal, 'title' | 'content' | 'isPublic'>;
+export interface GpsEvidence {
+  latitude: number;
+  longitude: number;
+  accuracyMeters: number;
+  recordedAt: string;
+}
+export interface ActivityScoring {
+  status: 'CERTIFIED' | 'GPS_REQUIRED' | 'BELOW_MINIMUM' | 'DAILY_LIMIT';
+  certificationDate: string;
+  visitPoints: number;
+  summitPoints: number;
+  policyVersion: string;
+}
 export interface HikingActivity {
   id: number;
   mountainId: number;
@@ -45,11 +66,12 @@ export interface HikingActivity {
   elapsedMs: number;
   completed: boolean;
   journalId: number | null;
+  scoring?: ActivityScoring | null;
 }
 export type HikingActivityInput = Pick<
   HikingActivity,
   'mountainId' | 'courseId' | 'startedAt' | 'endedAt' | 'distanceMeters' | 'elapsedMs' | 'completed'
-> & { clientRequestId: string };
+> & { clientRequestId: string; gpsEvidence?: GpsEvidence };
 export const getHikingRecords = (signal?: AbortSignal) =>
   api<HikingActivity[]>('/api/users/me/hiking-records', 'GET', undefined, signal);
 export const saveHikingRecord = (
@@ -131,15 +153,46 @@ export async function api<T>(
 export type MemberImageKind = 'profile' | 'background';
 export const getCurrentMember = (signal?: AbortSignal) =>
   api<Member>('/api/users/me', 'GET', undefined, signal);
-export function uploadMemberImage(kind: MemberImageKind, file: File, signal?: AbortSignal) {
+const checkImageOwner = async (expectedUserId: number | undefined, signal?: AbortSignal) => {
+  if (expectedUserId !== undefined && (await getCurrentMember(signal)).userId !== expectedUserId)
+    throw new ApiError(401, '로그인 계정이 변경되었어요. 다시 로그인해 주세요.');
+};
+const ownedImageResponse = (member: Member, expectedUserId?: number) => {
+  if (expectedUserId !== undefined && member.userId !== expectedUserId)
+    throw new ApiError(401, '로그인 계정이 변경되었어요. 다시 로그인해 주세요.');
+  return member;
+};
+export async function uploadMemberImage(
+  kind: MemberImageKind,
+  file: File,
+  signal?: AbortSignal,
+  expectedUserId?: number,
+) {
   const body = new FormData();
   body.append('file', file);
-  return api<Member>(`/api/users/me/images/${kind}`, 'PUT', body, signal);
+  const member = await api<Member>(
+    `/api/users/me/images/${kind}`,
+    'PUT',
+    body,
+    signal,
+    expectedUserId === undefined ? undefined : () => checkImageOwner(expectedUserId, signal),
+  );
+  return ownedImageResponse(member, expectedUserId);
 }
-// 삭제 응답에는 회원 정보가 없으므로 다시 조회해 기본 프로필 이미지로의 복귀까지 반영한다.
-export async function deleteMemberImage(kind: MemberImageKind, signal?: AbortSignal) {
-  await api<void>(`/api/users/me/images/${kind}`, 'DELETE', undefined, signal);
-  return getCurrentMember(signal);
+// Read the resolved fallback again after deletion; no old uploaded URL is retained locally.
+export async function deleteMemberImage(
+  kind: MemberImageKind,
+  signal?: AbortSignal,
+  expectedUserId?: number,
+) {
+  await api<void>(
+    `/api/users/me/images/${kind}`,
+    'DELETE',
+    undefined,
+    signal,
+    expectedUserId === undefined ? undefined : () => checkImageOwner(expectedUserId, signal),
+  );
+  return ownedImageResponse(await getCurrentMember(signal), expectedUserId);
 }
 export const scoreText = (score: number | null) =>
-  score === null ? '점수 미산정' : `${score.toLocaleString()} P`;
+  score === null ? '점수 미산정' : `${score.toLocaleString()}점`;

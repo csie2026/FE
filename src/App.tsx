@@ -1,3 +1,7 @@
+import ProfileAvatar from './components/common/ProfileAvatar';
+import { koreanMonthBounds } from './services/hikingStatistics';
+import { buildCompletedMountainCollection } from './services/completedHikes';
+import { scoringText } from './components/hiking/services/scoringDisplay';
 import { useCompletedHikes } from './hooks/useCompletedHikes';
 import {
   readHikingSelection,
@@ -72,6 +76,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [me, setMe] = useState<Member | null>(null);
+  const [profileRefresh, setProfileRefresh] = useState(0);
   const accountVersion = useRef(0);
   const memberImageVersion = useRef(0);
   const [nickname, setNickname] = useState('');
@@ -97,21 +102,25 @@ function App() {
   const [exploreCity, setExploreCity] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
-  const { ids: favoriteIds, toggle: toggleFavorite } = usePersistentIds(
-    'topeak.favoriteMountainIds',
-  );
-  const { goals: monthlyGoals, saveGoals, error: goalsError } = useMonthlyGoals();
+  const goalMonth = koreanMonthBounds().key;
   const explore = useExploreMountains(me?.profileCompleted ? me.userId : null);
   const mountainCatalog = explore.items;
+  const knownMountainIds = useMemo(() => new Set(mountainCatalog.map((item) => item.id)), [mountainCatalog]);
+  const { ids: favoriteIds, toggle: toggleFavorite, error: favoriteError } = usePersistentIds(
+    me?.profileCompleted ? me.userId : null,
+    knownMountainIds,
+  );
   const exploreRegions = useMemo(() => groupExploreMountains(mountainCatalog), [mountainCatalog]);
   const mountain = mountainCatalog.find((item) => item.id === selected);
   const favoriteMountains = mountainCatalog.filter((item) => favoriteIds.includes(item.id));
   const completedHikes = useCompletedHikes(
     me?.profileCompleted ? me.userId : null,
     screen === 'profile' || screen === 'conquered',
+    profileRefresh,
   );
-  const conqueredMountains = mountainCatalog.filter((item) =>
-    completedHikes.mountainIds.has(item.id),
+  const conqueredCollection = useMemo(
+    () => buildCompletedMountainCollection(mountainCatalog, completedHikes.completedMountains),
+    [mountainCatalog, completedHikes.completedMountains],
   );
   // 상세 링크에는 대상 ID를, history에는 화면과 선택 산을 저장한다.
   // 초기화·로그인·삭제 후 이동은 replace로 처리해 불필요하거나 유효하지 않은 이력을 남기지 않는다.
@@ -257,6 +266,13 @@ function App() {
       }
     },
     [clearAccount],
+  );
+  const monthlyGoalState = useMonthlyGoals(
+    me?.profileCompleted ? me.userId : null,
+    screen === 'profile',
+    goalMonth,
+    profileRefresh,
+    fail,
   );
   // 첫 진입 시 서버 세션을 확인한 뒤 프로필 설정, 상세 hash, 저장된 화면 순서로 진입 위치를 결정한다.
   useEffect(() => {
@@ -434,6 +450,22 @@ function App() {
     window.addEventListener('popstate', back);
     return () => window.removeEventListener('popstate', back);
   }, [me, screen, publicId]);
+  useEffect(() => {
+    if (screen !== 'profile' && screen !== 'publicProfile' && screen !== 'conquered') return;
+    const refresh = () => {
+      if (!document.hidden) {
+        setBusy(true);
+        setError('');
+        setProfileRefresh((value) => value + 1);
+      }
+    };
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [screen]);
   // 화면별로 본인 일지·공개 일지·타인 프로필을 조회하고, 화면 이탈이나 계정 변경 뒤의 응답은 버린다.
   useEffect(() => {
     if (!me?.profileCompleted) return;
@@ -495,7 +527,7 @@ function App() {
     return () => {
       active = false;
     };
-  }, [screen, publicId, journalId, editing, me?.profileCompleted, fail]);
+  }, [screen, publicId, journalId, editing, me?.userId, me?.profileCompleted, profileRefresh, fail]);
   useEffect(() => {
     document.title = 'ToPeak';
   }, []);
@@ -579,19 +611,8 @@ function App() {
     }
   };
   const avatar = (profile: PublicProfile) => (
-    <span className="avatar">
-      ☺
-      {profile.profileImageUrl && (
-        <img
-          src={profile.profileImageUrl}
-          alt="프로필"
-          referrerPolicy="no-referrer"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
-        />
-      )}
-    </span>
+    <ProfileAvatar userId={profile.userId} nickname={profile.nickname}
+      src={profile.profileImageUrl} className="avatar" />
   );
   // 화면에서 중복 삭제와 타인 일지 삭제를 막고, 실제 소유권은 서버가 다시 검증한다.
   // 삭제한 상세 화면은 history에서 교체해 뒤로 가기로 같은 항목을 다시 열지 않게 한다.
@@ -730,6 +751,9 @@ function App() {
           {error}
           <button onClick={() => setError('')}>닫기</button>
         </div>
+      )}
+      {me?.profileCompleted && favoriteError && (
+        <div className="error-banner" role="alert">{favoriteError}</div>
       )}
       {screen === 'login' && (
         <section className="login-screen">
@@ -1176,7 +1200,7 @@ function App() {
               </div>
             )}
             <MyPage
-              key={me.userId}
+              key={`${me.userId}:${goalMonth}`}
               member={me}
               onMemberUpdated={(updated, kind) => {
                 memberImageVersion.current += 1;
@@ -1188,15 +1212,18 @@ function App() {
                 );
               }}
               onAuthError={fail}
-              journals={journals}
-              completedCount={
-                completedHikes.loading || completedHikes.error ? null : completedHikes.count
+              journalCount={busy || Boolean(error) ? null : journals.length}
+              statistics={
+                completedHikes.loading || completedHikes.error || completedHikes.statistics.month !== goalMonth ? null : completedHikes.statistics
               }
-              totalDistanceKm={0}
-              monthlyDistanceKm={0}
-              monthlyGoals={monthlyGoals}
-              onSaveGoals={saveGoals}
-              goalsError={goalsError}
+              monthlyGoals={monthlyGoalState.goals}
+              onSaveGoals={monthlyGoalState.saveGoals}
+              goalsError={monthlyGoalState.error}
+              goalsReady={monthlyGoalState.ready}
+              goalsLoading={monthlyGoalState.loading}
+              goalsSaving={monthlyGoalState.saving}
+              goalsMonth={goalMonth}
+              onRetryGoals={monthlyGoalState.retry}
               onSettings={() => setDrawerOpen(true)}
               onEditProfile={() => {
                 setNickname(me.nickname);
@@ -1230,6 +1257,7 @@ function App() {
               </div>
             ) : (
               <MountainCollection
+                key={`${screen}:${me?.userId}`}
                 onSelectCourse={openHikingCourse}
                 mode={screen}
                 title={screen === 'favorites' ? '내가 찜한 산' : '완등한 산'}
@@ -1238,7 +1266,9 @@ function App() {
                     ? '마음에 담아둔 산을 모아봤어요.'
                     : 'GPS 산행 활동에서 정상 도달로 저장된 산을 모았어요.'
                 }
-                items={screen === 'favorites' ? favoriteMountains : conqueredMountains}
+                items={screen === 'favorites' ? favoriteMountains : conqueredCollection.items}
+                missingCount={screen === 'conquered' ? conqueredCollection.missingIds.length : 0}
+                onRefreshMountains={explore.retry}
                 favoriteIds={favoriteIds}
 
                 onFavoriteToggle={toggleFavorite}
@@ -1288,6 +1318,7 @@ function App() {
                       {Math.floor(record.elapsedMs / 60000)}분 ·{' '}
                       {record.completed ? '완등' : '산행 종료'}
                     </p>
+                    <p>{scoringText(record.scoring)}</p>
                     {record.journalId !== null ? (
                       <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
                     ) : (
@@ -1325,6 +1356,7 @@ function App() {
         <>
           {header('랭킹')}
           <RankingPage
+            key={me?.userId ?? 'guest'}
             currentUserId={me?.userId ?? null}
             onSelectUser={openProfile}
             onAuthError={fail}

@@ -1,6 +1,7 @@
 import type { HikingActivityInput } from '../../../api.ts';
 import type { GpsPoint, HikingCourse } from '../types.ts';
-import { trackDistance } from '../trackUtils.ts';
+import { trackDistance, isUsablePoint } from '../trackUtils.ts';
+import { isValidActivityInput } from './activityValidation.ts';
 
 export const RECOVERY_VERSION = 1;
 export const RECOVERY_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -68,6 +69,15 @@ export function activityInput(
   session: Session,
   course: Pick<HikingCourse, 'mountainId' | 'courseId'>,
 ): HikingActivityInput {
+  // Keep one originally filtered point for score eligibility, never a map-snapped coordinate.
+  const point = session.segments
+    .flat()
+    .find(
+      (p) =>
+        isUsablePoint(p, p.timestamp) &&
+        p.timestamp >= session.startedAt! &&
+        p.timestamp <= session.endedAt!,
+    );
   return {
     mountainId: Number(course.mountainId),
     courseId: Number(course.courseId),
@@ -77,6 +87,16 @@ export function activityInput(
     elapsedMs: session.accumulatedMs,
     completed: session.reachedSummit,
     clientRequestId: session.clientRequestId!,
+    ...(point
+      ? {
+          gpsEvidence: {
+            latitude: point.lat,
+            longitude: point.lng,
+            accuracyMeters: point.accuracy,
+            recordedAt: new Date(point.timestamp).toISOString(),
+          },
+        }
+      : {}),
   };
 }
 export function completeSession(
@@ -233,7 +253,10 @@ export function validateDraft(
     clientRequestId: d.clientRequestId,
   };
   const body = d.pendingInput;
+  // An ended pre-upgrade request has no evidence: preserve its UUID and exact original body.
+  if (body?.gpsEvidence !== undefined) expected.gpsEvidence = body.gpsEvidence;
   return (
+    isValidActivityInput(body, now) &&
     !!body &&
     Object.keys(body).length === Object.keys(expected).length &&
     Object.keys(expected).every(

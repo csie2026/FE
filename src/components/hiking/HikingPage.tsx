@@ -1,3 +1,4 @@
+import { scoringText } from './services/scoringDisplay';
 import {
   submitPendingActivity,
   describeSaveFailure,
@@ -569,6 +570,11 @@ function CoursePicker({
           화면 이동·잠금 시 자동 일시정지되며 등산 메뉴에서 임시 기록을 복구할 수 있습니다. 화면
           잠금 중 GPS 수집은 보장되지 않습니다.
         </p>
+        <p className="hiking-note">
+          방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야
+          합니다. 일시정지한 시간은 산행 시간에 포함되지 않으며, 하루에 한 번만 인증받을 수
+          있습니다.
+        </p>
       </div>
     </section>
   );
@@ -744,6 +750,7 @@ function ActiveHike({
               )}
             {saved && (
               <>
+                <p role="status">{scoringText(saved.scoring)}</p>
                 <button
                   type="button"
                   className="hiking-primary"
@@ -773,6 +780,11 @@ function ActiveHike({
           화면 이동·잠금 시 자동 일시정지됩니다. 등산 메뉴에서 마지막 임시 기록을 복구할 수
           있습니다. 임시 GPS 기록은 이 브라우저에서 마지막 저장 후 7일간 복구할 수 있습니다. 화면
           잠금 중 위치 수집은 보장되지 않습니다.
+        </p>
+        <p className="hiking-note">
+          방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야
+          합니다. 일시정지한 시간은 산행 시간에 포함되지 않으며, 하루에 한 번만 인증받을 수
+          있습니다.
         </p>
       </div>
     </section>

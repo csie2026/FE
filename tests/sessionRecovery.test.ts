@@ -112,7 +112,7 @@ test('pause checkpoints are idempotent and resuming a new segment never connects
   );
   assert.ok(draft.distanceMeters < 12);
 });
-test('ended recovery retains a frozen request body and drops precise GPS coordinates', () => {
+test('ended recovery retains one immutable GPS eligibility sample and drops the full GPS route', () => {
   const now = Date.now();
   const ended = completeSession(running(now), course, now);
   const draft = draftFromSession(ended, course, 1, crypto.randomUUID(), now);
