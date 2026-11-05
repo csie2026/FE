@@ -6,6 +6,7 @@ import {
 } from './services/activitySave';
 import HikingMap from './HikingMap';
 import HikingControls from './HikingControls';
+import { trackingStopMessages } from './services/sessionTracking';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, type HikingActivity } from '../../api';
 import { filterMountains } from './services/mountainSearch';
@@ -136,6 +137,12 @@ export default function HikingPage(props: HikingPageProps) {
                 ? '저장을 기다리는 산행이 있어요'
                 : '이어서 진행할 산행이 있어요'}
             </h1>
+            {pendingRecovery.draft.version === 1 && pendingRecovery.draft.state === 'COMPLETED' && (
+              <p role="alert">
+                구버전 종료 기록의 GPS 증거가 유실되었습니다. 기존 UUID로 서버 저장 여부를
+                확인합니다. 미저장 기록은 새 API로 저장할 수 없으며 임시 기록은 보존됩니다.
+              </p>
+            )}
             <b>{pendingRecovery.draft.mountainName}</b>
             <p>{pendingRecovery.draft.courseName}</p>
             <p>
@@ -596,7 +603,10 @@ function ActiveHike({
   onWriteJournal: (record: HikingActivity) => void;
 }) {
   const session = useHikingSession(course, userId, recovery, onRecoveryRequired);
-  const gps = useGeolocation(session.state !== 'COMPLETED', session.onPosition);
+  const gps = useGeolocation(
+    session.state !== 'COMPLETED' && !session.trackingStopReason,
+    session.onPosition,
+  );
   const usable = gps.status === 'AVAILABLE' && gps.position && isUsablePoint(gps.position);
   const remaining = usable ? distanceMeters(gps.position!, course.summitPoint) : null;
   const [saved, setSaved] = useState<HikingActivity | null>(null);
@@ -614,7 +624,13 @@ function ActiveHike({
         setSaveError(null);
       }
     });
-    submitPendingActivity(pendingInput, userId, controller.signal)
+    submitPendingActivity(
+      pendingInput,
+      userId,
+      controller.signal,
+      undefined,
+      recovery?.draft.version === 1 && recovery.draft.state === 'COMPLETED',
+    )
       .then((record) => {
         if (!active) return;
         markSaved();
@@ -630,7 +646,7 @@ function ActiveHike({
       active = false;
       controller.abort();
     };
-  }, [sessionState, pendingInput, isDurable, markSaved, saved, saveAttempt, userId]);
+  }, [sessionState, pendingInput, isDurable, markSaved, saved, saveAttempt, userId, recovery]);
   return (
     <section className="hiking-page" aria-label="GPS 등산 트래킹">
       <div className="hiking-course-heading">
@@ -639,7 +655,11 @@ function ActiveHike({
           <small>{course.courseName}</small>
         </div>
         <div className="hiking-heading-actions">
-          <span className="hiking-state">{labels[session.state]}</span>
+          <span className="hiking-state">
+            {session.trackingStopReason && session.state === 'PAUSED'
+              ? 'GPS 기록 중단'
+              : labels[session.state]}
+          </span>
           {(session.state === 'READY' || (session.state === 'COMPLETED' && saved)) && (
             <button type="button" className="hiking-back" onClick={onChangeCourse}>
               경로 변경
@@ -665,6 +685,11 @@ function ActiveHike({
                   : '산행 기록을 복구했습니다. 위치를 확인하고 계속하기를 눌러주세요.'}
             </p>
           )}
+        {session.trackingStopReason && session.state !== 'COMPLETED' && (
+          <p role="alert" className="recovery-storage-error">
+            {trackingStopMessages[session.trackingStopReason]}
+          </p>
+        )}
         {session.storageError && (
           <div role="alert" className="recovery-storage-error">
             <p>{session.storageError}</p>
@@ -682,21 +707,27 @@ function ActiveHike({
             ? saved
               ? 'GPS 추적 종료 · 등산기록이 저장되었습니다.'
               : 'GPS 추적 종료 · 등산기록을 저장해주세요.'
-            : messages[gps.status]}
-          {session.state !== 'COMPLETED' && gps.status === 'AVAILABLE' && gps.position && (
-            <small>
-              정확도 ±{Math.round(gps.position.accuracy)}m
-              {!usable ? ' · 유효한 GPS 좌표를 기다립니다' : ''}
-            </small>
-          )}
+            : session.trackingStopReason
+              ? 'GPS 수집 중단'
+              : messages[gps.status]}
           {session.state !== 'COMPLETED' &&
+            !session.trackingStopReason &&
+            gps.status === 'AVAILABLE' &&
+            gps.position && (
+              <small>
+                정확도 ±{Math.round(gps.position.accuracy)}m
+                {!usable ? ' · 유효한 GPS 좌표를 기다립니다' : ''}
+              </small>
+            )}
+          {session.state !== 'COMPLETED' &&
+            !session.trackingStopReason &&
             ['DENIED', 'UNAVAILABLE', 'TIMEOUT'].includes(gps.status) && (
               <button type="button" onClick={gps.retry}>
                 위치 다시 확인
               </button>
             )}
         </div>
-        {session.reachedSummit && (
+        {(saved ? saved.completed : session.reachedSummit) && (
           <p className="hiking-summit" role="status">
             정상 도달
           </p>

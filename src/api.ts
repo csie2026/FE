@@ -12,14 +12,14 @@ export interface RankingMember {
   rank: number;
 }
 
-export const getRankings = () => api<PublicProfile[]>('/api/rankings');
+export const getRankings = () => api<PublicProfile[]>("/api/rankings");
 export interface RankingSummary {
   members: RankingMember[];
   mine: RankingMember | null;
   totalMembers: number;
 }
 export const getRankingSummary = (signal?: AbortSignal) =>
-  api<RankingSummary>('/api/rankings/summary', 'GET', undefined, signal);
+  api<RankingSummary>("/api/rankings/summary", "GET", undefined, signal);
 export interface Member extends PublicProfile {
   backgroundImageUrl: string | null;
   birthYear: number | null;
@@ -37,10 +37,10 @@ export interface Journal {
   hikingDate: string;
   isPublic: boolean;
 }
-export type JournalInput = Pick<Journal, 'title' | 'content' | 'isPublic'> & {
+export type JournalInput = Pick<Journal, "title" | "content" | "isPublic"> & {
   hikingRecordId: number;
 };
-export type JournalUpdate = Pick<Journal, 'title' | 'content' | 'isPublic'>;
+export type JournalUpdate = Pick<Journal, "title" | "content" | "isPublic">;
 export interface GpsEvidence {
   latitude: number;
   longitude: number;
@@ -48,7 +48,7 @@ export interface GpsEvidence {
   recordedAt: string;
 }
 export interface ActivityScoring {
-  status: 'CERTIFIED' | 'GPS_REQUIRED' | 'BELOW_MINIMUM' | 'DAILY_LIMIT';
+  status: "CERTIFIED" | "GPS_REQUIRED" | "BELOW_MINIMUM" | "DAILY_LIMIT";
   certificationDate: string;
   visitPoints: number;
   summitPoints: number;
@@ -67,21 +67,43 @@ export interface HikingActivity {
   completed: boolean;
   journalId: number | null;
   scoring?: ActivityScoring | null;
+  gpsValidationVersion?: number | null;
 }
 export type HikingActivityInput = Pick<
   HikingActivity,
-  'mountainId' | 'courseId' | 'startedAt' | 'endedAt' | 'distanceMeters' | 'elapsedMs' | 'completed'
-> & { clientRequestId: string; gpsEvidence?: GpsEvidence };
+  | "mountainId"
+  | "courseId"
+  | "startedAt"
+  | "endedAt"
+  | "distanceMeters"
+  | "elapsedMs"
+  | "completed"
+> & {
+  clientRequestId: string;
+  gpsEvidence?: GpsEvidence;
+  gpsSegments?: GpsEvidencePoint[][];
+};
+export type GpsEvidencePoint = {
+  lat: number;
+  lng: number;
+  measuredAt: string;
+  accuracyMeters: number;
+};
 export const getHikingRecords = (signal?: AbortSignal) =>
-  api<HikingActivity[]>('/api/users/me/hiking-records', 'GET', undefined, signal);
+  api<HikingActivity[]>(
+    "/api/users/me/hiking-records",
+    "GET",
+    undefined,
+    signal,
+  );
 export const saveHikingRecord = (
   input: HikingActivityInput,
   signal?: AbortSignal,
   expectedUserId?: number,
 ) =>
   api<HikingActivity>(
-    '/api/users/me/hiking-records',
-    'POST',
+    "/api/users/me/hiking-records",
+    "POST",
     input,
     signal,
     expectedUserId === undefined
@@ -91,26 +113,30 @@ export const saveHikingRecord = (
           if (member.userId !== expectedUserId)
             throw new ApiError(
               401,
-              '산행을 기록한 회원과 현재 로그인한 회원이 다릅니다. 같은 회원으로 로그인해주세요.',
+              "산행을 기록한 회원과 현재 로그인한 회원이 다릅니다. 같은 회원으로 로그인해주세요.",
             );
         },
   );
-export const createJournal = (input: JournalInput) => api<Journal>('/api/journals', 'POST', input);
+export const createJournal = (input: JournalInput) =>
+  api<Journal>("/api/journals", "POST", input);
 export const updateJournal = (id: number, input: JournalUpdate) =>
-  api<Journal>(`/api/journals/${id}`, 'PATCH', input);
-export const deleteJournal = (id: number) => api<void>(`/api/journals/${id}`, 'DELETE');
+  api<Journal>(`/api/journals/${id}`, "PATCH", input);
+export const deleteJournal = (id: number) =>
+  api<void>(`/api/journals/${id}`, "DELETE");
 export const getJournal = (id: number) => api<Journal>(`/api/journals/${id}`);
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 // 세션 쿠키와 서버 오류 상태를 모든 도메인 요청에서 일관되게 다루는 공통 진입점이다.
 export async function api<T>(
   path: string,
-  method = 'GET',
+  method = "GET",
   body?: unknown,
   signal?: AbortSignal,
   beforeSend?: () => Promise<void>,
@@ -119,47 +145,80 @@ export async function api<T>(
   const multipart = body instanceof FormData;
   // 변경 요청은 현재 세션의 CSRF 토큰과 헤더 이름을 서버에서 받아 사용한다.
   // FormData는 브라우저가 multipart 경계를 지정해야 하므로 Content-Type을 직접 설정하지 않는다.
-  if (method !== 'GET') {
-    const csrfResponse = await fetch('/api/csrf', {
-      credentials: 'include',
-      cache: 'no-store',
+  if (method !== "GET") {
+    const csrfResponse = await fetch("/api/csrf", {
+      credentials: "include",
+      cache: "no-store",
       signal,
     });
     if (!csrfResponse.ok)
-      throw new ApiError(csrfResponse.status, '인증 정보를 확인할 수 없습니다.');
-    const csrf = (await csrfResponse.json()) as { headerName: string; token: string };
+      throw new ApiError(
+        csrfResponse.status,
+        "인증 정보를 확인할 수 없습니다.",
+      );
+    const csrf = (await csrfResponse.json()) as {
+      headerName: string;
+      token: string;
+    };
     headers[csrf.headerName] = csrf.token;
-    if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
+    if (body !== undefined && !multipart)
+      headers["Content-Type"] = "application/json";
   }
   // Activity retries recheck the member after CSRF retrieval, immediately before sending.
   if (beforeSend) await beforeSend();
-  if (signal?.aborted) throw new DOMException('요청이 취소되었습니다.', 'AbortError');
+  if (signal?.aborted)
+    throw new DOMException("요청이 취소되었습니다.", "AbortError");
   const response = await fetch(path, {
     method,
     headers,
-    credentials: 'include',
-    cache: 'no-store',
+    credentials: "include",
+    cache: "no-store",
     signal,
-    body: multipart ? body : body === undefined ? undefined : JSON.stringify(body),
+    body: multipart
+      ? body
+      : body === undefined
+        ? undefined
+        : JSON.stringify(body),
   });
   if (!response.ok) {
-    const error = (await response.json().catch(() => ({}))) as { message?: string };
-    throw new ApiError(response.status, error.message ?? '요청을 처리할 수 없습니다.');
+    const error = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      error?: string;
+    };
+    throw new ApiError(
+      response.status,
+      error.message ?? "요청을 처리할 수 없습니다.",
+      error.error,
+    );
   }
   // 삭제·로그아웃의 빈 응답을 JSON으로 읽지 않아 정상 처리 후 파싱 오류가 발생하지 않게 한다.
-  return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
+  return response.status === 204
+    ? (undefined as T)
+    : (response.json() as Promise<T>);
 }
 
-export type MemberImageKind = 'profile' | 'background';
+export type MemberImageKind = "profile" | "background";
 export const getCurrentMember = (signal?: AbortSignal) =>
-  api<Member>('/api/users/me', 'GET', undefined, signal);
-const checkImageOwner = async (expectedUserId: number | undefined, signal?: AbortSignal) => {
-  if (expectedUserId !== undefined && (await getCurrentMember(signal)).userId !== expectedUserId)
-    throw new ApiError(401, '로그인 계정이 변경되었어요. 다시 로그인해 주세요.');
+  api<Member>("/api/users/me", "GET", undefined, signal);
+const checkImageOwner = async (
+  expectedUserId: number | undefined,
+  signal?: AbortSignal,
+) => {
+  if (
+    expectedUserId !== undefined &&
+    (await getCurrentMember(signal)).userId !== expectedUserId
+  )
+    throw new ApiError(
+      401,
+      "로그인 계정이 변경되었어요. 다시 로그인해 주세요.",
+    );
 };
 const ownedImageResponse = (member: Member, expectedUserId?: number) => {
   if (expectedUserId !== undefined && member.userId !== expectedUserId)
-    throw new ApiError(401, '로그인 계정이 변경되었어요. 다시 로그인해 주세요.');
+    throw new ApiError(
+      401,
+      "로그인 계정이 변경되었어요. 다시 로그인해 주세요.",
+    );
   return member;
 };
 export async function uploadMemberImage(
@@ -169,13 +228,15 @@ export async function uploadMemberImage(
   expectedUserId?: number,
 ) {
   const body = new FormData();
-  body.append('file', file);
+  body.append("file", file);
   const member = await api<Member>(
     `/api/users/me/images/${kind}`,
-    'PUT',
+    "PUT",
     body,
     signal,
-    expectedUserId === undefined ? undefined : () => checkImageOwner(expectedUserId, signal),
+    expectedUserId === undefined
+      ? undefined
+      : () => checkImageOwner(expectedUserId, signal),
   );
   return ownedImageResponse(member, expectedUserId);
 }
@@ -187,12 +248,14 @@ export async function deleteMemberImage(
 ) {
   await api<void>(
     `/api/users/me/images/${kind}`,
-    'DELETE',
+    "DELETE",
     undefined,
     signal,
-    expectedUserId === undefined ? undefined : () => checkImageOwner(expectedUserId, signal),
+    expectedUserId === undefined
+      ? undefined
+      : () => checkImageOwner(expectedUserId, signal),
   );
   return ownedImageResponse(await getCurrentMember(signal), expectedUserId);
 }
 export const scoreText = (score: number | null) =>
-  score === null ? '점수 미산정' : `${score.toLocaleString()}점`;
+  score === null ? "점수 미산정" : `${score.toLocaleString()}점`;

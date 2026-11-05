@@ -27,6 +27,7 @@ const input: HikingActivityInput = Object.freeze({
   distanceMeters: 123.456,
   elapsedMs: 3600000,
   completed: true,
+  gpsSegments: [],
 });
 
 test('integrity guard rejects negative, nonfinite, missing and coerced distance values', () => {
@@ -163,4 +164,31 @@ test('raw accepted GPS reaches the frozen saved completion flag; display positio
   } finally {
     globalThis.fetch = original;
   }
+});
+
+test('GPS structure, ordering and independent point and UTF-8 byte limits follow BE', () => {
+  const p = { lat: 37, lng: 127, measuredAt: input.startedAt, accuracyMeters: 51 };
+  assert.ok(isValidActivityInput({ ...input, gpsSegments: [] }, now));
+  assert.ok(isValidActivityInput({ ...input, gpsSegments: [Array(10000).fill(p)] }, now));
+  for (const gpsSegments of [
+    undefined,
+    null,
+    {},
+    [null],
+    [[null]],
+    [[{ ...p, lat: 91 }]],
+    [[{ ...p, accuracyMeters: -1 }]],
+    [[{ ...p, measuredAt: 'bad' }]],
+    [[{ ...p, measuredAt: input.endedAt }], [p]],
+    [Array(10001).fill(p)],
+    Array(10001).fill([]),
+  ])
+    assert.equal(isValidActivityInput({ ...input, gpsSegments }, now), false);
+  const body = { ...input, gpsSegments: [], extra: '' };
+  const bytes = new TextEncoder().encode(JSON.stringify(body)).length;
+  body.extra = 'a'.repeat(2 * 1024 * 1024 - bytes);
+  assert.ok(isValidActivityInput(body, now));
+  body.extra += '?';
+  assert.equal(isValidActivityInput(body, now), false);
+  assert.ok(isValidActivityInput({ ...input, gpsSegments: undefined }, now, true));
 });
