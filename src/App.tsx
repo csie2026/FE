@@ -999,6 +999,11 @@ function App() {
                 required
                 autoComplete="nickname"
               />
+                {nickname.length >= 30 && (
+                  <span style={{ color: '#c2410c', fontSize: '12px' }}>
+                    닉네임은 최대 30자까지 입력할 수 있습니다.
+                  </span>
+                )}
             </label>
             <label>
               출생연도
