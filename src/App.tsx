@@ -12,6 +12,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import './App.css';
 import HikingPage from './components/hiking/HikingPage';
 import MountainCourseInfo from './components/MountainCourseInfo';
+import MountainWeather from './components/MountainWeather';
 import MyPage from './components/profile/MyPage';
 import MountainCollection from './components/profile/MountainCollection';
 import RankingPage from './components/ranking/RankingPage';
@@ -882,6 +883,7 @@ function App() {
                 <small>난이도</small>
               </div>
             </div>
+            <MountainWeather mountainId={mountain.id} />
             <MountainCourseInfo
               key={mountain.id}
               mountainId={mountain.id}

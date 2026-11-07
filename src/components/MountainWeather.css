@@ -1,0 +1,58 @@
+.mountain-weather {
+  min-width: 0;
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid #dce5df;
+  border-radius: 12px;
+  background: #f7faf8;
+  font-size: 13px;
+}
+.mountain-weather h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+.mountain-weather p {
+  margin: 8px 0;
+}
+.mountain-weather__note {
+  color: #52665b;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.mountain-weather details {
+  border-top: 1px solid #dce5df;
+  padding: 8px 0;
+}
+.mountain-weather summary {
+  min-height: 36px;
+  padding: 8px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+.mountain-weather button {
+  min-height: 44px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.mountain-weather__scroll {
+  max-height: 240px;
+  max-width: 100%;
+  overflow: auto;
+}
+.mountain-weather table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 510px;
+  font-size: 12px;
+}
+.mountain-weather caption {
+  text-align: left;
+  padding: 8px 0;
+}
+.mountain-weather th,
+.mountain-weather td {
+  padding: 8px;
+  border-bottom: 1px solid #dce5df;
+  text-align: left;
+  white-space: nowrap;
+}

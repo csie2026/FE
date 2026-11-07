@@ -259,3 +259,32 @@ export async function deleteMemberImage(
 }
 export const scoreText = (score: number | null) =>
   score === null ? "점수 미산정" : `${score.toLocaleString()}점`;
+
+export interface WeatherHour {
+  time: string;
+  temperature: number | null;
+  sky: number | null;
+  pty: number | null;
+  pop: number | null;
+  precipitationMm: number | null;
+  snowCm: number | null;
+  windSpeed: number | null;
+  humidity: number | null;
+}
+export interface MountainWeather {
+  mountainId: number;
+  mountainName: string;
+  baseTime: string;
+  days:
+    | {
+        date: string;
+        level: 'GOOD' | 'CAUTION' | 'BAD' | null;
+        message: string | null;
+        notes: string[] | null;
+        hours: WeatherHour[] | null;
+      }[]
+    | null;
+  source: string | null;
+}
+export const getMountainWeather = (mountainId: number, signal?: AbortSignal) =>
+  api<MountainWeather>(`/api/mountains/${mountainId}/weather`, 'GET', undefined, signal);
