@@ -28,7 +28,6 @@ export default function MountainWeather({ mountainId }: { mountainId: string | n
         if (active) setResult({ request, error: weatherError(cause) });
       },
     );
-    // Ignore late results without aborting a request shared by another view.
     return () => {
       active = false;
     };

@@ -1,7 +1,5 @@
 import { ApiError, getMountainWeather, type MountainWeather } from '../api.ts';
 
-// A short, bounded memory cache shares requests across detail, dialog and GPS views.
-// The server still owns the grid/base-time cache. No weather or location is persisted.
 const cache = new Map<number, { expires: number; value: Promise<MountainWeather> }>();
 const TTL = 5 * 60 * 1000;
 export function loadMountainWeather(mountainId: number): Promise<MountainWeather> {
@@ -35,7 +33,6 @@ export function weatherError(cause: unknown): string {
   return '날씨를 불러오지 못했어요. 연결 상태를 확인하고 다시 시도해주세요.';
 }
 
-// BE LocalDateTime values are Korea-local forecast times, not UTC observations.
 export function forecastTime(value: string | null | undefined): string {
   const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/);
   if (!match) return '시각 미제공';
