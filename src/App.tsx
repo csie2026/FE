@@ -43,7 +43,6 @@ type Screen =
   | 'login'
   | 'explore'
   | 'detail'
-  | 'hiking'
   | 'hikingTracking'
   | 'diary'
   | 'journalDetail'
@@ -100,7 +99,6 @@ function App() {
   const [hikingSelection, setHikingSelection] = useState<HikingSelection | null>(null);
   const [exploreRegion, setExploreRegion] = useState(0);
   const [exploreCity, setExploreCity] = useState<string | null>(null);
-  const [started, setStarted] = useState(false);
   const [isPublic, setIsPublic] = useState(false);
   const goalMonth = koreanMonthBounds().key;
   const explore = useExploreMountains(me?.profileCompleted ? me.userId : null);
@@ -399,7 +397,6 @@ function App() {
         'hikingTracking',
         'explore',
         'detail',
-        'hiking',
         'diary',
         'journalDetail',
         'write',
@@ -891,52 +888,9 @@ function App() {
               <button onClick={() => go('diary')}>등산 기록하기</button>
               <button
                 className="primary"
-                onClick={() => {
-                  setStarted(true);
-                  go('hikingTracking');
-                }}
+                onClick={() => go('hikingTracking')}
               >
                 등산 앱과 연동하기
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-      {screen === 'hiking' && (
-        <>
-          {header('등산 중', true)}
-          <div className="trail-map">
-            <div className="map-pattern dense" />
-            <svg className="trail-line" viewBox="0 0 300 400">
-              <path
-                d="M145 375 C120 330 184 310 156 270 S115 210 160 178 204 134 170 100 160 65 185 28"
-                fill="none"
-                stroke="#155b43"
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeDasharray="2 3"
-              />
-            </svg>
-            <span className="live-pill">Ⅱ 오프라인</span>
-            <span className="map-control">◎</span>
-            <span className="map-control second">➤</span>
-            <span className="trail-start">시작</span>
-          </div>
-          <div className="hike-panel">
-            <div className="hike-stats">
-              <b>⌁ 520m</b>
-              <b>↪ 2.3km</b>
-            </div>
-            <div className="hike-stats timer">
-              <b>{started ? '00:18:42' : '01:15:20'}</b>
-              <b>◴ 2.4km/h</b>
-            </div>
-            <div className="bottom-actions">
-              <button onClick={() => setStarted(!started)}>
-                {started ? 'Ⅱ 일시정지' : '▶ 계속하기'}
-              </button>
-              <button className="primary" onClick={() => go('hikingTracking')}>
-                실제 산행 시작하기
               </button>
             </div>
           </div>
