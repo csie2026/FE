@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import type { City, Mountain } from '../data/exploreRegions';
 import MountainCard from './MountainCard';
 import MountainCourseInfo from './MountainCourseInfo';
+import MountainWeather from './MountainWeather';
 import { matchesMountain } from '../services/exploreMountains';
 
 type Props = {
@@ -221,6 +222,7 @@ export default function CityMountainList({
                 정상 좌표: {viewed.lat}, {viewed.lng}
               </p>
             )}
+            <MountainWeather mountainId={viewed.id} />
             <MountainCourseInfo
               key={viewed.id}
               mountainId={viewed.id}

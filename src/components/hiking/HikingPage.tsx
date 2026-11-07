@@ -6,6 +6,7 @@ import {
 } from './services/activitySave';
 import HikingMap from './HikingMap';
 import HikingControls from './HikingControls';
+import MountainWeather from '../MountainWeather';
 import { trackingStopMessages } from './services/sessionTracking';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, type HikingActivity } from '../../api';
@@ -674,6 +675,7 @@ function ActiveHike({
         state={session.state}
       />
       <div className="hiking-panel">
+        {session.state === 'READY' && <MountainWeather mountainId={course.mountainId} />}
         {recovery &&
           session.clientRequestId === recovery.draft.clientRequestId &&
           session.state !== 'READY' && (
