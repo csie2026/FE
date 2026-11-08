@@ -21,6 +21,9 @@ export interface RankingSummary {
 export const getRankingSummary = (signal?: AbortSignal) =>
   api<RankingSummary>('/api/rankings/summary', 'GET', undefined, signal);
 export interface Member extends PublicProfile {
+  provider?: string | null;
+  email?: string | null;
+  joinedAt?: string | null;
   backgroundImageUrl: string | null;
   birthYear: number | null;
   age: number | null;
@@ -112,9 +115,9 @@ export const updateJournal = (id: number, input: JournalUpdate) =>
 export const deleteJournal = (id: number) => api<void>(`/api/journals/${id}`, 'DELETE');
 export const getJournal = (id: number) => api<Journal>(`/api/journals/${id}`);
 let sessionGeneration = 0;
-let sessionExpired: (() => void) | undefined;
+let sessionExpired: ((code?: string, userId?: number) => void) | undefined;
 
-export function subscribeSessionExpiry(listener: () => void) {
+export function subscribeSessionExpiry(listener: (code?: string, userId?: number) => void) {
   const generation = ++sessionGeneration;
   sessionExpired = listener;
   return () => {
@@ -136,7 +139,7 @@ export class ApiError extends Error {
 }
 function fallbackMessage(status: number, message: string) {
   return [502, 503, 504].includes(status)
-    ? "서버에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
+    ? '서버에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해주세요.'
     : message;
 }
 // 세션 쿠키와 서버 오류 상태를 모든 도메인 요청에서 일관되게 다루는 공통 진입점이다.
@@ -148,9 +151,9 @@ export async function api<T>(
   beforeSend?: () => Promise<void>,
 ): Promise<T> {
   const generation = sessionGeneration;
-  const checkSession = (status: number) => {
+  const checkSession = (status: number, code?: string, userId?: number) => {
     if (status === 401 && path !== '/api/logout' && generation === sessionGeneration)
-      sessionExpired?.();
+      sessionExpired?.(code, userId);
   };
   const headers: Record<string, string> = {};
   const multipart = body instanceof FormData;
@@ -188,14 +191,19 @@ export async function api<T>(
     body: multipart ? body : body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
-    checkSession(response.status);
     const error = (await response.json().catch(() => ({}))) as {
       message?: string;
       error?: string;
+      userId?: number;
     };
+    checkSession(
+      response.status,
+      error.error,
+      Number.isSafeInteger(error.userId) && error.userId! > 0 ? error.userId : undefined,
+    );
     throw new ApiError(
       response.status,
-      error.message ?? fallbackMessage(response.status, "요청을 처리할 수 없습니다."),
+      error.message ?? fallbackMessage(response.status, '요청을 처리할 수 없습니다.'),
       error.error,
     );
   }

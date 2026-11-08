@@ -26,7 +26,7 @@ const mainMenus: { destination: DrawerDestination; label: string }[] = [
   { destination: 'profile', label: '마이페이지' },
 ];
 const utilities: { destination: DrawerDestination; label: string }[] = [
-  { destination: 'accountSettings', label: '계정 설정' },
+  { destination: 'accountSettings', label: '설정' },
   { destination: 'about', label: '앱 정보' },
 ];
 
