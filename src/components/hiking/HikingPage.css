@@ -59,6 +59,8 @@
   font-size: 13px;
 }
 .hiking-back {
+  min-height: 44px;
+  min-width: 44px;
   align-self: flex-start;
   border: 0;
   background: transparent;
@@ -78,7 +80,7 @@
   padding: 13px;
   background: white;
   font: inherit;
-  font-size: 14px;
+  font-size: 16px;
 }
 .hiking-option-list {
   padding: 0 18px 24px;

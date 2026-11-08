@@ -241,7 +241,8 @@
   display: none;
 }
 .region-city-filters button {
-  min-height: 34px;
+  min-height: 44px;
+  min-width: 44px;
   flex: none;
   padding: 0 10px;
   border: 1px solid #d6e0d5;
@@ -260,7 +261,8 @@
   gap: 6px;
 }
 .mountain-dialog-actions button {
-  min-height: 34px;
+  min-height: 44px;
+  min-width: 44px;
   padding: 0 9px;
   border: 1px solid #d8e2d7;
   border-radius: 10px;
@@ -485,4 +487,5 @@
   border: 1px solid #cbd9ce;
   border-radius: 10px;
   font: inherit;
+  font-size: 16px;
 }

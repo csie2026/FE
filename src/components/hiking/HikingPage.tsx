@@ -69,6 +69,16 @@ type SessionProps = {
   onRecoveryRequired: () => void;
 };
 export default function HikingPage(props: HikingPageProps) {
+  if (!window.isSecureContext || typeof window.crypto?.randomUUID !== 'function')
+    return (
+      <section className="hiking-page">
+        <p role="alert">GPS 산행을 이용하려면 HTTPS 주소를 지원하는 최신 브라우저에서 열어주세요.</p>
+      </section>
+    );
+  return <HikingSessionPage {...props} />;
+}
+
+function HikingSessionPage(props: HikingPageProps) {
   const [pendingRecovery, setPendingRecovery] = useState<RecoveryRead>(() =>
     readRecovery(props.userId),
   );
@@ -185,7 +195,7 @@ export default function HikingPage(props: HikingPageProps) {
         </div>
         <p className="hiking-note">
           임시 위치 기록은 이 브라우저에 저장됩니다. 마지막 저장 후 7일간 복구할 수 있고, 만료된
-          기록은 다음 확인 때 삭제됩니다. 공용 기기에서는 저장 완료 또는 임시 기록 삭제를
+          기록은 자동 복구가 중단되며 직접 삭제할 때까지 보관됩니다. 공용 기기에서는 저장 완료 또는 임시 기록 삭제를
           확인해주세요. 화면 잠금 중 GPS 수집은 보장되지 않습니다.
         </p>
       </section>
@@ -575,8 +585,8 @@ function CoursePicker({
           </button>
         </div>
         <p className="hiking-note">
-          화면 이동·잠금 시 자동 일시정지되며 등산 메뉴에서 임시 기록을 복구할 수 있습니다. 화면
-          잠금 중 GPS 수집은 보장되지 않습니다.
+          화면이 숨겨진 것을 감지하면 일시정지합니다. 앱 전환이나 잠금 중에는 GPS 수집이 제한될 수
+          있습니다. 복귀하면 산행 상태를 확인하고 계속하기를 눌러주세요.
         </p>
         <p className="hiking-note">
           방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야
@@ -718,7 +728,9 @@ function ActiveHike({
             gps.position && (
               <small>
                 정확도 ±{Math.round(gps.position.accuracy)}m
-                {!usable ? ' · 유효한 GPS 좌표를 기다립니다' : ''}
+                {gps.position.accuracy > GPS_FILTER.maxAccuracyMeters
+                  ? ' · 정확도가 낮아 이 위치는 기록하지 않습니다. 탁 트인 곳에서 기다려주세요.'
+                  : !usable && ' · 유효한 GPS 좌표를 기다립니다'}
               </small>
             )}
           {session.state !== 'COMPLETED' &&
@@ -810,9 +822,9 @@ function ActiveHike({
           정상 도달 반경 {SUMMIT_RADIUS_METERS}m · GPS 정확도 {GPS_FILTER.maxAccuracyMeters}m 이내
         </p>
         <p className="hiking-note">
-          화면 이동·잠금 시 자동 일시정지됩니다. 등산 메뉴에서 마지막 임시 기록을 복구할 수
-          있습니다. 임시 GPS 기록은 이 브라우저에서 마지막 저장 후 7일간 복구할 수 있습니다. 화면
-          잠금 중 위치 수집은 보장되지 않습니다.
+          화면이 숨겨진 것을 감지하면 일시정지합니다. 앱 전환이나 잠금 중에는 GPS 수집이 제한될 수
+          있습니다. 복귀하면 상태를 확인하세요. 등산 메뉴에서 마지막으로 저장된 기록을 7일간
+          복구할 수 있습니다.
         </p>
         <p className="hiking-note">
           방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야
