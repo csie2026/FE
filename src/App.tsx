@@ -1,4 +1,5 @@
 import ProfileAvatar from './components/common/ProfileAvatar';
+import { createLogout } from './services/logout';
 import { koreanMonthBounds } from './services/hikingStatistics';
 import { buildCompletedMountainCollection } from './services/completedHikes';
 import { scoringText } from './components/hiking/services/scoringDisplay';
@@ -8,7 +9,16 @@ import {
   type HikingSelection,
 } from './components/hiking/services/hikingNavigation';
 import logo from './assets/topeak-logo.svg';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import './App.css';
 import HikingPage from './components/hiking/HikingPage';
 import MountainCourseInfo from './components/MountainCourseInfo';
@@ -25,6 +35,7 @@ import SideDrawer from './components/common/SideDrawer';
 import ComingSoonPage from './components/common/ComingSoonPage';
 import {
   api,
+  subscribeSessionExpiry,
   ApiError,
   deleteJournal,
   getJournal,
@@ -75,9 +86,12 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [logoutError, setLogoutError] = useState(false);
   const [me, setMe] = useState<Member | null>(null);
   const [profileRefresh, setProfileRefresh] = useState(0);
   const accountVersion = useRef(0);
+  const logoutPending = useRef(false);
+  const logoutAction = useRef<ReturnType<typeof createLogout> | null>(null);
   const memberImageVersion = useRef(0);
   const [nickname, setNickname] = useState('');
   const [birthYear, setBirthYear] = useState('');
@@ -104,11 +118,15 @@ function App() {
   const goalMonth = koreanMonthBounds().key;
   const explore = useExploreMountains(me?.profileCompleted ? me.userId : null);
   const mountainCatalog = explore.items;
-  const knownMountainIds = useMemo(() => new Set(mountainCatalog.map((item) => item.id)), [mountainCatalog]);
-  const { ids: favoriteIds, toggle: toggleFavorite, error: favoriteError } = usePersistentIds(
-    me?.profileCompleted ? me.userId : null,
-    knownMountainIds,
+  const knownMountainIds = useMemo(
+    () => new Set(mountainCatalog.map((item) => item.id)),
+    [mountainCatalog],
   );
+  const {
+    ids: favoriteIds,
+    toggle: toggleFavorite,
+    error: favoriteError,
+  } = usePersistentIds(me?.profileCompleted ? me.userId : null, knownMountainIds);
   const exploreRegions = useMemo(() => groupExploreMountains(mountainCatalog), [mountainCatalog]);
   const mountain = mountainCatalog.find((item) => item.id === selected);
   const favoriteMountains = mountainCatalog.filter((item) => favoriteIds.includes(item.id));
@@ -237,6 +255,7 @@ function App() {
     accountVersion.current += 1;
     clearLegacyMemberImages();
     setMe(null);
+    setLogoutError(false);
     setHikingSelection(null);
     setNickname('');
     setBirthYear('');
@@ -252,6 +271,7 @@ function App() {
   }, []);
   const fail = useCallback(
     (e: unknown) => {
+      if (logoutPending.current && e instanceof ApiError && e.status === 401) return;
       setError(e instanceof Error ? e.message : '요청에 실패했습니다.');
       if (e instanceof ApiError && e.status === 401) {
         setDrawerOpen(false);
@@ -265,6 +285,13 @@ function App() {
       }
     },
     [clearAccount],
+  );
+  useLayoutEffect(
+    () =>
+      subscribeSessionExpiry(() =>
+        fail(new ApiError(401, '로그인 세션이 만료되었습니다. 다시 로그인해주세요.')),
+      ),
+    [fail, me?.userId],
   );
   const monthlyGoalState = useMonthlyGoals(
     me?.profileCompleted ? me.userId : null,
@@ -525,7 +552,16 @@ function App() {
     return () => {
       active = false;
     };
-  }, [screen, publicId, journalId, editing, me?.userId, me?.profileCompleted, profileRefresh, fail]);
+  }, [
+    screen,
+    publicId,
+    journalId,
+    editing,
+    me?.userId,
+    me?.profileCompleted,
+    profileRefresh,
+    fail,
+  ]);
   useEffect(() => {
     document.title = 'ToPeak';
   }, []);
@@ -536,20 +572,28 @@ function App() {
     setPublicId(id);
     setScreen('publicProfile', id);
   };
-  const logout = async () => {
-    setDrawerOpen(false);
-    setBusy(true);
-    clearAccount();
-    setScreen('login');
-    window.history.replaceState(null, '', '/');
-    try {
-      await api('/api/logout', 'POST');
-    } catch (cause) {
-      fail(cause);
-    } finally {
-      setBusy(false);
+  const updateLogoutPending = useCallback((pending: boolean) => {
+    logoutPending.current = pending;
+    setBusy(pending);
+    if (pending) {
+      setDrawerOpen(false);
+      setLogoutError(false);
+      setError('');
     }
-  };
+  }, []);
+  useEffect(() => {
+    logoutAction.current = createLogout({
+      onPending: updateLogoutPending,
+      onSuccess: () => {
+        clearAccount();
+        setError('');
+        setCurrentScreen('login');
+        window.history.replaceState({ toPeakScreen: 'login', toPeakIndex: 0 }, '', '/');
+      },
+      onFailure: () => setLogoutError(true),
+    });
+  }, [clearAccount, updateLogoutPending]);
+  const logout = () => logoutAction.current?.();
   // 프로필 저장 응답을 회원 상태에 반영한 뒤, 최초 설정과 기존 프로필 편집의 복귀 화면을 구분한다.
   const saveProfile = async () => {
     const version = accountVersion.current;
@@ -609,8 +653,12 @@ function App() {
     }
   };
   const avatar = (profile: PublicProfile) => (
-    <ProfileAvatar userId={profile.userId} nickname={profile.nickname}
-      src={profile.profileImageUrl} className="avatar" />
+    <ProfileAvatar
+      userId={profile.userId}
+      nickname={profile.nickname}
+      src={profile.profileImageUrl}
+      className="avatar"
+    />
   );
   // 화면에서 중복 삭제와 타인 일지 삭제를 막고, 실제 소유권은 서버가 다시 검증한다.
   // 삭제한 상세 화면은 history에서 교체해 뒤로 가기로 같은 항목을 다시 열지 않게 한다.
@@ -744,6 +792,17 @@ function App() {
         onLogout={() => void logout()}
         busy={busy}
       />
+      {logoutError && (
+        <div className="error-banner" role="alert">
+          로그아웃 완료를 확인하지 못했습니다. 다시 시도해주세요.
+          <button type="button" disabled={busy} onClick={() => void logout()}>
+            로그아웃 다시 시도
+          </button>
+          <button type="button" onClick={() => setLogoutError(false)}>
+            닫기
+          </button>
+        </div>
+      )}
       {error && (
         <div className="error-banner" role="alert">
           {error}
@@ -751,7 +810,9 @@ function App() {
         </div>
       )}
       {me?.profileCompleted && favoriteError && (
-        <div className="error-banner" role="alert">{favoriteError}</div>
+        <div className="error-banner" role="alert">
+          {favoriteError}
+        </div>
       )}
       {screen === 'login' && (
         <section className="login-screen">
@@ -955,11 +1016,11 @@ function App() {
                 required
                 autoComplete="nickname"
               />
-                {nickname.length >= 30 && (
-                  <span style={{ color: '#c2410c', fontSize: '12px' }}>
-                    닉네임은 최대 30자까지 입력할 수 있습니다.
-                  </span>
-                )}
+              {nickname.length >= 30 && (
+                <span style={{ color: '#c2410c', fontSize: '12px' }}>
+                  닉네임은 최대 30자까지 입력할 수 있습니다.
+                </span>
+              )}
             </label>
             <label>
               출생연도
@@ -1175,7 +1236,11 @@ function App() {
               onAuthError={fail}
               journalCount={busy || Boolean(error) ? null : journals.length}
               statistics={
-                completedHikes.loading || completedHikes.error || completedHikes.statistics.month !== goalMonth ? null : completedHikes.statistics
+                completedHikes.loading ||
+                completedHikes.error ||
+                completedHikes.statistics.month !== goalMonth
+                  ? null
+                  : completedHikes.statistics
               }
               monthlyGoals={monthlyGoalState.goals}
               onSaveGoals={monthlyGoalState.saveGoals}
