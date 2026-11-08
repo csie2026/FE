@@ -134,6 +134,11 @@ export class ApiError extends Error {
     this.code = code;
   }
 }
+function fallbackMessage(status: number, message: string) {
+  return [502, 503, 504].includes(status)
+    ? "서버에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
+    : message;
+}
 // 세션 쿠키와 서버 오류 상태를 모든 도메인 요청에서 일관되게 다루는 공통 진입점이다.
 export async function api<T>(
   path: string,
@@ -159,7 +164,10 @@ export async function api<T>(
     });
     if (!csrfResponse.ok) {
       checkSession(csrfResponse.status);
-      throw new ApiError(csrfResponse.status, '인증 정보를 확인할 수 없습니다.');
+      throw new ApiError(
+        csrfResponse.status,
+        fallbackMessage(csrfResponse.status, '인증 정보를 확인할 수 없습니다.'),
+      );
     }
     const csrf = (await csrfResponse.json()) as {
       headerName: string;
@@ -185,7 +193,11 @@ export async function api<T>(
       message?: string;
       error?: string;
     };
-    throw new ApiError(response.status, error.message ?? '요청을 처리할 수 없습니다.', error.error);
+    throw new ApiError(
+      response.status,
+      error.message ?? fallbackMessage(response.status, "요청을 처리할 수 없습니다."),
+      error.error,
+    );
   }
   // 삭제·로그아웃의 빈 응답을 JSON으로 읽지 않아 정상 처리 후 파싱 오류가 발생하지 않게 한다.
   return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);

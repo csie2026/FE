@@ -56,7 +56,8 @@
   color: #17261f;
   font-size: 22px;
   padding: 5px;
-  min-width: 38px;
+  min-width: 44px;
+  min-height: 44px;
 }
 .back {
   font-size: 23px;

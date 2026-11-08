@@ -136,3 +136,21 @@ test('score distinguishes an uncalculated score from zero', () => {
   assert.equal(scoreText(0), '0점');
   assert.equal(scoreText(1250), '1,250점');
 });
+
+test('프록시 장애는 API 조회와 CSRF 발급 모두에서 재시도 안내와 상태를 보존한다', async () => {
+  const original = globalThis.fetch;
+  const paths: string[] = [];
+  globalThis.fetch = async (input) => {
+    paths.push(String(input));
+    return new Response('Bad Gateway', { status: 502 });
+  };
+  try {
+    for (const method of ['GET', 'POST']) {
+      await assert.rejects(api('/api/users/me', method), (error) =>
+        error instanceof ApiError && error.status === 502 && error.message.includes('다시 시도'));
+    }
+    assert.deepEqual(paths, ['/api/users/me', '/api/csrf']);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
