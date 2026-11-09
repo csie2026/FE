@@ -1505,7 +1505,7 @@ function App() {
       )}
       {screen === 'accountSettings' && me && (
         <>
-          {header('설정', true)}
+          {header('계정', true)}
           <SettingsPage
             key={me.userId}
             userId={me.userId}

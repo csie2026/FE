@@ -53,7 +53,7 @@ export default function SettingsPage({
     }
   }
   return (
-    <section className="scroll-content settings-content" aria-label="설정">
+    <section className="scroll-content settings-content" aria-label="계정">
       <article className="settings-card">
         <h2>회원 정보</h2>
         <p>ToPeak에 등록된 계정 정보입니다.</p>
