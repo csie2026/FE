@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errorMessages';
 import { scoringText } from './services/scoringDisplay';
 import {
   submitPendingActivity,
@@ -72,7 +73,9 @@ export default function HikingPage(props: HikingPageProps) {
   if (!window.isSecureContext || typeof window.crypto?.randomUUID !== 'function')
     return (
       <section className="hiking-page">
-        <p role="alert">GPS 산행을 이용하려면 HTTPS 주소를 지원하는 최신 브라우저에서 열어주세요.</p>
+        <p role="alert">
+          GPS 산행을 이용하려면 HTTPS 주소를 지원하는 최신 브라우저에서 열어주세요.
+        </p>
       </section>
     );
   return <HikingSessionPage {...props} />;
@@ -111,7 +114,9 @@ function HikingSessionPage(props: HikingPageProps) {
       setRecoveryError('');
       props.onRestoreSelection({ mountainId: draft.mountainId, courseId: draft.courseId });
     } catch (cause) {
-      setRecoveryError(cause instanceof Error ? cause.message : '산행 복구에 실패했습니다.');
+      setRecoveryError(
+        getErrorMessage(cause, '산행 기록을 복구하지 못했습니다. 다시 시도해주세요.'),
+      );
     }
   };
   const discard = () => {
@@ -195,8 +200,8 @@ function HikingSessionPage(props: HikingPageProps) {
         </div>
         <p className="hiking-note">
           임시 위치 기록은 이 브라우저에 저장됩니다. 마지막 저장 후 7일간 복구할 수 있고, 만료된
-          기록은 자동 복구가 중단되며 직접 삭제할 때까지 보관됩니다. 공용 기기에서는 저장 완료 또는 임시 기록 삭제를
-          확인해주세요. 화면 잠금 중 GPS 수집은 보장되지 않습니다.
+          기록은 자동 복구가 중단되며 직접 삭제할 때까지 보관됩니다. 공용 기기에서는 저장 완료 또는
+          임시 기록 삭제를 확인해주세요. 화면 잠금 중 GPS 수집은 보장되지 않습니다.
         </p>
       </section>
     );
@@ -263,9 +268,10 @@ function LinkedHike({
                 ? '로그인 세션이 만료되었습니다. 다시 로그인해주세요.'
                 : cause instanceof ApiError && cause.status === 404
                   ? '선택한 산 또는 등산로를 찾을 수 없습니다. 다시 선택해주세요.'
-                  : cause instanceof Error
-                    ? cause.message
-                    : '선택한 산행 경로를 불러오지 못했습니다.',
+                  : getErrorMessage(
+                      cause,
+                      '선택한 산행 경로를 불러오지 못했습니다. 다시 시도해주세요.',
+                    ),
           });
       });
     return () => controller.abort();
@@ -341,7 +347,7 @@ function CoursePicker({
             '산·코스 조회 API를 찾을 수 없습니다. 백엔드에 최신 조회 API가 적용되었는지 확인해주세요.',
           );
         } else {
-          setError(cause instanceof Error ? cause.message : '목록을 불러오지 못했습니다.');
+          setError(getErrorMessage(cause, '목록을 불러오지 못했습니다. 다시 시도해주세요.'));
         }
       })
       .finally(() => {
@@ -366,7 +372,7 @@ function CoursePicker({
       setSelected(toHikingCourse(mountain, detail));
     } catch (cause) {
       if (!controller.signal.aborted)
-        setError(cause instanceof Error ? cause.message : '경로를 불러오지 못했습니다.');
+        setError(getErrorMessage(cause, '경로를 불러오지 못했습니다. 다시 시도해주세요.'));
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }
@@ -589,9 +595,8 @@ function CoursePicker({
           있습니다. 복귀하면 산행 상태를 확인하고 계속하기를 눌러주세요.
         </p>
         <p className="hiking-note">
-          방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야
-          합니다. 일시정지한 시간은 산행 시간에 포함되지 않으며, 하루에 한 번만 인증받을 수
-          있습니다.
+          방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야 합니다.
+          일시정지한 시간은 산행 시간에 포함되지 않으며, 하루에 한 번만 인증받을 수 있습니다.
         </p>
       </div>
     </section>
@@ -823,13 +828,12 @@ function ActiveHike({
         </p>
         <p className="hiking-note">
           화면이 숨겨진 것을 감지하면 일시정지합니다. 앱 전환이나 잠금 중에는 GPS 수집이 제한될 수
-          있습니다. 복귀하면 상태를 확인하세요. 등산 메뉴에서 마지막으로 저장된 기록을 7일간
-          복구할 수 있습니다.
+          있습니다. 복귀하면 상태를 확인하세요. 등산 메뉴에서 마지막으로 저장된 기록을 7일간 복구할
+          수 있습니다.
         </p>
         <p className="hiking-note">
-          방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야
-          합니다. 일시정지한 시간은 산행 시간에 포함되지 않으며, 하루에 한 번만 인증받을 수
-          있습니다.
+          방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야 합니다.
+          일시정지한 시간은 산행 시간에 포함되지 않으며, 하루에 한 번만 인증받을 수 있습니다.
         </p>
       </div>
     </section>

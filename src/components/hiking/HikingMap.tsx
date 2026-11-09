@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errorMessages';
 import { useEffect, useRef, useState } from 'react';
 import { loadMapSdk, type KakaoMaps } from './services/mapSdk';
 import { courseProgressPath, nearestCoursePosition } from './mapDisplayPath';
@@ -91,7 +92,8 @@ export default function HikingMap({ course, position, segments, state }: Props) 
         setReady(true);
       })
       .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : '지도 로딩 실패');
+        if (active)
+          setError(getErrorMessage(cause, '지도를 불러오지 못했습니다. 다시 시도해주세요.'));
       });
     return () => {
       active = false;

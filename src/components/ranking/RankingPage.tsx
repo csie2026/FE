@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errorMessages';
 import ProfileAvatar from '../common/ProfileAvatar';
 import { useEffect, useState } from 'react';
 import {
@@ -67,7 +68,7 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
       })
       .catch((cause: unknown) => {
         if (!active) return;
-        setError(cause instanceof Error ? cause.message : '랭킹을 불러오지 못했어요.');
+        setError(getErrorMessage(cause, '랭킹을 불러오지 못했어요. 다시 시도해주세요.'));
         if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
       })
       .finally(() => {

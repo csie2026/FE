@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../../utils/errorMessages';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { trackDistance } from '../trackUtils';
 import type { GpsPoint, HikingCourse } from '../types';
@@ -45,7 +46,8 @@ export function useHikingSession(
   }, []);
   const persist = useCallback(
     (next: Session, mode: 'create' | 'update' = 'update') => {
-      if (retired.current || !next.clientRequestId) throw new Error('Session is no longer active');
+      if (retired.current || !next.clientRequestId)
+        throw new Error('산행 기록이 더 이상 활성 상태가 아닙니다. 현재 기록을 다시 확인해주세요.');
       const timestamp = Date.now();
       assertTrackingCapacity(next, course, userId, ownerToken, timestamp);
       const draft = draftFromSession(next, course, userId, ownerToken, timestamp);
@@ -66,9 +68,10 @@ export function useHikingSession(
       } catch (cause) {
         setDurable(false);
         setStorageError(
-          cause instanceof Error
-            ? cause.message
-            : '산행 임시 저장에 실패했습니다. 화면을 닫지 말고 다시 시도해주세요.',
+          getErrorMessage(
+            cause,
+            '산행 기록을 임시 저장하지 못했습니다. 화면을 닫지 말고 다시 시도해주세요.',
+          ),
         );
         return false;
       }

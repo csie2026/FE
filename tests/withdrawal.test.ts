@@ -110,7 +110,11 @@ test('rejection and lost response remain errors rather than false completed with
   }
   await mock(
     async () => {
-      await assert.rejects(withdrawAccount(41, '탈퇴'), TypeError);
+      await assert.rejects(
+        withdrawAccount(41, '탈퇴'),
+        (error) =>
+          error instanceof ApiError && error.status === 0 && error.code === 'network_error',
+      );
     },
     (path, init) => {
       if (path === '/api/csrf') return csrf();

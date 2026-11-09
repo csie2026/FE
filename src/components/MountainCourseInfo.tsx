@@ -26,7 +26,7 @@ export default function MountainCourseInfo({
     getCourses(Number(mountainId), controller.signal)
       .then((courses) => {
         if (courses.some((course) => String(course.mountainId) !== mountainId))
-          throw new Error('Course mismatch');
+          throw new Error('선택한 산과 등산로 정보가 일치하지 않습니다. 다시 선택해주세요.');
         if (!controller.signal.aborted) setResult({ request, courses, loading: false, error: '' });
       })
       .catch((cause: unknown) => {
@@ -80,7 +80,9 @@ export default function MountainCourseInfo({
                 aria-label={`${course.name} 선택하고 GPS 산행 준비`}
               >
                 산행 준비
-                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="m6 4 4 4-4 4" /></svg>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <path d="m6 4 4 4-4 4" />
+                </svg>
               </button>
             )}
           </li>

@@ -32,7 +32,7 @@ test('profile write sends session cookies and server CSRF token', async () => {
     globalThis.fetch = original;
   }
 });
-test('unauthorized session and validation errors retain HTTP status', async () => {
+test('인증·검증 오류는 HTTP 상태를 유지하고 영문 메시지를 한글로 표시한다', async () => {
   const original = globalThis.fetch;
   try {
     for (const status of [401, 400, 403]) {
@@ -40,7 +40,7 @@ test('unauthorized session and validation errors retain HTTP status', async () =
         new Response(JSON.stringify({ message: 'failed' }), { status });
       await assert.rejects(
         api('/api/users/me'),
-        (e) => e instanceof ApiError && e.status === status && e.message === 'failed',
+        (e) => e instanceof ApiError && e.status === status && /[가-힣]/.test(e.message),
       );
     }
   } finally {
@@ -91,7 +91,8 @@ test('failed journal deletion preserves the server error', async () => {
     await assert.rejects(
       deleteJournal(42),
       (cause) =>
-        cause instanceof ApiError && cause.status === 404 && cause.message === '삭제 요청 실패');
+        cause instanceof ApiError && cause.status === 404 && cause.message === '삭제 요청 실패',
+    );
   } finally {
     globalThis.fetch = original;
   }
@@ -106,7 +107,8 @@ test('journal detail fetches the full record with session credentials', async ()
     title: '산행',
     content: '첫째 줄\n둘째 줄',
     hikingDate: '2020-01-01',
-    isPublic: false };
+    isPublic: false,
+  };
   globalThis.fetch = async (input, init) => {
     assert.equal(String(input), '/api/journals/42');
     assert.equal(init?.method, 'GET');
@@ -126,7 +128,8 @@ test('inaccessible journal detail preserves the server rejection', async () => {
   try {
     await assert.rejects(
       getJournal(42),
-      (cause) => cause instanceof ApiError && cause.status === 404);
+      (cause) => cause instanceof ApiError && cause.status === 404,
+    );
   } finally {
     globalThis.fetch = original;
   }
@@ -146,8 +149,11 @@ test('프록시 장애는 API 조회와 CSRF 발급 모두에서 재시도 안�
   };
   try {
     for (const method of ['GET', 'POST']) {
-      await assert.rejects(api('/api/users/me', method), (error) =>
-        error instanceof ApiError && error.status === 502 && error.message.includes('다시 시도'));
+      await assert.rejects(
+        api('/api/users/me', method),
+        (error) =>
+          error instanceof ApiError && error.status === 502 && error.message.includes('다시 시도'),
+      );
     }
     assert.deepEqual(paths, ['/api/users/me', '/api/csrf']);
   } finally {
