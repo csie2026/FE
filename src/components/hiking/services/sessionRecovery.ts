@@ -10,6 +10,13 @@ export const MAX_RECOVERY_POINTS = 10_000;
 export const MAX_RECOVERY_BYTES = 1_000_000;
 export const recoveryKey = (userId: number) => `topeak.hikingSession.v1.${userId}`;
 export type TrackingStopReason = 'point-limit' | 'capacity-limit' | 'storage-error';
+// Local-only metadata. Never included in the server request or legacy drafts.
+export type NativeCheckpoint = {
+  cursor: number;
+  lastTimestamp: number | null;
+  segment: number;
+  baseElapsedMs: number;
+};
 export type Session = {
   startedAt: number | null;
   endedAt: number | null;
@@ -21,6 +28,7 @@ export type Session = {
   reachedSummit: boolean;
   pendingInput: HikingActivityInput | null;
   trackingStopReason?: TrackingStopReason | null;
+  native?: NativeCheckpoint;
 };
 type CompactPoint = [number, number, number, number, number | null, number | null];
 export type RecoveryDraft = {
@@ -42,10 +50,15 @@ export type RecoveryDraft = {
   segments: CompactPoint[][];
   pendingInput: Omit<HikingActivityInput, 'gpsSegments'> | null;
   trackingStopReason?: TrackingStopReason | null;
+  native?: NativeCheckpoint;
 };
 export type RecoveryRead =
   { kind: 'none' } | { kind: 'ready'; draft: RecoveryDraft } | { kind: 'error'; message: string };
-export type RecoveryContext = { draft: RecoveryDraft; ownerToken: string };
+export type RecoveryContext = {
+  draft: RecoveryDraft;
+  ownerToken: string;
+  finishRequested?: boolean;
+};
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const finite = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 const id = (n: unknown): n is number => finite(n) && Number.isSafeInteger(n) && n > 0;
@@ -128,6 +141,7 @@ export function sessionFromDraft(draft: RecoveryDraft): Session {
     activeSince: null,
     accumulatedMs: draft.accumulatedMs,
     reachedSummit: draft.reachedSummit,
+    ...(draft.native ? { native: { ...draft.native } } : {}),
     trackingStopReason:
       draft.trackingStopReason ??
       (draft.state === 'PAUSED' &&
@@ -178,6 +192,7 @@ export function draftFromSession(
     startedAt: paused.startedAt!,
     endedAt: paused.endedAt,
     clientRequestId: paused.clientRequestId!,
+    ...(paused.native ? { native: { ...paused.native } } : {}),
     state: paused.state === 'COMPLETED' ? 'COMPLETED' : 'PAUSED',
     accumulatedMs: paused.accumulatedMs,
     reachedSummit: paused.reachedSummit,
@@ -230,6 +245,27 @@ export function validateDraft(
     d.segments.length > MAX_RECOVERY_POINTS
   )
     return false;
+  if (d.native !== undefined) {
+    const n = d.native;
+    if (
+      !n ||
+      typeof n !== 'object' ||
+      !Number.isSafeInteger(n.cursor) ||
+      n.cursor < 0 ||
+      !(
+        n.lastTimestamp === null ||
+        (finite(n.lastTimestamp) &&
+          n.lastTimestamp >= d.startedAt &&
+          n.lastTimestamp <= d.updatedAt)
+      ) ||
+      !Number.isSafeInteger(n.segment) ||
+      n.segment < -1 ||
+      !Number.isSafeInteger(n.baseElapsedMs) ||
+      n.baseElapsedMs < 0 ||
+      n.baseElapsedMs > d.accumulatedMs
+    )
+      return false;
+  }
   let points = 0;
   let previousTime = d.startedAt;
   for (const segment of d.segments) {

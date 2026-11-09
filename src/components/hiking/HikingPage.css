@@ -312,6 +312,16 @@
   display: block;
   font-size: 10px;
 }
+.hiking-gps-warning {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #d6a64a;
+  border-radius: 8px;
+  background: #fff5db;
+  color: #674615;
+  font-size: 13px;
+  line-height: 1.6;
+}
 .hiking-gps-status button {
   display: block;
   margin-top: 7px;
