@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errorMessages';
 import { useEffect, useRef, useState } from 'react';
 import './SettingsPage.css';
 import { formatJoinedDate, loginProviderLabel } from '../../services/accountDetails.ts';
@@ -46,11 +47,7 @@ export default function SettingsPage({
       // Explicit checkbox consent and final click preserve the existing API confirmation contract.
       await onWithdraw('탈퇴');
     } catch (cause) {
-      setError(
-        cause instanceof Error
-          ? cause.message
-          : '탈퇴 완료 여부를 확인하지 못했습니다. 다시 확인하십시오.',
-      );
+      setError(getErrorMessage(cause, '탈퇴 완료 여부를 확인하지 못했습니다. 다시 확인하십시오.'));
     } finally {
       setPending(false);
     }

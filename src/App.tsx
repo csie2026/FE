@@ -1,3 +1,4 @@
+import { getErrorMessage } from './utils/errorMessages';
 import ProfileAvatar from './components/common/ProfileAvatar';
 import { createLogout } from './services/logout';
 import { koreanMonthBounds } from './services/hikingStatistics';
@@ -306,7 +307,7 @@ function App() {
   const fail = useCallback(
     (e: unknown) => {
       if (logoutPending.current && e instanceof ApiError && e.status === 401) return;
-      setError(e instanceof Error ? e.message : '요청에 실패했습니다.');
+      setError(getErrorMessage(e));
       if (e instanceof ApiError && e.status === 401) {
         setDrawerOpen(false);
         clearAccount();
