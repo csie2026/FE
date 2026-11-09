@@ -21,6 +21,7 @@ import {
 } from 'react';
 import './App.css';
 import HikingPage from './components/hiking/HikingPage';
+import HikingRecoveryNotice from './components/hiking/HikingRecoveryNotice';
 import MountainCourseInfo from './components/MountainCourseInfo';
 import MountainWeather from './components/MountainWeather';
 import MyPage from './components/profile/MyPage';
@@ -813,6 +814,14 @@ function App() {
         <div className="error-banner" role="alert">
           {favoriteError}
         </div>
+      )}
+      {!loading && me?.profileCompleted && screen !== 'login' && (
+        <HikingRecoveryNotice
+          key={me.userId}
+          userId={me.userId}
+          visible={screen !== 'hikingTracking' && screen !== 'setup'}
+          onNavigate={go}
+        />
       )}
       {screen === 'login' && (
         <section className="login-screen">
