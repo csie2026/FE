@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../utils/errorMessages';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api';
 import {
@@ -52,7 +53,7 @@ export function useMonthlyGoals(
         setResult({
           request,
           data: null,
-          error: cause instanceof Error ? cause.message : '월별 목표를 불러오지 못했습니다.',
+          error: getErrorMessage(cause, '이번 달 목표를 불러오지 못했습니다. 다시 시도해주세요.'),
         });
         if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
       });
@@ -74,10 +75,7 @@ export function useMonthlyGoals(
           setWrite({
             scope,
             pending: false,
-            error:
-              cause instanceof Error
-                ? cause.message
-                : '목표를 저장하지 못했습니다. 다시 시도해주세요.',
+            error: getErrorMessage(cause, '목표를 저장하지 못했습니다. 다시 시도해주세요.'),
           });
           if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
         }

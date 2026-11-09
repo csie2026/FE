@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../utils/errorMessages';
 import { useEffect, useRef, useState } from 'react';
 import {
   ApiError,
@@ -55,9 +56,7 @@ export function useMemberImage(kind: MemberImageKind, options: MemberImageOption
       onMemberUpdated(updated, kind);
     } catch (cause) {
       if (controller.signal.aborted) return;
-      setError(
-        cause instanceof Error ? cause.message : '사진을 변경하지 못했어요. 다시 시도해 주세요.',
-      );
+      setError(getErrorMessage(cause, '사진을 변경하지 못했어요. 다시 시도해 주세요.'));
       if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
     } finally {
       if (pending.current === controller) {

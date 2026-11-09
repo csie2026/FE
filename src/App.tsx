@@ -1,3 +1,4 @@
+import { getErrorMessage } from './utils/errorMessages';
 import ProfileAvatar from './components/common/ProfileAvatar';
 import { createLogout } from './services/logout';
 import { koreanMonthBounds } from './services/hikingStatistics';
@@ -33,7 +34,14 @@ import { usePersistentIds } from './hooks/usePersistentIds';
 import { useMonthlyGoals } from './hooks/useMonthlyGoals';
 import { clearLegacyMemberImages } from './utils/memberImages';
 import SideDrawer from './components/common/SideDrawer';
-import ComingSoonPage from './components/common/ComingSoonPage';
+import SettingsPage from './components/settings/SettingsPage';
+import { withdrawAccount } from './services/withdrawal';
+import {
+  clearWithdrawnAccountData,
+  completeAccountWithdrawal,
+  startWithdrawalSync,
+} from './services/accountData';
+import { subscribeAccountRetirement } from './services/accountLifecycle';
 import {
   api,
   subscribeSessionExpiry,
@@ -88,7 +96,17 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [logoutError, setLogoutError] = useState(false);
+  const [withdrawalPending, setWithdrawalPending] = useState(false);
+  const withdrawalLock = useRef(false);
+  const [withdrawalNotice, setWithdrawalNotice] = useState<{
+    userId: number;
+    failed: boolean;
+  } | null>(null);
   const [me, setMe] = useState<Member | null>(null);
+  const currentMemberId = useRef<number | null>(null);
+  useLayoutEffect(() => {
+    currentMemberId.current = me?.userId ?? null;
+  }, [me?.userId]);
   const [profileRefresh, setProfileRefresh] = useState(0);
   const accountVersion = useRef(0);
   const logoutPending = useRef(false);
@@ -96,6 +114,16 @@ function App() {
   const memberImageVersion = useRef(0);
   const [nickname, setNickname] = useState('');
   const [birthYear, setBirthYear] = useState('');
+  const [currentYear] = useState(() => new Date().getFullYear());
+  const birthYearOptions = Array.from(
+    { length: currentYear - 1950 + 1 },
+    (_, index) => currentYear - index,
+  );
+  // Preserve an existing valid pre-1950 year without offering earlier years to new members.
+  if (me?.birthYear != null && me.birthYear >= 1900 && me.birthYear < 1950) {
+    birthYearOptions.push(me.birthYear);
+  }
+
   const [journals, setJournals] = useState<Journal[]>([]);
   const [journalId, setJournalId] = useState<number | null>(null);
   const [journalDetail, setJournalDetail] = useState<Journal | null>(null);
@@ -204,6 +232,7 @@ function App() {
   };
   // 일반 메뉴 이동은 세션과 프로필 완료 여부를 먼저 확인하고, 이전 화면의 조회 결과를 비운다.
   const go = (next: Screen, nextMountain = selected) => {
+    if (withdrawalLock.current) return;
     setDrawerOpen(false);
     setError('');
     if (!me) {
@@ -241,6 +270,7 @@ function App() {
     setScreen(next, publicId, nextMountain);
   };
   const goBack = () => {
+    if (withdrawalLock.current) return;
     if (window.history.state?.toPeakIndex > 0) window.history.back();
     else
       go(
@@ -269,11 +299,16 @@ function App() {
     setHikingRecords([]);
     setSelectedRecordId(null);
     setEditing(null);
+    setTitle('');
+    setContent('');
+    setJournalMountain('');
+    setDate('');
+    setIsPublic(false);
   }, []);
   const fail = useCallback(
     (e: unknown) => {
       if (logoutPending.current && e instanceof ApiError && e.status === 401) return;
-      setError(e instanceof Error ? e.message : '요청에 실패했습니다.');
+      setError(getErrorMessage(e));
       if (e instanceof ApiError && e.status === 401) {
         setDrawerOpen(false);
         clearAccount();
@@ -289,10 +324,33 @@ function App() {
   );
   useLayoutEffect(
     () =>
-      subscribeSessionExpiry(() =>
-        fail(new ApiError(401, '로그인 세션이 만료되었습니다. 다시 로그인해주세요.')),
-      ),
+      subscribeSessionExpiry((code, retiredUserId) => {
+        if (code === 'account_unavailable' && retiredUserId) {
+          const cleanup = completeAccountWithdrawal(retiredUserId);
+          setWithdrawalNotice({ userId: retiredUserId, ...cleanup });
+        }
+        fail(new ApiError(401, '로그인 세션이 만료되었습니다. 다시 로그인해주세요.', code));
+      }),
     [fail, me?.userId],
+  );
+  useEffect(
+    () =>
+      startWithdrawalSync((userId, result) => {
+        if (currentMemberId.current === userId) setWithdrawalNotice({ userId, ...result });
+      }),
+    [],
+  );
+  useEffect(
+    () =>
+      subscribeAccountRetirement((userId) => {
+        if (userId !== me?.userId) return;
+        clearAccount();
+        setDrawerOpen(false);
+        setBusy(false);
+        setCurrentScreen('login');
+        window.history.replaceState({ toPeakScreen: 'login', toPeakIndex: 0 }, '', '/');
+      }),
+    [clearAccount, me?.userId],
   );
   const monthlyGoalState = useMonthlyGoals(
     me?.profileCompleted ? me.userId : null,
@@ -343,6 +401,7 @@ function App() {
         if (!active || version !== accountVersion.current) return;
         setMe(user);
         setNickname(user.nickname ?? '');
+        setBirthYear(user.birthYear == null ? '' : String(user.birthYear));
         const match = window.location.hash.match(/^#users\/(\d+)$/);
         const detailMatch = window.location.hash.match(/^#journals\/(\d+)$/);
         if (!user.profileCompleted) initializeScreen('setup');
@@ -595,6 +654,36 @@ function App() {
     });
   }, [clearAccount, updateLogoutPending]);
   const logout = () => logoutAction.current?.();
+  const withdraw = async (confirmation: string) => {
+    if (!me || withdrawalLock.current) return;
+    const userId = me.userId;
+    const version = accountVersion.current;
+    withdrawalLock.current = true;
+    setWithdrawalPending(true);
+    setDrawerOpen(false);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 20_000);
+    try {
+      await withdrawAccount(userId, confirmation, controller.signal);
+      const cleanup = completeAccountWithdrawal(userId);
+      setWithdrawalNotice({ userId, ...cleanup });
+      if (version === accountVersion.current) {
+        clearAccount();
+        setCurrentScreen('login');
+        window.history.replaceState({ toPeakScreen: 'login', toPeakIndex: 0 }, '', '/');
+      }
+      setError('');
+    } catch (cause) {
+      if (cause instanceof ApiError) throw cause;
+      throw new Error(
+        '탈퇴 완료 여부를 확인하지 못했습니다. 로그인 상태를 확인한 후 다시 시도하십시오.',
+      );
+    } finally {
+      window.clearTimeout(timer);
+      withdrawalLock.current = false;
+      setWithdrawalPending(false);
+    }
+  };
   // 프로필 저장 응답을 회원 상태에 반영한 뒤, 최초 설정과 기존 프로필 편집의 복귀 화면을 구분한다.
   const saveProfile = async () => {
     const version = accountVersion.current;
@@ -604,7 +693,7 @@ function App() {
       return;
     }
     if (!/^\d{4}$/.test(birthYear) || year < 1900 || year > new Date().getFullYear()) {
-      setError('출생연도는 1900년부터 현재 연도 사이로 입력해주세요.');
+      setError('출생연도를 선택해 주세요.');
       return;
     }
     setBusy(true);
@@ -751,7 +840,13 @@ function App() {
   const header = (title: string, back = false) => (
     <header className={`topbar${screen === 'ranking' ? ' topbar--ranking' : ''}`}>
       {back ? (
-        <button type="button" className="back" onClick={goBack} aria-label="뒤로가기">
+        <button
+          type="button"
+          className="back"
+          onClick={goBack}
+          aria-label="뒤로가기"
+          disabled={withdrawalPending}
+        >
           ‹
         </button>
       ) : (
@@ -763,6 +858,7 @@ function App() {
           type="button"
           className="icon-button menu-button"
           onClick={() => setDrawerOpen(true)}
+          disabled={withdrawalPending}
           aria-label="메뉴 열기"
           aria-haspopup="dialog"
         >
@@ -791,8 +887,31 @@ function App() {
         onClose={() => setDrawerOpen(false)}
         onNavigate={go}
         onLogout={() => void logout()}
-        busy={busy}
+        busy={busy || withdrawalPending}
       />
+      {withdrawalNotice && (
+        <div className="error-banner" role="status">
+          <span>
+            {withdrawalNotice.failed
+              ? '회원탈퇴는 완료됐지만 이 브라우저의 일부 저장 정보를 정리하지 못했어요. 저장소 설정을 확인한 뒤 다시 시도해주세요.'
+              : '회원탈퇴가 완료되었습니다.'}
+          </span>
+          {withdrawalNotice.failed && (
+            <button
+              type="button"
+              onClick={() => {
+                const result = clearWithdrawnAccountData(withdrawalNotice.userId);
+                setWithdrawalNotice({ userId: withdrawalNotice.userId, ...result });
+              }}
+            >
+              브라우저 정보 정리 다시 시도
+            </button>
+          )}
+          <button type="button" onClick={() => setWithdrawalNotice(null)}>
+            닫기
+          </button>
+        </div>
+      )}
       {logoutError && (
         <div className="error-banner" role="alert">
           로그아웃 완료를 확인하지 못했습니다. 다시 시도해주세요.
@@ -958,10 +1077,7 @@ function App() {
             />
             <div className="bottom-actions">
               <button onClick={() => go('diary')}>등산 기록하기</button>
-              <button
-                className="primary"
-                onClick={() => go('hikingTracking')}
-              >
+              <button className="primary" onClick={() => go('hikingTracking')}>
                 등산 앱과 연동하기
               </button>
             </div>
@@ -1033,16 +1149,24 @@ function App() {
             </label>
             <label>
               출생연도
-              <input
+              <select
                 value={birthYear}
                 onChange={(e) => setBirthYear(e.target.value)}
-                inputMode="numeric"
-                placeholder="2003"
-                maxLength={4}
+                autoComplete="bday-year"
                 required
-              />
+                disabled={busy}
+              >
+                <option value="" disabled>
+                  출생연도를 선택해 주세요
+                </option>
+                {birthYearOptions.map((year) => (
+                  <option key={year} value={String(year)}>
+                    {year}년
+                  </option>
+                ))}
+              </select>
             </label>
-            <p className="muted">출생연도만 입력해주세요.</p>
+            <p className="muted">출생연도를 선택해 주세요.</p>
             <button className="submit" disabled={busy}>
               {me?.profileCompleted ? '변경 사항 저장' : '시작하기'}
             </button>
@@ -1375,8 +1499,19 @@ function App() {
           </section>
         </>
       )}
-      {screen === 'accountSettings' && (
-        <ComingSoonPage title="계정 설정" header={header('계정 설정', true)} />
+      {screen === 'accountSettings' && me && (
+        <>
+          {header('설정', true)}
+          <SettingsPage
+            key={me.userId}
+            userId={me.userId}
+            nickname={me.nickname}
+            provider={me.provider}
+            email={me.email}
+            joinedAt={me.joinedAt}
+            onWithdraw={withdraw}
+          />
+        </>
       )}
       {screen === 'about' && (
         <>

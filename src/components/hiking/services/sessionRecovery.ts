@@ -1,3 +1,4 @@
+import { isRetiredAccount } from '../../../services/accountLifecycle.ts';
 import type { HikingActivityInput } from '../../../api.ts';
 import type { GpsPoint, HikingCourse } from '../types.ts';
 import { trackDistance, isUsablePoint } from '../trackUtils.ts';
@@ -363,6 +364,8 @@ export function writeRecovery(
   mode: 'create' | 'claim' | 'update',
   storage: Storage = localStorage,
 ): void {
+  if (isRetiredAccount(draft.userId))
+    throw new Error('탈퇴한 회원의 임시 기록은 다시 저장할 수 없습니다.');
   const current = readRecovery(draft.userId, Date.now(), storage);
   if (mode === 'create' && current.kind !== 'none')
     throw new Error('복구 가능한 산행이 남아 있습니다. 기존 산행을 먼저 확인해주세요.');

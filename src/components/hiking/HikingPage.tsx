@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../../utils/errorMessages';
 import { scoringText } from './services/scoringDisplay';
 import {
   submitPendingActivity,
@@ -129,7 +130,9 @@ function HikingSessionPage(props: HikingPageProps) {
       setRecoveryError('');
       props.onRestoreSelection({ mountainId: draft.mountainId, courseId: draft.courseId });
     } catch (cause) {
-      setRecoveryError(cause instanceof Error ? cause.message : '산행 복구에 실패했습니다.');
+      setRecoveryError(
+        getErrorMessage(cause, '산행 기록을 복구하지 못했습니다. 다시 시도해주세요.'),
+      );
     }
   };
   const discard = async () => {
@@ -322,9 +325,10 @@ function LinkedHike({
                 ? '로그인 세션이 만료되었습니다. 다시 로그인해주세요.'
                 : cause instanceof ApiError && cause.status === 404
                   ? '선택한 산 또는 등산로를 찾을 수 없습니다. 다시 선택해주세요.'
-                  : cause instanceof Error
-                    ? cause.message
-                    : '선택한 산행 경로를 불러오지 못했습니다.',
+                  : getErrorMessage(
+                      cause,
+                      '선택한 산행 경로를 불러오지 못했습니다. 다시 시도해주세요.',
+                    ),
           });
       });
     return () => controller.abort();
@@ -400,7 +404,7 @@ function CoursePicker({
             '산·코스 조회 API를 찾을 수 없습니다. 백엔드에 최신 조회 API가 적용되었는지 확인해주세요.',
           );
         } else {
-          setError(cause instanceof Error ? cause.message : '목록을 불러오지 못했습니다.');
+          setError(getErrorMessage(cause, '목록을 불러오지 못했습니다. 다시 시도해주세요.'));
         }
       })
       .finally(() => {
@@ -425,7 +429,7 @@ function CoursePicker({
       setSelected(toHikingCourse(mountain, detail));
     } catch (cause) {
       if (!controller.signal.aborted)
-        setError(cause instanceof Error ? cause.message : '경로를 불러오지 못했습니다.');
+        setError(getErrorMessage(cause, '경로를 불러오지 못했습니다. 다시 시도해주세요.'));
     } finally {
       if (!controller.signal.aborted) setLoading(false);
     }

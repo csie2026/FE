@@ -1,3 +1,9 @@
+import {
+  getErrorMessage,
+  NETWORK_ERROR_MESSAGE,
+  TIMEOUT_ERROR_MESSAGE,
+} from './utils/errorMessages.ts';
+
 export interface PublicProfile {
   userId: number;
   nickname: string;
@@ -21,6 +27,9 @@ export interface RankingSummary {
 export const getRankingSummary = (signal?: AbortSignal) =>
   api<RankingSummary>('/api/rankings/summary', 'GET', undefined, signal);
 export interface Member extends PublicProfile {
+  provider?: string | null;
+  email?: string | null;
+  joinedAt?: string | null;
   backgroundImageUrl: string | null;
   birthYear: number | null;
   age: number | null;
@@ -112,9 +121,9 @@ export const updateJournal = (id: number, input: JournalUpdate) =>
 export const deleteJournal = (id: number) => api<void>(`/api/journals/${id}`, 'DELETE');
 export const getJournal = (id: number) => api<Journal>(`/api/journals/${id}`);
 let sessionGeneration = 0;
-let sessionExpired: (() => void) | undefined;
+let sessionExpired: ((code?: string, userId?: number) => void) | undefined;
 
-export function subscribeSessionExpiry(listener: () => void) {
+export function subscribeSessionExpiry(listener: (code?: string, userId?: number) => void) {
   const generation = ++sessionGeneration;
   sessionExpired = listener;
   return () => {
@@ -134,10 +143,110 @@ export class ApiError extends Error {
     this.code = code;
   }
 }
-function fallbackMessage(status: number, message: string) {
-  return [502, 503, 504].includes(status)
-    ? "서버에 일시적으로 연결할 수 없습니다. 잠시 후 다시 시도해주세요."
-    : message;
+type ErrorBody = { message?: unknown; error?: unknown; userId?: unknown };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function hasErrorName(value: unknown, name: string) {
+  return isRecord(value) && value.name === name;
+}
+
+function preserveCancellation(cause: unknown, signal?: AbortSignal) {
+  if (
+    hasErrorName(cause, 'TimeoutError') ||
+    (signal?.aborted && hasErrorName(signal.reason, 'TimeoutError'))
+  ) {
+    throw new ApiError(0, TIMEOUT_ERROR_MESSAGE, 'request_timeout');
+  }
+  // 화면 이탈에 따른 취소는 네트워크 장애로 바꾸지 않는다.
+  if (hasErrorName(cause, 'AbortError')) throw cause;
+  if (signal?.aborted) throw new DOMException('요청이 취소되었습니다.', 'AbortError');
+}
+
+async function fetchResponse(path: string, options: RequestInit) {
+  try {
+    return await fetch(path, options);
+  } catch (cause) {
+    preserveCancellation(cause, options.signal ?? undefined);
+    throw new ApiError(0, NETWORK_ERROR_MESSAGE, 'network_error');
+  }
+}
+
+async function readJson(response: Response, signal?: AbortSignal): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch (cause) {
+    preserveCancellation(cause, signal);
+    throw new ApiError(
+      response.status,
+      '서버 응답을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.',
+      'invalid_response',
+    );
+  }
+}
+
+function fallbackMessage(status: number, code?: string) {
+  switch (code) {
+    case 'invalid_csrf':
+      return '인증 정보를 확인할 수 없습니다. 다시 시도해주세요.';
+    case 'account_unavailable':
+      return '더 이상 이용할 수 없는 계정입니다. 다시 로그인해주세요.';
+    case 'session_upgrade_required':
+      return '로그인 정보를 갱신해야 합니다. 다시 로그인해주세요.';
+    case 'oauth_login_failed':
+      return '로그인에 실패했습니다. 잠시 후 다시 시도해주세요.';
+    case 'duplicate_hiking_activity':
+      return '같은 산행 기록이 이미 저장되어 있습니다. 저장된 기록을 확인해주세요.';
+  }
+  if (status >= 500) return '서버에서 요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.';
+  switch (status) {
+    case 400:
+    case 422:
+      return '입력한 정보를 확인하고 다시 시도해주세요.';
+    case 401:
+      return '로그인이 필요합니다. 다시 로그인해주세요.';
+    case 403:
+      return '이 요청에 대한 권한이 없습니다.';
+    case 404:
+      return '요청한 정보를 찾을 수 없습니다.';
+    case 405:
+      return '지원하지 않는 요청입니다.';
+    case 408:
+      return TIMEOUT_ERROR_MESSAGE;
+    case 409:
+      return '기존 정보와 요청 내용이 충돌합니다. 최신 정보를 확인해주세요.';
+    case 413:
+      return '전송할 데이터의 용량이 너무 큽니다. 용량을 줄여 다시 시도해주세요.';
+    case 415:
+      return '지원하지 않는 데이터 형식입니다.';
+    case 429:
+      return '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.';
+    default:
+      return '요청을 처리할 수 없습니다. 잠시 후 다시 시도해주세요.';
+  }
+}
+
+async function readHttpError(response: Response, signal?: AbortSignal) {
+  let error: ErrorBody = {};
+  try {
+    const value: unknown = await response.json();
+    if (isRecord(value)) error = value;
+  } catch (cause) {
+    preserveCancellation(cause, signal);
+    // HTML 또는 빈 오류 응답도 원래 HTTP 상태를 유지한다.
+  }
+  const code = typeof error.error === 'string' ? error.error : undefined;
+  return {
+    code,
+    userId:
+      typeof error.userId === 'number' && Number.isSafeInteger(error.userId) && error.userId > 0
+        ? error.userId
+        : undefined,
+    // 서버의 한글 안내는 유지하고 영문 기본 검증 문구는 상태별 안내로 대체한다.
+    message: getErrorMessage(error, fallbackMessage(response.status, code)),
+  };
 }
 // 세션 쿠키와 서버 오류 상태를 모든 도메인 요청에서 일관되게 다루는 공통 진입점이다.
 export async function api<T>(
@@ -148,38 +257,47 @@ export async function api<T>(
   beforeSend?: () => Promise<void>,
 ): Promise<T> {
   const generation = sessionGeneration;
-  const checkSession = (status: number) => {
+  const checkSession = (status: number, code?: string, userId?: number) => {
     if (status === 401 && path !== '/api/logout' && generation === sessionGeneration)
-      sessionExpired?.();
+      sessionExpired?.(code, userId);
   };
   const headers: Record<string, string> = {};
   const multipart = body instanceof FormData;
   // 변경 요청은 현재 세션의 CSRF 토큰과 헤더 이름을 서버에서 받아 사용한다.
   // FormData는 브라우저가 multipart 경계를 지정해야 하므로 Content-Type을 직접 설정하지 않는다.
   if (method !== 'GET') {
-    const csrfResponse = await fetch('/api/csrf', {
+    const csrfResponse = await fetchResponse('/api/csrf', {
       credentials: 'include',
       cache: 'no-store',
       signal,
     });
     if (!csrfResponse.ok) {
-      checkSession(csrfResponse.status);
+      const error = await readHttpError(csrfResponse, signal);
+      checkSession(csrfResponse.status, error.code, error.userId);
+      throw new ApiError(csrfResponse.status, error.message, error.code);
+    }
+    const csrf = await readJson(csrfResponse, signal);
+    if (
+      !isRecord(csrf) ||
+      typeof csrf.headerName !== 'string' ||
+      !/^[!#$%&'*+.^_\x60|~0-9A-Za-z-]+$/.test(csrf.headerName) ||
+      typeof csrf.token !== 'string' ||
+      !csrf.token.trim() ||
+      /[\r\n]/.test(csrf.token)
+    ) {
       throw new ApiError(
         csrfResponse.status,
-        fallbackMessage(csrfResponse.status, '인증 정보를 확인할 수 없습니다.'),
+        '인증 정보를 확인할 수 없습니다. 다시 시도해주세요.',
+        'invalid_csrf_response',
       );
     }
-    const csrf = (await csrfResponse.json()) as {
-      headerName: string;
-      token: string;
-    };
     headers[csrf.headerName] = csrf.token;
     if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   }
   // Activity retries recheck the member after CSRF retrieval, immediately before sending.
   if (beforeSend) await beforeSend();
   if (signal?.aborted) throw new DOMException('요청이 취소되었습니다.', 'AbortError');
-  const response = await fetch(path, {
+  const response = await fetchResponse(path, {
     method,
     headers,
     credentials: 'include',
@@ -188,19 +306,12 @@ export async function api<T>(
     body: multipart ? body : body === undefined ? undefined : JSON.stringify(body),
   });
   if (!response.ok) {
-    checkSession(response.status);
-    const error = (await response.json().catch(() => ({}))) as {
-      message?: string;
-      error?: string;
-    };
-    throw new ApiError(
-      response.status,
-      error.message ?? fallbackMessage(response.status, "요청을 처리할 수 없습니다."),
-      error.error,
-    );
+    const error = await readHttpError(response, signal);
+    checkSession(response.status, error.code, error.userId);
+    throw new ApiError(response.status, error.message, error.code);
   }
   // 삭제·로그아웃의 빈 응답을 JSON으로 읽지 않아 정상 처리 후 파싱 오류가 발생하지 않게 한다.
-  return response.status === 204 ? (undefined as T) : (response.json() as Promise<T>);
+  return response.status === 204 ? (undefined as T) : ((await readJson(response, signal)) as T);
 }
 
 export type MemberImageKind = 'profile' | 'background';
