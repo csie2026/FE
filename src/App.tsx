@@ -1,6 +1,7 @@
 import { getErrorMessage } from './utils/errorMessages';
 import ProfileAvatar from './components/common/ProfileAvatar';
 import { createLogout } from './services/logout';
+import { confirmLogin, forgetLogin, shouldNotifySessionExpiry } from './services/loginHistory';
 import { koreanMonthBounds } from './services/hikingStatistics';
 import { buildCompletedMountainCollection } from './services/completedHikes';
 import { scoringText } from './components/hiking/services/scoringDisplay';
@@ -284,6 +285,7 @@ function App() {
   // 계정 세대를 증가시켜 로그아웃 이전의 비동기 응답이 새 회원 상태에 반영되지 않게 한다.
   const clearAccount = useCallback(() => {
     accountVersion.current += 1;
+    forgetLogin();
     clearLegacyMemberImages();
     setMe(null);
     setLogoutError(false);
@@ -325,6 +327,7 @@ function App() {
   useLayoutEffect(
     () =>
       subscribeSessionExpiry((code, retiredUserId) => {
+        if (logoutPending.current || !shouldNotifySessionExpiry(code)) return;
         if (code === 'account_unavailable' && retiredUserId) {
           const cleanup = completeAccountWithdrawal(retiredUserId);
           setWithdrawalNotice({ userId: retiredUserId, ...cleanup });
@@ -399,6 +402,7 @@ function App() {
     api<Member>('/api/users/me')
       .then((user) => {
         if (!active || version !== accountVersion.current) return;
+        confirmLogin();
         setMe(user);
         setNickname(user.nickname ?? '');
         setBirthYear(user.birthYear == null ? '' : String(user.birthYear));
