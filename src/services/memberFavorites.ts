@@ -1,3 +1,4 @@
+import { isRetiredAccount, subscribeAccountRetirement } from './accountLifecycle.ts';
 const PREFIX = 'topeak.favoriteMountainIds.member.v1.';
 const READ_ERROR = '찜 목록을 읽지 못했습니다. 브라우저 저장소 설정을 확인해주세요.';
 export interface FavoriteSnapshot {
@@ -32,7 +33,7 @@ export function createMemberFavoritesStore(storage: () => FavoriteStorage) {
   const emit = () => listeners.forEach((listener) => listener());
   function snapshot(userId: number | null): FavoriteSnapshot {
     const key = memberFavoritesKey(userId);
-    if (key === null) return EMPTY_FAVORITES;
+    if (key === null || isRetiredAccount(userId)) return EMPTY_FAVORITES;
     const temporary = volatile.get(key);
     if (temporary) return temporary;
     let raw: string | null;
@@ -60,11 +61,10 @@ export function createMemberFavoritesStore(storage: () => FavoriteStorage) {
   }
   function toggle(userId: number | null, id: string, knownIds: ReadonlySet<string>) {
     const key = memberFavoritesKey(userId);
-    if (key === null || !isMountainId(id) || !knownIds.has(id)) return false;
+    if (key === null || isRetiredAccount(userId) || !isMountainId(id) || !knownIds.has(id))
+      return false;
     const current = snapshot(userId).ids.filter((value) => knownIds.has(value));
-    const ids = current.includes(id)
-      ? current.filter((value) => value !== id)
-      : [...current, id];
+    const ids = current.includes(id) ? current.filter((value) => value !== id) : [...current, id];
     const raw = JSON.stringify(ids);
     try {
       storage().setItem(key, raw);
@@ -92,6 +92,14 @@ export function createMemberFavoritesStore(storage: () => FavoriteStorage) {
     }
     emit();
   }
+  subscribeAccountRetirement((id) => {
+    const key = memberFavoritesKey(id);
+    if (key) {
+      cache.delete(key);
+      volatile.delete(key);
+    }
+    emit();
+  });
   return {
     snapshot,
     toggle,
