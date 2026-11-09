@@ -711,7 +711,11 @@ function App() {
       setMe(user);
       setScreen(me?.profileCompleted ? 'profile' : 'explore');
     } catch (e) {
+      if (version !== accountVersion.current || logoutPending.current) return;
       fail(e);
+      if (me?.profileCompleted && !(e instanceof ApiError && e.status === 401)) {
+        setScreen('profile');
+      }
     } finally {
       setBusy(false);
     }
