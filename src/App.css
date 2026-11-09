@@ -724,6 +724,7 @@
 }
 .social {
   flex: none;
+  color: #000;
   height: 48px;
   border: 1px solid #dfe3db;
   border-radius: 12px;
