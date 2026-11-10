@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { ActivityScoring, HikingActivityInput } from "../src/api.ts";
@@ -252,7 +253,7 @@ test("integration response-loss retry preserves both evidence formats and uses B
   globalThis.fetch = async (url, init) => {
     if (String(url) === "/api/csrf")
       return Response.json({ headerName: "X-CSRF-TOKEN", token: "test" });
-    if (String(url) === "/api/users/me") return Response.json({ userId: 1 });
+    if (String(url) === "/api/users/me") return Response.json(memberResponse(1));
     posts.push(init!.body as string);
     if (posts.length === 1) throw TypeError("response lost after commit");
     const input: HikingActivityInput = JSON.parse(init!.body as string);

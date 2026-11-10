@@ -1,3 +1,4 @@
+import { createScopedRequest } from './services/scopedRequest';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
 import ProfileAvatar from './components/common/ProfileAvatar';
@@ -113,6 +114,8 @@ function App() {
   const [profileRefresh, setProfileRefresh] = useState(0);
   const accountVersion = useRef(0);
   const logoutPending = useRef(false);
+  const profileSave = useRef(createScopedRequest());
+  const journalSave = useRef(createScopedRequest());
   const logoutAction = useRef<ReturnType<typeof createLogout> | null>(null);
   const memberImageVersion = useRef(0);
   const [nickname, setNickname] = useState('');
@@ -128,12 +131,21 @@ function App() {
   }
 
   const [journals, setJournals] = useState<Journal[]>([]);
+  const [journalReadError, setJournalReadError] = useState(false);
   const [journalId, setJournalId] = useState<number | null>(null);
   const [journalDetail, setJournalDetail] = useState<Journal | null>(null);
   const [deletingJournalId, setDeletingJournalId] = useState<number | null>(null);
   const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
   const [publicId, setPublicId] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const profile = profileSave.current,
+      journal = journalSave.current;
+    return () => {
+      profile.invalidate();
+      journal.invalidate();
+    };
+  }, [screen, me?.userId, editing]);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [date, setDate] = useState('');
@@ -181,6 +193,8 @@ function App() {
     replaceCurrent = false,
     nextHike: HikingSelection | null = null,
   ) => {
+    profileSave.current.invalidate();
+    journalSave.current.invalidate();
     const previous = window.history.state;
     const index = typeof previous?.toPeakIndex === 'number' ? previous.toPeakIndex : 0;
     const replace = loading || next === 'login' || replaceCurrent;
@@ -286,6 +300,8 @@ function App() {
   };
   // 계정 세대를 증가시켜 로그아웃 이전의 비동기 응답이 새 회원 상태에 반영되지 않게 한다.
   const clearAccount = useCallback(() => {
+    profileSave.current.invalidate();
+    journalSave.current.invalidate();
     accountVersion.current += 1;
     forgetLogin();
     clearLegacyMemberImages();
@@ -369,6 +385,7 @@ function App() {
     clearLegacyMemberImages();
     if (oauthFailure) window.history.replaceState(window.history.state, '', oauthFailure.cleanUrl);
     const version = accountVersion.current;
+    const controller = new AbortController();
     let active = true;
     const initializeScreen = (
       next: Screen,
@@ -402,7 +419,7 @@ function App() {
       );
       setCurrentScreen(next);
     };
-    api<Member>('/api/users/me')
+    api<Member>('/api/users/me', 'GET', undefined, controller.signal)
       .then((user) => {
         if (!active || version !== accountVersion.current) return;
         confirmLogin();
@@ -473,12 +490,15 @@ function App() {
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [fail, oauthFailure]);
   // 브라우저 뒤로 가기는 새 이력을 만들지 않고 기존 화면과 대상 ID를 복원한다.
   // 복원할 화면도 현재 로그인·프로필 상태의 제한을 따른다.
   useEffect(() => {
     const back = () => {
+      profileSave.current.invalidate();
+      journalSave.current.invalidate();
       setDrawerOpen(false);
       if (!me) {
         setCurrentScreen('login');
@@ -567,6 +587,7 @@ function App() {
     const version = accountVersion.current;
     // 마이페이지 조회 중 이미지가 갱신되면 늦게 도착한 회원 응답이 최신 이미지 URL을 덮어쓰지 않게 한다.
     const imageVersion = memberImageVersion.current;
+    const controller = new AbortController();
     let active = true;
     const update =
       <T,>(setter: (value: T) => void) =>
@@ -575,15 +596,29 @@ function App() {
       };
     const request =
       screen === 'journalDetail' && journalId
-        ? getJournal(journalId).then(update(setJournalDetail))
+        ? getJournal(journalId, controller.signal).then(update(setJournalDetail))
         : screen === 'diary'
-          ? api<Journal[]>('/api/journals').then(update(setJournals))
+          ? api<Journal[]>('/api/journals', 'GET', undefined, controller.signal).then(
+              update(setJournals),
+            )
           : screen === 'myJournals'
-            ? api<Journal[]>('/api/users/me/journals').then(update(setJournals))
+            ? api<Journal[]>('/api/users/me/journals', 'GET', undefined, controller.signal).then(
+                update(setJournals),
+              )
             : screen === 'publicProfile' && publicId
               ? Promise.all([
-                  api<PublicProfile>(`/api/users/${publicId}/profile`),
-                  api<Journal[]>(`/api/users/${publicId}/journals`),
+                  api<PublicProfile>(
+                    `/api/users/${publicId}/profile`,
+                    'GET',
+                    undefined,
+                    controller.signal,
+                  ),
+                  api<Journal[]>(
+                    `/api/users/${publicId}/journals`,
+                    'GET',
+                    undefined,
+                    controller.signal,
+                  ),
                 ]).then(([profile, records]) => {
                   if (active && version === accountVersion.current) {
                     setPublicProfile(profile);
@@ -592,8 +627,8 @@ function App() {
                 })
               : screen === 'profile'
                 ? Promise.all([
-                    api<Member>('/api/users/me'),
-                    api<Journal[]>('/api/users/me/journals'),
+                    api<Member>('/api/users/me', 'GET', undefined, controller.signal),
+                    api<Journal[]>('/api/users/me/journals', 'GET', undefined, controller.signal),
                   ]).then(([user, records]) => {
                     if (active && version === accountVersion.current) {
                       setMe((current) =>
@@ -610,17 +645,24 @@ function App() {
                     }
                   })
                 : (screen === 'write' && !editing) || screen === 'hikingRecords'
-                  ? getHikingRecords().then(update(setHikingRecords))
+                  ? getHikingRecords(controller.signal).then(update(setHikingRecords))
                   : Promise.resolve();
     request
+      .then(() => {
+        if (active && version === accountVersion.current) setJournalReadError(false);
+      })
       .catch((e) => {
-        if (active && version === accountVersion.current) fail(e);
+        if (active && version === accountVersion.current) {
+          setJournalReadError(true);
+          fail(e);
+        }
       })
       .finally(() => {
         if (active && version === accountVersion.current) setBusy(false);
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [
     screen,
@@ -646,6 +688,8 @@ function App() {
     logoutPending.current = pending;
     setBusy(pending);
     if (pending) {
+      profileSave.current.invalidate();
+      journalSave.current.invalidate();
       setDrawerOpen(false);
       setLogoutError(false);
       setError('');
@@ -696,65 +740,78 @@ function App() {
   };
   // 프로필 저장 응답을 회원 상태에 반영한 뒤, 최초 설정과 기존 프로필 편집의 복귀 화면을 구분한다.
   const saveProfile = async () => {
-    const version = accountVersion.current;
+    if (busy) return;
     const year = Number(birthYear);
     if (!nickname.trim() || nickname.trim().length > 30) {
       setError('닉네임은 1~30자로 입력해주세요.');
       return;
     }
-    if (!/^\d{4}$/.test(birthYear) || year < 1900 || year > new Date().getFullYear()) {
+    if (!/^\d{4}$/.test(birthYear) || year < 1900 || year > currentYear) {
       setError('출생연도를 선택해 주세요.');
       return;
     }
-    setBusy(true);
-    setError('');
-    try {
-      const user = await api<Member>('/api/users/me/profile', 'PATCH', {
-        nickname: nickname.trim(),
-        birthYear: year,
-      });
-      if (version !== accountVersion.current) return;
-      setMe(user);
-      setScreen(me?.profileCompleted ? 'profile' : 'explore');
-    } catch (e) {
-      if (version !== accountVersion.current || logoutPending.current) return;
-      fail(e);
-      if (me?.profileCompleted && !(e instanceof ApiError && e.status === 401)) {
-        setScreen('profile');
-      }
-    } finally {
-      setBusy(false);
-    }
+    await profileSave.current.run(
+      async () => {
+        setBusy(true);
+        setError('');
+        return api<Member>('/api/users/me/profile', 'PATCH', {
+          nickname: nickname.trim(),
+          birthYear: year,
+        });
+      },
+      {
+        success: (user) => {
+          setMe(user);
+          setBusy(Boolean(me?.profileCompleted));
+          setScreen(me?.profileCompleted ? 'profile' : 'explore');
+        },
+        failure: (cause) => {
+          if (!logoutPending.current) fail(cause);
+        },
+        settled: () => setBusy(false),
+      },
+    );
   };
-  // 같은 작성 폼을 신규 작성과 수정에 사용하고, 저장 뒤 본인 목록을 다시 조회하도록 전환한다.
+  // A stale response must not navigate away from a newer screen. The request may
+  // still commit on the server; re-entering the list always reads current data.
   const saveJournal = async () => {
     if (busy) return;
-    const version = accountVersion.current;
     if (!title.trim() || (!editing && (!selectedRecord || selectedRecord.journalId !== null))) {
       setError('등산기록을 선택하고 제목을 입력해주세요.');
       return;
     }
-    setBusy(true);
-    setError('');
-    try {
-      const input = { title, content, isPublic };
-      if (editing) await updateJournal(editing, input);
-      else await createJournal({ ...input, hikingRecordId: selectedRecord!.id });
-      if (version !== accountVersion.current) return;
-      setJournals([]);
-      setScreen('myJournals');
-    } catch (e) {
-      if (version !== accountVersion.current) return;
-      fail(e);
-      setBusy(false);
-      if (e instanceof ApiError && e.status === 409) {
-        getHikingRecords()
-          .then((records) => {
-            if (version === accountVersion.current) setHikingRecords(records);
-          })
-          .catch(fail);
-      }
-    }
+    const version = accountVersion.current;
+    const current = journalSave.current.capture();
+    await journalSave.current.run(
+      async () => {
+        setBusy(true);
+        setError('');
+        const input = { title, content, isPublic };
+        return editing
+          ? updateJournal(editing, input)
+          : createJournal({ ...input, hikingRecordId: selectedRecord!.id });
+      },
+      {
+        success: () => {
+          setJournals([]);
+          setBusy(true);
+          setScreen('myJournals');
+        },
+        failure: (cause) => {
+          fail(cause);
+          if (cause instanceof ApiError && cause.status === 409) {
+            getHikingRecords()
+              .then((records) => {
+                if (version === accountVersion.current && current()) setHikingRecords(records);
+              })
+              .catch((error) => {
+                if (version === accountVersion.current && current()) fail(error);
+              });
+          }
+        },
+        settled: () => setBusy(false),
+      },
+    );
   };
   const avatar = (profile: PublicProfile) => (
     <ProfileAvatar
@@ -814,6 +871,8 @@ function App() {
   const journalList = () =>
     busy ? (
       <p role="status">불러오는 중…</p>
+    ) : journalReadError ? (
+      <p role="status">등산일지를 불러오지 못했습니다. 화면을 다시 열어 조회해주세요.</p>
     ) : journals.length ? (
       journals.map((j) => (
         <article
@@ -1399,7 +1458,7 @@ function App() {
               onRetryGoals={monthlyGoalState.retry}
               onSettings={() => setDrawerOpen(true)}
               onEditProfile={() => {
-                setNickname(me.nickname);
+                setNickname(me.nickname ?? '');
                 setBirthYear(me.birthYear === null ? '' : String(me.birthYear));
                 go('setup');
               }}
@@ -1519,7 +1578,7 @@ function App() {
           <SettingsPage
             key={me.userId}
             userId={me.userId}
-            nickname={me.nickname}
+            nickname={me.nickname ?? ''}
             provider={me.provider}
             email={me.email}
             joinedAt={me.joinedAt}

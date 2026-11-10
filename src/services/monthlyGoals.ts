@@ -1,4 +1,5 @@
 import { api, ApiError, getCurrentMember } from '../api.ts';
+import { monthlyGoalResponse } from './responseValidation.ts';
 export interface MonthlyGoals {
   distanceKm: number | null;
   hikeCount: number | null;
@@ -24,24 +25,14 @@ export function validGoals(goals: MonthlyGoals) {
   );
 }
 function checked(data: MonthlyGoalResponse, userId: number, month: string) {
-  if (data?.userId !== userId)
+  if (!monthlyGoalResponse(data) || data.month !== month)
+    throw new ApiError(
+      200,
+      '서버의 월별 목표 응답을 확인하지 못했습니다. 다시 조회해주세요.',
+      'invalid_response',
+    );
+  if (data.userId !== userId)
     throw new ApiError(401, '로그인한 회원이 변경되었습니다. 다시 로그인해주세요.');
-  if (
-    data.month !== month ||
-    !('distanceKm' in data) ||
-    !('hikeCount' in data) ||
-    !(
-      data.distanceKm === null ||
-      (typeof data.distanceKm === 'number' &&
-        Number.isFinite(data.distanceKm) &&
-        data.distanceKm > 0)
-    ) ||
-    !(
-      data.hikeCount === null ||
-      (typeof data.hikeCount === 'number' && Number.isInteger(data.hikeCount) && data.hikeCount > 0)
-    )
-  )
-    throw new Error('서버의 월별 목표 응답을 확인하지 못했습니다. 다시 조회해주세요.');
   return data;
 }
 export async function getMonthlyGoals(userId: number, month: string, signal?: AbortSignal) {

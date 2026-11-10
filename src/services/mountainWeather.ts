@@ -9,7 +9,7 @@ export function loadMountainWeather(mountainId: number): Promise<MountainWeather
   if (existing && existing.expires > Date.now()) return existing.value;
   const value = getMountainWeather(mountainId, AbortSignal.timeout(12_000)).then((data) => {
     if (!data || data.mountainId !== mountainId || (data.days != null && !Array.isArray(data.days)))
-      throw new Error('날씨 응답을 확인할 수 없습니다.');
+      throw new ApiError(200, '날씨 응답을 확인할 수 없습니다.', 'invalid_response');
     return data;
   });
   const entry = { expires: Date.now() + TTL, value };

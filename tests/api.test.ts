@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { api, ApiError, deleteJournal, getJournal, scoreText } from '../src/api.ts';
@@ -11,7 +12,7 @@ test('profile write sends session cookies and server CSRF token', async () => {
       JSON.stringify(
         calls.length === 1
           ? { headerName: 'X-CSRF-TOKEN', token: 'csrf' }
-          : { profileCompleted: true },
+          : memberResponse(),
       ),
       { status: 200 },
     );
@@ -101,6 +102,7 @@ test('journal detail fetches the full record with session credentials', async ()
   const original = globalThis.fetch;
   const journal = {
     id: 42,
+    hikingRecordId: null,
     userId: 7,
     nickname: '작성자',
     mountainName: '소래산',

@@ -1,3 +1,4 @@
+import { weatherResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiError } from '../src/api.ts';
@@ -17,7 +18,7 @@ test('weather uses real mountain ID and shares in-flight and cached requests', a
     calls++;
     assert.equal(path, '/api/mountains/17001/weather');
     assert.equal(init?.credentials, 'include');
-    return new Response(JSON.stringify({ mountainId: 17001, days: [] }));
+    return new Response(JSON.stringify(weatherResponse(17001)));
   };
   try {
     const a = loadMountainWeather(17001);
@@ -42,7 +43,7 @@ test('503 and 502 failures preserve status and allow a fresh retry', async () =>
         (cause) => cause instanceof ApiError && cause.status === status,
       );
       assert.match(weatherError(new ApiError(status, '')), status === 503 ? /준비되지/ : /기상청/);
-      globalThis.fetch = async () => new Response(JSON.stringify({ mountainId: id, days: null }));
+      globalThis.fetch = async () => new Response(JSON.stringify(weatherResponse(id, null)));
       assert.equal((await loadMountainWeather(id)).days, null);
     }
   } finally {
@@ -72,7 +73,7 @@ test('different mountains and late responses keep their own data', async () => {
       await new Promise<void>((resolve) => {
         finish = resolve;
       });
-    return new Response(JSON.stringify({ mountainId: id, days: [] }));
+    return new Response(JSON.stringify(weatherResponse(id)));
   };
   try {
     const slow = loadMountainWeather(17003);
@@ -92,7 +93,7 @@ test('cache expires and forecast labels keep Korea local time and missing values
   Date.now = () => now;
   globalThis.fetch = async () => {
     calls++;
-    return new Response(JSON.stringify({ mountainId: 17005, days: [] }));
+    return new Response(JSON.stringify(weatherResponse(17005)));
   };
   try {
     await loadMountainWeather(17005);
