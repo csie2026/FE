@@ -90,6 +90,118 @@
 .scroll-content::-webkit-scrollbar {
   display: none;
 }
+.about-content {
+  padding-top: 24px;
+  /* The app shell already reserves the device safe area. */
+  padding-bottom: 32px;
+  overflow-wrap: anywhere;
+}
+.about-content p,
+.about-content li {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #526357;
+}
+.about-intro {
+  text-align: center;
+  padding: 8px 4px 24px;
+}
+.about-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin-bottom: 12px;
+}
+.about-intro h1 {
+  margin: 0 0 10px;
+  font-size: 28px;
+  color: #244d36;
+}
+.about-content .about-tagline {
+  color: #244d36;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.about-intro > p:last-child {
+  margin-bottom: 0;
+}
+.about-section {
+  margin-bottom: 28px;
+}
+.scroll-content.about-content h2 {
+  font-size: 17px;
+  margin: 0 0 14px;
+}
+.about-features {
+  display: grid;
+  gap: 10px;
+}
+.about-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #fbfbf7;
+  border: 1px solid #d8ddd5;
+  border-radius: 14px;
+}
+.about-feature > div {
+  min-width: 0;
+}
+.about-feature-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #e4e9df;
+  color: #244d36;
+}
+.about-feature-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.about-content .about-feature h3 {
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+.about-feature p {
+  margin: 0;
+}
+.about-steps {
+  padding-left: 24px;
+  margin: 0;
+}
+.about-steps li {
+  padding: 5px 0 5px 5px;
+}
+.about-steps li::marker {
+  color: #244d36;
+  font-weight: 700;
+}
+.about-notice {
+  padding: 18px;
+  border-radius: 14px;
+  background: #e4e9df;
+}
+.about-notice ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.about-notice li + li {
+  margin-top: 8px;
+}
+.about-project {
+  border-top: 1px solid #d8ddd5;
+  padding-top: 20px;
+  text-align: center;
+}
+.about-project p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
 .search {
   height: 42px;
   border: 1px solid #d8ddd5;
