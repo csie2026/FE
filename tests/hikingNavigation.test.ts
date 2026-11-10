@@ -62,7 +62,8 @@ test('linked hiking selection refetches DB records and preserves the exact selec
   const controller = new AbortController();
   const paths: string[] = [];
   globalThis.fetch = async (path, init) => {
-    assert.equal(init?.signal, controller.signal);
+    assert.ok(init?.signal instanceof AbortSignal);
+    assert.equal(init.signal.aborted, false);
     assert.equal(init?.credentials, 'include');
     paths.push(String(path));
     return new Response(JSON.stringify(String(path) === '/api/mountains' ? [mountain] : detail), {
@@ -76,6 +77,17 @@ test('linked hiking selection refetches DB records and preserves the exact selec
     assert.equal(course.courseId, '10');
     assert.equal(course.courseName, detail.course.name);
     assert.deepEqual(course.path[1], { lat: 37.66, lng: 126.98 });
+    const pendingSignals: AbortSignal[] = [];
+    globalThis.fetch = async (_path, init) => {
+      assert.equal(init?.credentials, 'include');
+      pendingSignals.push(init!.signal!);
+      return new Promise(() => {});
+    };
+    const pending = loadHikingSelection({ mountainId: 47, courseId: 10 }, controller.signal);
+    controller.abort();
+    await assert.rejects(pending, { name: 'AbortError' });
+    assert.equal(pendingSignals.length, 2);
+    assert.ok(pendingSignals.every(signal => signal.aborted));
   } finally {
     globalThis.fetch = original;
   }

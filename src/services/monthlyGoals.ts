@@ -73,8 +73,8 @@ export async function putMonthlyGoals(
       'PUT',
       goals,
       signal,
-      async () => {
-        const member = await getCurrentMember(signal);
+      async (requestSignal) => {
+        const member = await getCurrentMember(requestSignal);
         if (member.userId !== userId)
           throw new ApiError(401, '로그인한 회원이 변경되었습니다. 다시 로그인해주세요.');
       },

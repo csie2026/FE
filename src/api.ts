@@ -106,8 +106,8 @@ export const saveHikingRecord = (
     signal,
     expectedUserId === undefined
       ? undefined
-      : async () => {
-          const member = await getCurrentMember(signal);
+      : async (requestSignal) => {
+          const member = await getCurrentMember(requestSignal);
           if (member.userId !== expectedUserId)
             throw new ApiError(
               401,
@@ -167,7 +167,9 @@ function preserveCancellation(cause: unknown, signal?: AbortSignal) {
 
 async function fetchResponse(path: string, options: RequestInit) {
   try {
-    return await fetch(path, options);
+    const response = await fetch(path, options);
+    if (options.signal?.aborted) preserveCancellation(options.signal.reason, options.signal);
+    return response;
   } catch (cause) {
     preserveCancellation(cause, options.signal ?? undefined);
     throw new ApiError(0, NETWORK_ERROR_MESSAGE, 'network_error');
@@ -176,7 +178,9 @@ async function fetchResponse(path: string, options: RequestInit) {
 
 async function readJson(response: Response, signal?: AbortSignal): Promise<unknown> {
   try {
-    return await response.json();
+    const value: unknown = await response.json();
+    if (signal?.aborted) preserveCancellation(signal.reason, signal);
+    return value;
   } catch (cause) {
     preserveCancellation(cause, signal);
     throw new ApiError(
@@ -237,6 +241,7 @@ async function readHttpError(response: Response, signal?: AbortSignal) {
     preserveCancellation(cause, signal);
     // HTML 또는 빈 오류 응답도 원래 HTTP 상태를 유지한다.
   }
+  if (signal?.aborted) preserveCancellation(signal.reason, signal);
   const code = typeof error.error === 'string' ? error.error : undefined;
   return {
     code,
@@ -249,12 +254,53 @@ async function readHttpError(response: Response, signal?: AbortSignal) {
   };
 }
 // 세션 쿠키와 서버 오류 상태를 모든 도메인 요청에서 일관되게 다루는 공통 진입점이다.
+export const API_TIMEOUT_MS = 20_000;
 export async function api<T>(
   path: string,
   method = 'GET',
   body?: unknown,
   signal?: AbortSignal,
-  beforeSend?: () => Promise<void>,
+  beforeSend?: (signal?: AbortSignal) => Promise<void>,
+): Promise<T> {
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort(signal?.reason);
+  let onAbort: () => void = () => {};
+  const cancelled = new Promise<never>((_, reject) => {
+    onAbort = () => {
+      try {
+        preserveCancellation(controller.signal.reason, controller.signal);
+      } catch (cause) {
+        reject(cause);
+      }
+    };
+    controller.signal.addEventListener('abort', onAbort, { once: true });
+  });
+  signal?.addEventListener('abort', forwardAbort, { once: true });
+  if (signal?.aborted) forwardAbort();
+  const timer = setTimeout(
+    () => controller.abort(new DOMException('요청 시간이 초과되었습니다.', 'TimeoutError')),
+    API_TIMEOUT_MS,
+  );
+  try {
+    if (controller.signal.aborted) return await cancelled;
+    // Race also bounds adapters/body readers that ignore AbortSignal. Never automatically retry.
+    return await Promise.race([
+      apiRequest<T>(path, method, body, controller.signal, beforeSend),
+      cancelled,
+    ]);
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', forwardAbort);
+    controller.signal.removeEventListener('abort', onAbort);
+  }
+}
+
+async function apiRequest<T>(
+  path: string,
+  method: string,
+  body: unknown,
+  signal: AbortSignal,
+  beforeSend?: (signal?: AbortSignal) => Promise<void>,
 ): Promise<T> {
   const generation = sessionGeneration;
   const checkSession = (status: number, code?: string, userId?: number) => {
@@ -295,7 +341,7 @@ export async function api<T>(
     if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   }
   // Activity retries recheck the member after CSRF retrieval, immediately before sending.
-  if (beforeSend) await beforeSend();
+  if (beforeSend) await beforeSend(signal);
   if (signal?.aborted) throw new DOMException('요청이 취소되었습니다.', 'AbortError');
   const response = await fetchResponse(path, {
     method,
@@ -339,7 +385,7 @@ export async function uploadMemberImage(
     'PUT',
     body,
     signal,
-    expectedUserId === undefined ? undefined : () => checkImageOwner(expectedUserId, signal),
+    expectedUserId === undefined ? undefined : (requestSignal) => checkImageOwner(expectedUserId, requestSignal),
   );
   return ownedImageResponse(member, expectedUserId);
 }
@@ -354,7 +400,7 @@ export async function deleteMemberImage(
     'DELETE',
     undefined,
     signal,
-    expectedUserId === undefined ? undefined : () => checkImageOwner(expectedUserId, signal),
+    expectedUserId === undefined ? undefined : (requestSignal) => checkImageOwner(expectedUserId, requestSignal),
   );
   return ownedImageResponse(await getCurrentMember(signal), expectedUserId);
 }

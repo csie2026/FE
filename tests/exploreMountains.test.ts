@@ -99,7 +99,8 @@ test('explore reads the same authenticated API as GPS and forwards cancellation 
   globalThis.fetch = async (input, init) => {
     paths.push(String(input));
     assert.equal(init?.credentials, 'include');
-    assert.equal(init?.signal, controller.signal);
+    assert.ok(init?.signal instanceof AbortSignal);
+    assert.equal(init.signal.aborted, false);
     return new Response(JSON.stringify([]), { status: 200 });
   };
   try {
@@ -109,6 +110,16 @@ test('explore reads the same authenticated API as GPS and forwards cancellation 
     globalThis.fetch = async () =>
       new Response(JSON.stringify({ message: '조회 실패' }), { status: 500 });
     await assert.rejects(getMountains(), (error: { status: number }) => error.status === 500);
+    let pendingSignal: AbortSignal | null | undefined;
+    globalThis.fetch = async (_path, init) => {
+      assert.equal(init?.credentials, 'include');
+      pendingSignal = init?.signal;
+      return new Promise(() => {});
+    };
+    const pending = getMountains(controller.signal);
+    controller.abort();
+    await assert.rejects(pending, { name: 'AbortError' });
+    assert.equal(pendingSignal?.aborted, true);
   } finally {
     globalThis.fetch = original;
   }

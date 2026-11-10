@@ -8,8 +8,8 @@ export async function withdrawAccount(userId: number, confirmation: string, sign
     'DELETE',
     { expectedUserId: userId, confirmation },
     signal,
-    async () => {
-      if ((await getCurrentMember(signal)).userId !== userId)
+    async (requestSignal) => {
+      if ((await getCurrentMember(requestSignal)).userId !== userId)
         throw new ApiError(409, '로그인 계정이 변경되었습니다. 다시 확인하십시오.');
     },
   );
