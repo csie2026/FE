@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { api, ApiError, API_TIMEOUT_MS, subscribeSessionExpiry, saveHikingRecord } from '../src/api.ts';
@@ -83,8 +84,8 @@ test('caller cancellation remains AbortError and a completed request clears its 
     controller.abort();
     await assert.rejects(pending,{ name: 'AbortError' });
     let completedSignal: AbortSignal | null | undefined;
-    globalThis.fetch = async (_path,init) => { completedSignal = init?.signal; return Response.json({ ok: true }); };
-    assert.deepEqual(await api('/api/users/me'),{ ok: true });
+    globalThis.fetch = async (_path,init) => { completedSignal = init?.signal; return Response.json(memberResponse()); };
+    assert.deepEqual(await api('/api/users/me'), memberResponse());
     t.mock.timers.tick(API_TIMEOUT_MS * 2);
     assert.equal(completedSignal?.aborted,false);
   } finally { globalThis.fetch = original; }
@@ -103,7 +104,7 @@ test('common timeout keeps hiking save uncertain and preserves the frozen UUID a
   globalThis.fetch = async (path) => {
     paths.push(String(path));
     if (path === '/api/csrf') return csrf();
-    if (path === '/api/users/me') return Response.json({ userId: 1 });
+    if (path === '/api/users/me') return Response.json(memberResponse(1));
     announce(); return never();
   };
   try {

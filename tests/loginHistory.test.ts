@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -35,7 +36,7 @@ test('server-confirmed login and subsequent 401 distinguish anonymous, expiry, i
     assert.equal(notices, 0); // first visit and anonymous protected API
 
     for (const reason of ['idle expiry', 'server restart']) {
-      globalThis.fetch = async () => Response.json({ userId: 7 });
+      globalThis.fetch = async () => Response.json(memberResponse(7));
       await api('/api/users/me');
       confirmLogin();
       assert.equal(notices, reason === 'idle expiry' ? 0 : 1);
@@ -77,7 +78,7 @@ test('server-confirmed login and subsequent 401 distinguish anonymous, expiry, i
 
     forgetLogin();
     values.set('topeak:server-confirmed-login', '1'); // reload retains only notice evidence
-    globalThis.fetch = async () => Response.json({ userId: 7 });
+    globalThis.fetch = async () => Response.json(memberResponse(7));
     await api('/api/users/me');
     assert.equal(notices, 2); // stored history alone never triggers expiry
     globalThis.fetch = async () => unauthorized();

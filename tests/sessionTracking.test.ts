@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -296,7 +297,7 @@ test('after limit stop, failed server save and serialized reload retry use ident
   globalThis.fetch = async (url, init) => {
     if (String(url) === '/api/csrf')
       return Response.json({ headerName: 'X-CSRF-TOKEN', token: 'test' });
-    if (String(url) === '/api/users/me') return Response.json({ userId: 1 });
+    if (String(url) === '/api/users/me') return Response.json(memberResponse(1));
     bodies.push(init!.body as string);
     if (bodies.length === 1) throw new TypeError('response lost');
     return Response.json({

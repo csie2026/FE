@@ -1,3 +1,4 @@
+import { validApiResponse } from './services/responseValidation.ts';
 import {
   getErrorMessage,
   NETWORK_ERROR_MESSAGE,
@@ -6,13 +7,13 @@ import {
 
 export interface PublicProfile {
   userId: number;
-  nickname: string;
+  nickname: string | null;
   profileImageUrl: string | null;
   score: number | null;
 }
 export interface RankingMember {
   userId: number;
-  nickname: string;
+  nickname: string | null;
   profileImageUrl: string | null;
   score: number | null;
   rank: number;
@@ -39,7 +40,7 @@ export interface Journal {
   hikingRecordId: number | null;
   id: number;
   userId: number;
-  nickname: string;
+  nickname: string | null;
   mountainName: string;
   title: string;
   content: string;
@@ -119,7 +120,8 @@ export const createJournal = (input: JournalInput) => api<Journal>('/api/journal
 export const updateJournal = (id: number, input: JournalUpdate) =>
   api<Journal>(`/api/journals/${id}`, 'PATCH', input);
 export const deleteJournal = (id: number) => api<void>(`/api/journals/${id}`, 'DELETE');
-export const getJournal = (id: number) => api<Journal>(`/api/journals/${id}`);
+export const getJournal = (id: number, signal?: AbortSignal) =>
+  api<Journal>(`/api/journals/${id}`, 'GET', undefined, signal);
 let sessionGeneration = 0;
 let sessionExpired: ((code?: string, userId?: number) => void) | undefined;
 
@@ -357,7 +359,14 @@ async function apiRequest<T>(
     throw new ApiError(response.status, error.message, error.code);
   }
   // 삭제·로그아웃의 빈 응답을 JSON으로 읽지 않아 정상 처리 후 파싱 오류가 발생하지 않게 한다.
-  return response.status === 204 ? (undefined as T) : ((await readJson(response, signal)) as T);
+  const value = response.status === 204 ? undefined : await readJson(response, signal);
+  if (!validApiResponse(path, method, value))
+    throw new ApiError(
+      response.status,
+      '서버 응답을 확인하지 못했습니다. 잠시 후 다시 시도해주세요.',
+      'invalid_response',
+    );
+  return value as T;
 }
 
 export type MemberImageKind = 'profile' | 'background';
@@ -385,7 +394,9 @@ export async function uploadMemberImage(
     'PUT',
     body,
     signal,
-    expectedUserId === undefined ? undefined : (requestSignal) => checkImageOwner(expectedUserId, requestSignal),
+    expectedUserId === undefined
+      ? undefined
+      : (requestSignal) => checkImageOwner(expectedUserId, requestSignal),
   );
   return ownedImageResponse(member, expectedUserId);
 }
@@ -400,7 +411,9 @@ export async function deleteMemberImage(
     'DELETE',
     undefined,
     signal,
-    expectedUserId === undefined ? undefined : (requestSignal) => checkImageOwner(expectedUserId, requestSignal),
+    expectedUserId === undefined
+      ? undefined
+      : (requestSignal) => checkImageOwner(expectedUserId, requestSignal),
   );
   return ownedImageResponse(await getCurrentMember(signal), expectedUserId);
 }

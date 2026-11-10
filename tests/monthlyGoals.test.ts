@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiError } from '../src/api.ts';
@@ -35,7 +36,7 @@ test('goal save sends CSRF and rechecks account before PUT; independent targets 
   globalThis.fetch = async (url, init) => {
     if (String(url) === '/api/csrf')
       return Response.json({ headerName: 'X-CSRF-TOKEN', token: 'test' });
-    if (String(url) === '/api/users/me') return Response.json({ userId: 1 });
+    if (String(url) === '/api/users/me') return Response.json(memberResponse(1));
     assert.equal(init?.method, 'PUT');
     assert.equal((init!.headers as Record<string, string>)['X-CSRF-TOKEN'], 'test');
     putCount++;
@@ -62,7 +63,7 @@ test('account change while waiting for CSRF blocks goal PUT rather than writing 
     if (init?.method === 'PUT') puts++;
     return String(url) === '/api/csrf'
       ? Response.json({ headerName: 'X-CSRF-TOKEN', token: 'test' })
-      : Response.json({ userId: 2 });
+      : Response.json(memberResponse(2));
   };
   try {
     await assert.rejects(

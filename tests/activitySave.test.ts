@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiError, type HikingActivityInput } from '../src/api.ts';
@@ -36,7 +37,7 @@ async function mock(
   const posts: HikingActivityInput[] = [];
   globalThis.fetch = async (url, init) => {
     if (String(url) === '/api/csrf') return json({ headerName: 'X-CSRF-TOKEN', token: 'csrf' });
-    if (String(url) === '/api/users/me') return json({ userId: member });
+    if (String(url) === '/api/users/me') return json(memberResponse(member));
     posts.push(JSON.parse(init?.body as string));
     return reply(init);
   };
@@ -127,7 +128,7 @@ test('account identity is checked after waiting for CSRF and before POST', async
       member = 2;
       return json({ headerName: 'X-CSRF-TOKEN', token: 'new-session' });
     }
-    return json({ userId: member });
+    return json(memberResponse(member));
   };
   try {
     await assert.rejects(submitPendingActivity(input, 1), failure('authentication'));
@@ -159,7 +160,7 @@ test('screen exit cancellation prevents a pending preflight from sending POST', 
       controller.abort();
       return json({ headerName: 'X-CSRF-TOKEN', token: 'csrf' });
     }
-    if (String(url) === '/api/users/me') return json({ userId: 1 });
+    if (String(url) === '/api/users/me') return json(memberResponse(1));
     posts++;
     return json(record);
   };

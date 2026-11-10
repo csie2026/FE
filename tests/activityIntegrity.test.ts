@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { HikingActivityInput } from '../src/api.ts';
@@ -115,7 +116,7 @@ test('raw accepted GPS reaches the frozen saved completion flag; display positio
   globalThis.fetch = async (url, init) => {
     const path = String(url);
     if (path === '/api/csrf') return Response.json({ headerName: 'X-CSRF-TOKEN', token: 'test' });
-    if (path === '/api/users/me') return Response.json({ userId: 1 });
+    if (path === '/api/users/me') return Response.json(memberResponse(1));
     const body = JSON.parse(init?.body as string);
     posts.push(body);
     return Response.json({

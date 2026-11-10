@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-type Props = { userId: number; nickname: string; src: string | null; className: string };
+type Props = { userId: number; nickname: string | null; src: string | null; className: string };
 function AvatarContent({ nickname, src, className }: Props) {
   const [failed, setFailed] = useState(false);
   const visible = Boolean(src) && !failed;
@@ -14,7 +14,9 @@ function AvatarContent({ nickname, src, className }: Props) {
           onError={() => setFailed(true)}
         />
       ) : (
-        Array.from(nickname.trim()).slice(-2).join('') || '산'
+        Array.from((nickname ?? '').trim())
+          .slice(-2)
+          .join('') || '산'
       )}
     </span>
   );

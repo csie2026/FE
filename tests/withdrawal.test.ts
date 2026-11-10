@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiError, api, subscribeSessionExpiry } from '../src/api.ts';
@@ -61,7 +62,7 @@ test('withdrawal uses session CSRF, rechecks account and sends only explicit int
         ? csrf()
         : init?.method === 'DELETE'
           ? new Response(null, { status: 204 })
-          : Response.json({ userId: 41 }),
+          : Response.json(memberResponse(41)),
   );
 });
 test('account switch during CSRF never deletes the new account', async () => {
@@ -76,7 +77,7 @@ test('account switch during CSRF never deletes the new account', async () => {
         false,
       );
     },
-    (path) => (path === '/api/csrf' ? csrf() : Response.json({ userId: 42 })),
+    (path) => (path === '/api/csrf' ? csrf() : Response.json(memberResponse(42))),
   );
 });
 test('CSRF failure and session expiry stop before destructive mutation', async () => {
@@ -105,7 +106,7 @@ test('rejection and lost response remain errors rather than false completed with
           ? csrf()
           : init?.method === 'DELETE'
             ? Response.json({ message: 'not completed' }, { status })
-            : Response.json({ userId: 41 }),
+            : Response.json(memberResponse(41)),
     );
   }
   await mock(
@@ -119,7 +120,7 @@ test('rejection and lost response remain errors rather than false completed with
     (path, init) => {
       if (path === '/api/csrf') return csrf();
       if (init?.method === 'DELETE') throw TypeError('response lost');
-      return Response.json({ userId: 41 });
+      return Response.json(memberResponse(41));
     },
   );
 });
@@ -134,7 +135,7 @@ test('unexpected successful JSON cannot confirm deletion', async () => {
           ? csrf()
           : init?.method === 'DELETE'
             ? Response.json(body)
-            : Response.json({ userId: 41 }),
+            : Response.json(memberResponse(41)),
     );
 });
 test('cancellation before send prevents DELETE', async () => {
@@ -152,7 +153,7 @@ test('cancellation before send prevents DELETE', async () => {
         controller.abort();
         return csrf();
       }
-      return Response.json({ userId: 41 });
+      return Response.json(memberResponse(41));
     },
   );
 });

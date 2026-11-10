@@ -1,14 +1,9 @@
 import { getErrorMessage } from '../../utils/errorMessages';
 import ProfileAvatar from '../common/ProfileAvatar';
-import { useEffect, useState } from 'react';
-import {
-  ApiError,
-  getRankingSummary,
-  scoreText,
-  type RankingMember,
-  type RankingSummary,
-} from '../../api';
+import { useEffect, useMemo, useState } from 'react';
+import { ApiError, scoreText, type RankingMember, type RankingSummary } from '../../api';
 import './RankingPage.css';
+import { startRankingRequest } from '../../services/ranking';
 
 type Props = {
   currentUserId: number | null;
@@ -48,50 +43,39 @@ function points(member: RankingMember) {
 
 // 서버가 정렬한 공개 회원 목록을 사용하고, 사용자 선택은 상위 화면의 타인 프로필 이동으로 연결한다.
 export default function RankingPage({ currentUserId, onSelectUser, onAuthError }: Props) {
-  const [summary, setSummary] = useState<RankingSummary | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const request = useMemo(() => ({ currentUserId, attempt }), [currentUserId, attempt]);
+  const [result, setResult] = useState<{
+    request: typeof request;
+    summary?: RankingSummary;
+    error?: string;
+  } | null>(null);
+  const current = result?.request === request ? result : null;
+  const summary = current?.summary;
+  const loading = currentUserId !== null && current === null;
+  const error = current?.error ?? '';
 
   // Abort superseded requests on navigation, refresh or account changes.
   useEffect(() => {
-    const controller = new AbortController();
-    let active = true;
     if (currentUserId === null) return;
-    getRankingSummary(controller.signal)
-      .then((data) => {
-        if (active) {
-          if (data.mine !== null && data.mine.userId !== currentUserId)
-            throw new Error('로그인한 회원의 순위를 확인할 수 없습니다.');
-          setSummary(data);
-        }
-      })
-      .catch((cause: unknown) => {
-        if (!active) return;
-        setError(getErrorMessage(cause, '랭킹을 불러오지 못했어요. 다시 시도해주세요.'));
+    return startRankingRequest(currentUserId, {
+      success: (summary) => setResult({ request, summary }),
+      failure: (cause) => {
+        setResult({
+          request,
+          error: getErrorMessage(cause, '랭킹을 불러오지 못했어요. 다시 시도해주세요.'),
+        });
         if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-      controller.abort();
-    };
-  }, [attempt, currentUserId, onAuthError]);
+      },
+    });
+  }, [request, currentUserId, onAuthError]);
 
   function refresh() {
-    setLoading(true);
-    setError('');
-    setSummary(null);
     setAttempt((value) => value + 1);
   }
   useEffect(() => {
     const foreground = () => {
       if (!document.hidden) {
-        setLoading(true);
-        setError('');
-        setSummary(null);
         setAttempt((value) => value + 1);
       }
     };
@@ -176,7 +160,7 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
                           {rank}
                         </span>
                       </span>
-                      <b className="podium-name" title={member?.nickname}>
+                      <b className="podium-name" title={member?.nickname ?? undefined}>
                         {member?.nickname ?? '빈 자리'}
                       </b>
                       <span className="podium-score">{member ? points(member) : null}</span>
@@ -209,7 +193,7 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
                         >
                           <span className="leaderboard-position">{member.rank}</span>
                           <RankAvatar member={member} />
-                          <span className="leaderboard-name" title={member.nickname}>
+                          <span className="leaderboard-name" title={member.nickname ?? undefined}>
                             {member.nickname}
                             {member.userId === currentUserId && <small>나</small>}
                           </span>
@@ -238,7 +222,7 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
         ) : mine ? (
           <button type="button" onClick={() => onSelectUser(mine.userId)}>
             <b>{mine.rank.toLocaleString()}위</b>
-            <span title={mine.nickname}>{mine.nickname}</span>
+            <span title={mine.nickname ?? undefined}>{mine.nickname}</span>
             <strong>{points(mine)}</strong>
           </button>
         ) : (

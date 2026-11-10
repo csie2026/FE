@@ -1,3 +1,4 @@
+import { memberResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { api, ApiError, subscribeSessionExpiry } from '../src/api.ts';
@@ -292,16 +293,13 @@ test('네트워크 복원 후 같은 프로필 값으로 수동 재시도할 수
       if (offline) throw new TypeError('Failed to fetch');
       if (path === '/api/csrf') return csrf();
       savedBody = JSON.parse(init!.body as string);
-      return Response.json({ ...input, profileCompleted: true });
+      return Response.json(memberResponse(1, input));
     },
     async (paths) => {
       await assert.rejects(api('/api/users/me/profile', 'PATCH', input));
       assert.deepEqual(input, { nickname: '등산객', birthYear: 2003 });
       offline = false;
-      assert.deepEqual(await api('/api/users/me/profile', 'PATCH', input), {
-        ...input,
-        profileCompleted: true,
-      });
+      assert.deepEqual(await api('/api/users/me/profile', 'PATCH', input), memberResponse(1, input));
       assert.deepEqual(savedBody, input);
       assert.deepEqual(paths, ['/api/csrf', '/api/csrf', '/api/users/me/profile']);
     },
