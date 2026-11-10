@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { type HikingActivityInput } from '../src/api.ts';
+import { ApiError, type HikingActivityInput } from '../src/api.ts';
 import {
   submitPendingActivity,
   confirmsSavedActivity,
   ActivitySaveFailure,
+  describeSaveFailure,
 } from '../src/components/hiking/services/activitySave.ts';
 
 const input: HikingActivityInput = Object.freeze({
@@ -171,6 +172,14 @@ test('screen exit cancellation prevents a pending preflight from sending POST', 
     globalThis.fetch = original;
   }
 });
+test('distance/evidence rejection explains preservation without claiming legacy data loss', () => {
+  const error = describeSaveFailure(new ApiError(400, 'GPS 경로와 제출 거리가 일치하지 않습니다.'));
+  assert.equal(error.kind, 'rejected');
+  assert.match(error.message, /거리/);
+  assert.match(error.message, /보존/);
+  assert.doesNotMatch(error.message, /유실/);
+});
+
 test('validation rejection is distinct from a retryable unknown outcome', async () => {
   await mock(
     async () => {

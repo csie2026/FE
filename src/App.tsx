@@ -1,4 +1,5 @@
 import { getErrorMessage } from './utils/errorMessages';
+import { readOAuthFailure } from './services/oauthFailure';
 import ProfileAvatar from './components/common/ProfileAvatar';
 import { createLogout } from './services/logout';
 import { confirmLogin, forgetLogin, shouldNotifySessionExpiry } from './services/loginHistory';
@@ -95,7 +96,8 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
+  const [oauthFailure] = useState(() => readOAuthFailure(window.location.href));
+  const [error, setError] = useState(oauthFailure?.message ?? '');
   const [logoutError, setLogoutError] = useState(false);
   const [withdrawalPending, setWithdrawalPending] = useState(false);
   const withdrawalLock = useRef(false);
@@ -365,6 +367,7 @@ function App() {
   // 첫 진입 시 서버 세션을 확인한 뒤 프로필 설정, 상세 hash, 저장된 화면 순서로 진입 위치를 결정한다.
   useEffect(() => {
     clearLegacyMemberImages();
+    if (oauthFailure) window.history.replaceState(window.history.state, '', oauthFailure.cleanUrl);
     const version = accountVersion.current;
     let active = true;
     const initializeScreen = (
@@ -463,12 +466,15 @@ function App() {
           fail(e);
       })
       .finally(() => {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+          if (oauthFailure) setError(oauthFailure.message);
+        }
       });
     return () => {
       active = false;
     };
-  }, [fail]);
+  }, [fail, oauthFailure]);
   // 브라우저 뒤로 가기는 새 이력을 만들지 않고 기존 화면과 대상 ID를 복원한다.
   // 복원할 화면도 현재 로그인·프로필 상태의 제한을 따른다.
   useEffect(() => {

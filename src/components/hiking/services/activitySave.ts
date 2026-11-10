@@ -53,7 +53,7 @@ export function describeSaveFailure(cause: unknown): ActivitySaveFailure {
     if (cause.status === 400)
       return new ActivitySaveFailure(
         'rejected',
-        'GPS 요청 구조나 시각이 유효하지 않습니다. 구버전 종료 기록은 GPS 증거가 유실되어 새로 저장할 수 없습니다. 임시 기록은 보존됩니다.',
+        '산행의 GPS 증거·거리·시각을 확인하지 못했습니다. 임시 기록은 보존됩니다. 기록을 확인한 뒤 다시 시도해주세요.',
       );
     if (cause.status === 409 && cause.code === 'duplicate_hiking_activity')
       return new ActivitySaveFailure(
