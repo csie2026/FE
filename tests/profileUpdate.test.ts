@@ -1,10 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiError, subscribeSessionExpiry } from '../src/api.ts';
+import { ApiError, API_TIMEOUT_MS, subscribeSessionExpiry } from '../src/api.ts';
 import {
   updateProfile,
   isProfileAccountMismatch,
   PROFILE_ACCOUNT_CHANGED,
+  ProfileSaveUnconfirmed,
+  confirmProfileSave,
 } from '../src/services/profileUpdate.ts';
 import { createScopedRequest } from '../src/services/scopedRequest.ts';
 import { memberResponse } from './fixtures.ts';
@@ -322,3 +324,204 @@ test('scope exit during CSRF prevents the account check and write', async () => 
     },
   );
 });
+
+for (const failure of ['network', 'server', 'invalid-response'] as const) {
+  test(`confirmed PATCH with failed account recheck remains saved: ${failure}`, async () => {
+    let reads = 0,
+      patches = 0;
+    await withFetch(
+      async (url) => {
+        if (String(url) === '/api/csrf') return csrf();
+        if (String(url) === '/api/users/me/profile') {
+          patches++;
+          return Response.json(
+            memberResponse(1, { nickname: 'Updated', birthYear: 2003, profileCompleted: true }),
+          );
+        }
+        if (++reads === 1) return Response.json(memberResponse(1));
+        if (failure === 'network') throw new TypeError('Failed to fetch');
+        if (failure === 'server') return Response.json({}, { status: 503 });
+        return Response.json({});
+      },
+      async () => {
+        await assert.rejects(
+          updateProfile(input(), () => true),
+          (cause: unknown) => cause instanceof ProfileSaveUnconfirmed && cause.outcome === 'saved',
+        );
+      },
+    );
+    assert.equal(patches, 1);
+    assert.equal(reads, 2);
+  });
+}
+
+for (const failure of ['network', 'server', 'invalid-response'] as const) {
+  test(`unconfirmed PATCH response never becomes saved: ${failure}`, async () => {
+    let reads = 0;
+    await withFetch(
+      async (url) => {
+        if (String(url) === '/api/csrf') return csrf();
+        if (String(url) === '/api/users/me') {
+          reads++;
+          return Response.json(memberResponse(1));
+        }
+        if (failure === 'network') throw new TypeError('Failed to fetch');
+        if (failure === 'server') return Response.json({}, { status: 503 });
+        return Response.json({});
+      },
+      async () => {
+        await assert.rejects(
+          updateProfile(input(), () => true),
+          (cause: unknown) =>
+            cause instanceof ProfileSaveUnconfirmed && cause.outcome === 'unknown',
+        );
+      },
+    );
+    assert.equal(reads, 1);
+  });
+}
+
+test('failure during preflight never claims that a PATCH was sent or saved', async () => {
+  let patches = 0;
+  await withFetch(
+    async (url) => {
+      if (String(url) === '/api/csrf') return csrf();
+      if (String(url) === '/api/users/me') throw new TypeError('Failed to fetch');
+      patches++;
+      return Response.json(memberResponse(1));
+    },
+    async () => {
+      await assert.rejects(
+        updateProfile(input(), () => true),
+        (cause: unknown) =>
+          cause instanceof ApiError &&
+          cause.code === 'network_error' &&
+          !(cause instanceof ProfileSaveUnconfirmed),
+      );
+    },
+  );
+  assert.equal(patches, 0);
+});
+
+test('post-save 401 retains session-expiry handling rather than a successful pending result', async () => {
+  let reads = 0,
+    expired = 0;
+  const unsubscribe = subscribeSessionExpiry(() => {
+    expired++;
+  });
+  try {
+    await withFetch(
+      async (url) => {
+        if (String(url) === '/api/csrf') return csrf();
+        if (String(url) === '/api/users/me/profile') return Response.json(memberResponse(1));
+        return ++reads === 1
+          ? Response.json(memberResponse(1))
+          : Response.json({}, { status: 401 });
+      },
+      async () => {
+        await assert.rejects(
+          updateProfile(input(), () => true),
+          (cause: unknown) => cause instanceof ApiError && cause.status === 401,
+        );
+      },
+    );
+    assert.equal(expired, 1);
+  } finally {
+    unsubscribe();
+  }
+});
+
+test('confirmation retries only GET and returns the latest same-account server values', async () => {
+  const paths: string[] = [];
+  let attempt = 0;
+  const latest = memberResponse(1, {
+    nickname: 'Latest server value',
+    birthYear: 2001,
+    profileCompleted: true,
+  });
+  await withFetch(
+    async (url, options) => {
+      paths.push(String(url));
+      assert.equal(options?.method, 'GET');
+      if (++attempt === 1) throw new TypeError('Failed to fetch');
+      return Response.json(latest);
+    },
+    async () => {
+      await assert.rejects(confirmProfileSave(1, () => true));
+      assert.deepEqual(await confirmProfileSave(1, () => true), latest);
+    },
+  );
+  assert.deepEqual(paths, ['/api/users/me', '/api/users/me']);
+});
+
+test('confirmation retry detects another account and discards late scoped responses', async () => {
+  await withFetch(
+    async () => Response.json(memberResponse(2)),
+    async () => {
+      await assert.rejects(
+        confirmProfileSave(1, () => true),
+        mismatch,
+      );
+    },
+  );
+  const response = deferred<Response>();
+  let current = true;
+  await withFetch(
+    async () => response.promise,
+    async () => {
+      const confirming = confirmProfileSave(1, () => current);
+      current = false;
+      response.resolve(Response.json(memberResponse(1)));
+      await assert.rejects(
+        confirming,
+        (cause: unknown) => cause instanceof DOMException && cause.name === 'AbortError',
+      );
+    },
+  );
+});
+
+test('normal save returns fresh member values instead of the earlier PATCH response', async () => {
+  let reads = 0;
+  const latest = memberResponse(1, { nickname: 'Concurrent newer value', birthYear: 2002 });
+  await withFetch(
+    async (url) => {
+      if (String(url) === '/api/csrf') return csrf();
+      if (String(url) === '/api/users/me')
+        return Response.json(++reads === 1 ? memberResponse(1) : latest);
+      return Response.json(memberResponse(1, { nickname: 'Updated' }));
+    },
+    async () => {
+      assert.deepEqual(await updateProfile(input(), () => true), latest);
+    },
+  );
+});
+
+for (const stage of ['patch', 'recheck'] as const) {
+  test(`timeout at ${stage} preserves whether the save was confirmed`, async (t) => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    const started = deferred<void>();
+    let reads = 0;
+    await withFetch(
+      async (url) => {
+        if (String(url) === '/api/csrf') return csrf();
+        if (String(url) === '/api/users/me' && ++reads === 1)
+          return Response.json(memberResponse(1));
+        if (stage === 'recheck' && String(url) === '/api/users/me/profile')
+          return Response.json(memberResponse(1));
+        started.resolve();
+        return new Promise<Response>(() => {});
+      },
+      async () => {
+        const saving = updateProfile(input(), () => true);
+        await started.promise;
+        t.mock.timers.tick(API_TIMEOUT_MS);
+        await assert.rejects(
+          saving,
+          (cause: unknown) =>
+            cause instanceof ProfileSaveUnconfirmed &&
+            cause.outcome === (stage === 'patch' ? 'unknown' : 'saved'),
+        );
+      },
+    );
+  });
+}

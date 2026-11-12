@@ -1,5 +1,5 @@
 import { getPublicProfileView } from './services/publicProfile';
-import { updateProfile, isProfileAccountMismatch } from './services/profileUpdate';
+import { updateProfile, confirmProfileSave, ProfileSaveUnconfirmed, isProfileAccountMismatch, type ProfileUpdate } from './services/profileUpdate';
 import { createScopedRequest } from './services/scopedRequest';
 import { subscribeForegroundRefresh } from './services/foregroundRefresh';
 import { recordLifecycle } from './services/lifecycleDiagnostics';
@@ -111,6 +111,9 @@ function App() {
   useEffect(() => { recordLifecycle('global-loading', { loading }); }, [loading]);
   const [busy, setBusy] = useState(false);
   const [profileAccountChanged, setProfileAccountChanged] = useState(false);
+  const [profileConfirmation, setProfileConfirmation] = useState<{
+    input: ProfileUpdate; wasProfileCompleted: boolean; isCurrent: () => boolean; message: string;
+  } | null>(null);
   const [oauthFailure] = useState(() => readOAuthFailure(window.location.href));
   const [error, setError] = useState(oauthFailure?.message ?? '');
   const [logoutError, setLogoutError] = useState(false);
@@ -315,6 +318,7 @@ function App() {
   // 계정 세대를 증가시켜 로그아웃 이전의 비동기 응답이 새 회원 상태에 반영되지 않게 한다.
   const clearAccount = useCallback(() => {
     setProfileAccountChanged(false);
+    setProfileConfirmation(null);
     profileSave.current.invalidate();
     journalSave.current.invalidate();
     accountVersion.current += 1;
@@ -740,6 +744,8 @@ function App() {
   // 프로필 저장 응답을 회원 상태에 반영한 뒤, 최초 설정과 기존 프로필 편집의 복귀 화면을 구분한다.
   const saveProfile = async () => {
     if (busy || !me || screen !== 'setup') return;
+    if (profileConfirmation?.isCurrent()) return;
+    setProfileConfirmation(null);
     const year = Number(birthYear);
     if (!nickname.trim() || nickname.trim().length > 30) {
       setError('닉네임은 1~30자로 입력해주세요.');
@@ -782,11 +788,46 @@ function App() {
             setScreen('login', null, null, null, true);
             return;
           }
+          if (cause instanceof ProfileSaveUnconfirmed) {
+            setProfileConfirmation({ input: snapshot, wasProfileCompleted, isCurrent, message: cause.message });
+            return;
+          }
           if (!logoutPending.current) fail(cause);
         },
         settled: () => setBusy(false),
       },
     );
+  };
+  const confirmSavedProfile = async () => {
+    const pending = profileConfirmation;
+    if (busy || !pending?.isCurrent() || screen !== 'setup') return;
+    await profileSave.current.run(async () => {
+      setBusy(true);
+      setError('');
+      return confirmProfileSave(pending.input.expectedUserId, pending.isCurrent);
+    }, {
+      success: (user) => {
+        if (!pending.isCurrent()) return;
+        setProfileConfirmation(null);
+        setMe(user);
+        if (user.profileCompleted && user.nickname === pending.input.nickname && user.birthYear === pending.input.birthYear) {
+          setScreen(pending.wasProfileCompleted ? 'profile' : 'explore');
+        } else {
+          setError('현재 서버 값이 저장하려던 내용과 다릅니다. 입력 내용을 확인한 뒤 필요한 경우에만 다시 저장해주세요.');
+        }
+      },
+      failure: (cause) => {
+        if (!pending.isCurrent()) return;
+        if (isProfileAccountMismatch(cause)) {
+          clearAccount();
+          setBusy(false);
+          setProfileAccountChanged(true);
+          setError(cause.message);
+          setScreen('login', null, null, null, true);
+        } else if (!logoutPending.current) fail(cause);
+      },
+      settled: () => setBusy(false),
+    });
   };
   // 이전 화면의 늦은 응답으로 현재 화면을 이동시키지 않는다. 서버 저장은 완료될 수 있으므로
   // 목록에 다시 진입할 때는 최신 데이터를 조회한다.
@@ -1233,6 +1274,7 @@ function App() {
               <input
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
+                disabled={busy || Boolean(profileConfirmation?.isCurrent())}
                 maxLength={30}
                 required
                 autoComplete="nickname"
@@ -1250,7 +1292,7 @@ function App() {
                 onChange={(e) => setBirthYear(e.target.value)}
                 autoComplete="bday-year"
                 required
-                disabled={busy}
+                disabled={busy || Boolean(profileConfirmation?.isCurrent())}
               >
                 <option value="" disabled>
                   출생연도를 선택해 주세요
@@ -1263,7 +1305,15 @@ function App() {
               </select>
             </label>
             <p className="muted">출생연도를 선택해 주세요.</p>
-            <button className="submit" disabled={busy}>
+            {profileConfirmation?.isCurrent() && (
+              <div role="status">
+                <p>{profileConfirmation.message}</p>
+                <button type="button" disabled={busy} onClick={() => void confirmSavedProfile()}>
+                  저장 결과 확인
+                </button>
+              </div>
+            )}
+            <button className="submit" disabled={busy || Boolean(profileConfirmation?.isCurrent())}>
               {me?.profileCompleted ? '변경 사항 저장' : '시작하기'}
             </button>
           </form>
