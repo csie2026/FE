@@ -32,7 +32,7 @@ const catalog = [
   { id: '2', name: '다른 산', city: '부천시', region: '서부권역' },
 ];
 
-test('only certified and GPS-verified summits enter the collection', () => {
+test('GPS-verified repeat summits enter the collection even under legacy DAILY_LIMIT', () => {
   const repeated = {
     ...activity(2, 1, true, '2026-11-02T00:00:00Z'),
     scoring: {
@@ -45,10 +45,10 @@ test('only certified and GPS-verified summits enter the collection', () => {
   };
   const summary = summarizeCompletedHikes([activity(1, 1, true), repeated, activity(3, 2, false)]);
   const collection = buildCompletedMountainCollection(catalog, summary.mountains);
-  assert.equal(summary.count, 1);
+  assert.equal(summary.count, 2);
   assert.equal(collection.items.length, 1);
-  assert.equal(collection.items[0].completion.completedCount, 1);
-  assert.equal(collection.items[0].completion.latestStartedAt, '2026-11-01T00:00:00Z');
+  assert.equal(collection.items[0].completion.completedCount, 2);
+  assert.equal(collection.items[0].completion.latestStartedAt, '2026-11-02T00:00:00Z');
 });
 
 test('only completed hikes determine the latest completed hike date', () => {

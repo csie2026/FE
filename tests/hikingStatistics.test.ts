@@ -22,14 +22,20 @@ const a = (
   endedAt: start,
   hikingDate: '1999-01-01',
   distanceMeters: meters,
-  elapsedMs: 0,
+  elapsedMs: 1200000,
   completed,
   journalId: null,
   gpsValidationVersion: 1,
-  scoring: { status: 'CERTIFIED', certificationDate: '2026-11-01', visitPoints: 200, summitPoints: completed ? 70 : 0, policyVersion: 'visit-general-or-verified-summit-multi-v2' },
+  scoring: {
+    status: 'CERTIFIED',
+    certificationDate: '2026-11-01',
+    visitPoints: 200,
+    summitPoints: completed ? 70 : 0,
+    policyVersion: 'visit-general-or-verified-summit-multi-v2',
+  },
 });
 
-test('server-certified activities count without FE reinterpreting eligibility thresholds', () => {
+test('saved distance and active time determine counts independently of score certification', () => {
   const records = [
     a(1, '2026-11-01T00:00:00Z', 0),
     a(2, '2026-11-02T00:00:00Z', 500),
@@ -38,8 +44,8 @@ test('server-certified activities count without FE reinterpreting eligibility th
   const s = summarizeHikingActivities(records, NOW).statistics;
   assert.deepEqual(s, {
     month: '2026-11',
-    totalHikeCount: 3,
-    monthlyHikeCount: 2,
+    totalHikeCount: 2,
+    monthlyHikeCount: 1,
     totalDistanceMeters: 1734.5,
     monthlyDistanceMeters: 500,
     completedHikeCount: 0,
@@ -47,10 +53,11 @@ test('server-certified activities count without FE reinterpreting eligibility th
   });
 });
 
-test('uncertified short test-course records remain outside hike and summit counts', () => {
+test('unverified short test-course records remain outside hike and summit counts', () => {
   const records = [1, 2, 3].map((id) => ({
     ...a(id, `2026-11-05T00:0${id}:00Z`, 90, true, 142),
     courseId: 421,
+    gpsValidationVersion: null,
     elapsedMs: 73000,
     scoring: {
       status: 'BELOW_MINIMUM' as const,
@@ -65,7 +72,13 @@ test('uncertified short test-course records remain outside hike and summit count
   assert.equal(statistics.completedHikeCount, 0);
   assert.equal(statistics.completedMountainCount, 0);
   assert.equal(records.filter((record) => String(record.scoring.status) === 'CERTIFIED').length, 0);
-  assert.equal(records.reduce((sum, record) => sum + record.scoring.visitPoints + record.scoring.summitPoints, 0), 0);
+  assert.equal(
+    records.reduce(
+      (sum, record) => sum + record.scoring.visitPoints + record.scoring.summitPoints,
+      0,
+    ),
+    0,
+  );
 });
 
 test('repeated summits increase completed count but unique mountain count stays separate from all hikes', () => {
@@ -87,10 +100,10 @@ test('repeated summits increase completed count but unique mountain count stays 
 test('month boundaries use KST start instants with inclusive start and exclusive next-month start', () => {
   const s = summarizeHikingActivities(
     [
-      a(1, '2026-10-31T14:59:59.999Z', 100),
-      a(2, '2026-10-31T15:00:00.000Z', 200),
-      a(3, '2026-11-30T14:59:59.999Z', 300),
-      a(4, '2026-11-30T15:00:00.000Z', 400),
+      a(1, '2026-10-31T14:59:59.999Z', 100, true),
+      a(2, '2026-10-31T15:00:00.000Z', 200, true),
+      a(3, '2026-11-30T14:59:59.999Z', 300, true),
+      a(4, '2026-11-30T15:00:00.000Z', 400, true),
     ],
     NOW,
   ).statistics;
@@ -177,6 +190,9 @@ test('invalid source data is an error instead of a misleading successful zero or
     { ...valid, startedAt: 'invalid' },
     { ...valid, completed: 'true' as unknown as boolean },
     { ...valid, mountainId: 0 },
+    { ...valid, elapsedMs: -1 },
+    { ...valid, elapsedMs: NaN },
+    { ...valid, elapsedMs: Infinity },
   ])
     assert.throws(() => summarizeHikingActivities([valid, record], NOW));
 });

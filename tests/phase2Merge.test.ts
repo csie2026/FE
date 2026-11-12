@@ -225,7 +225,7 @@ test('integration storage failure keeps old evidence and score sample source rat
   assert.equal(input.gpsEvidence!.recordedAt, new Date(first.timestamp).toISOString());
 });
 
-test('integration response-loss retry preserves both evidence formats and uses BE completion and scoring downstream', async () => {
+test('integration response-loss retry preserves evidence and separates saved statistics from scoring', async () => {
   const { session, now } = fixture();
   const ended = completeSession(session, course, now);
   const storage = store(),
@@ -275,7 +275,8 @@ test('integration response-loss retry preserves both evidence formats and uses B
     assert.deepEqual(saved.scoring, scoring);
     assert.match(scoringText(saved.scoring), /200점/);
     const stats = summarizeHikingActivities([saved], now).statistics;
-    assert.equal(stats.totalHikeCount, 1);
+    // 짧은 산행은 CERTIFIED 점수 응답만으로 횟수에 포함하지 않는다.
+    assert.equal(stats.totalHikeCount, 0);
     assert.equal(stats.totalDistanceMeters, saved.distanceMeters);
     assert.equal(stats.completedHikeCount, 0);
     assert.equal(summarizeCompletedHikes([saved]).count, 0);
