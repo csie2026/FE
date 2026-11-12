@@ -12,7 +12,7 @@ export function readHikingSelection(value: unknown): HikingSelection | null {
     : null;
 }
 
-// History stores IDs only. Re-fetch current BE records instead of trusting cached names or geometry.
+// 탐색 이력에는 ID만 저장하고 캐시된 이름·경로 대신 최신 서버 데이터를 다시 조회한다.
 export async function loadHikingSelection(selection: HikingSelection, signal?: AbortSignal) {
   if (!readHikingSelection(selection))
     throw new Error('산과 등산로 ID가 올바르지 않습니다. 다시 선택해주세요.');

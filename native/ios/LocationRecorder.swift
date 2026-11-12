@@ -2,15 +2,15 @@ import Foundation
 import UIKit
 import CoreLocation
 
-/// Process-lifetime owner: WebView/plugin destruction does not stop the manager.
-/// Every entry point and delegate callback runs on the main queue.
+/// 수집기는 앱 프로세스 동안 유지하며 WebView·플러그인 해제로 위치 관리자를 중지하지 않는다.
+/// 모든 진입점과 델리게이트 콜백은 메인 큐에서 실행한다.
 final class LocationRecorder: NSObject, CLLocationManagerDelegate {
     static let shared = LocationRecorder()
     private let manager = CLLocationManager()
     private var storage: LocationStore?
     private var active: StoredLocationSession?
     private var permissionRequests = [(Result<[String: Any], Error>) -> Void]()
-    // Retains failures even if writing the failure to SQLite also fails.
+    // SQLite에 오류 상태를 저장하지 못하더라도 메모리에 실패 정보를 유지한다.
     private var failures = [String: String]()
     private var collectionCutoffs = [String: Double]()
 
@@ -159,8 +159,8 @@ final class LocationRecorder: NSObject, CLLocationManagerDelegate {
             guard let cutoff = collectionCutoffs[key.clientRequestId] else {
                 throw LocationFailure(code: "SERVICE_INTERRUPTED", message: "Reconcile the interrupted collector before resuming.")
             }
-            // A prior stop may have stopped Core Location but failed to persist its boundary.
-            // Never count the intervening stopped time when storage becomes writable again.
+            // 이전 중지 요청이 Core Location만 멈추고 중지 경계 저장에는 실패했을 수 있다.
+            // 저장소가 복구되어도 그동안 수집이 멈춘 시간을 활동 시간에 더하지 않는다.
             try database.transition(existing, state: "paused", errorCode: nil, at: cutoff)
             guard let reconciled = try database.session(key) else {
                 throw LocationFailure(code: "STORAGE_ERROR", message: "Cannot reconcile the location boundary.")
@@ -202,7 +202,7 @@ final class LocationRecorder: NSObject, CLLocationManagerDelegate {
         }
         let summary = try database.summary(key)
         let failure = failures[key.clientRequestId] ?? session.errorCode
-        // A transient inability to obtain a fix is visible without declaring collection stopped.
+        // 일시적인 위치 수신 실패는 알리되 수집 자체가 중단된 것으로 처리하지 않는다.
         let stoppedByFailure = failures[key.clientRequestId] != nil && active?.key != key
         result["session"] = [
             "userId": key.userId, "clientRequestId": key.clientRequestId,
@@ -231,7 +231,7 @@ final class LocationRecorder: NSObject, CLLocationManagerDelegate {
 
     private func stopManager() {
         if let session = active { collectionCutoffs[session.key.clientRequestId] = nowMs() }
-        active = nil // Late callbacks must not append after stop or failure.
+        active = nil // 중지·실패 후 늦게 도착한 콜백이 좌표를 추가하지 못하게 한다.
         manager.stopUpdatingLocation()
         manager.allowsBackgroundLocationUpdates = false
         manager.showsBackgroundLocationIndicator = false
@@ -275,7 +275,7 @@ final class LocationRecorder: NSObject, CLLocationManagerDelegate {
         do {
             try store().append(locations, to: session)
             failures.removeValue(forKey: session.key.clientRequestId)
-            // No JS callback is required for storage; the caller polls readPoints on return.
+            // 좌표 저장에는 JS 콜백이 필요 없으며 화면 복귀 시 호출자가 readPoints로 조회한다.
         } catch {
             failActive("STORAGE_ERROR")
         }
@@ -286,7 +286,7 @@ final class LocationRecorder: NSObject, CLLocationManagerDelegate {
         if let coreError = error as? CLError {
             if coreError.code == .locationUnknown {
                 failures[session.key.clientRequestId] = "LOCATION_UNAVAILABLE"
-                return // Temporary loss of a fix: wait for another sample.
+                return // 일시적인 위치 수신 실패이므로 다음 표본을 기다린다.
             }
             if coreError.code == .denied {
                 failActive(CLLocationManager.locationServicesEnabled() ? "PERMISSION_DENIED" : "LOCATION_SERVICES_DISABLED")

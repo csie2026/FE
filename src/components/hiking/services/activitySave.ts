@@ -22,7 +22,7 @@ const sameInstant = (value: unknown, expected: string) =>
   Number.isFinite(Date.parse(value)) &&
   Date.parse(value) === Date.parse(expected);
 
-// A 2xx response is not enough: only the activity matching this frozen request confirms success.
+// 2xx 응답만으로 성공을 확정하지 않고 확정된 원본 요청과 일치하는 산행인지 확인한다.
 export function confirmsSavedActivity(
   value: unknown,
   input: HikingActivityInput,
@@ -49,7 +49,10 @@ export function describeSaveFailure(cause: unknown): ActivitySaveFailure {
   if (cause instanceof ActivitySaveFailure) return cause;
   if (cause instanceof ApiError) {
     if (cause.status === 413)
-      return new ActivitySaveFailure('rejected', 'GPS 요청이 2MiB 한도를 초과했습니다. 증거는 보존됩니다.');
+      return new ActivitySaveFailure(
+        'rejected',
+        'GPS 요청이 2MiB 한도를 초과했습니다. 증거는 보존됩니다.',
+      );
     if (cause.status === 400)
       return new ActivitySaveFailure(
         'rejected',

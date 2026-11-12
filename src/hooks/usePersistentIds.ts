@@ -3,8 +3,8 @@ import { createMemberFavoritesStore, EMPTY_FAVORITES } from '../services/memberF
 
 const favorites = createMemberFavoritesStore(() => window.localStorage);
 
-// The active key follows userId synchronously, so no previous-member list is exposed
-// while waiting for an effect after login, logout or an account change.
+// 저장 키를 userId에 맞춰 즉시 전환해 로그인·로그아웃·계정 변경 후
+// 이펙트 실행을 기다리는 동안에도 이전 회원의 목록이 노출되지 않게 한다.
 export function usePersistentIds(userId: number | null, knownMountainIds: ReadonlySet<string>) {
   const getSnapshot = useCallback(() => favorites.snapshot(userId), [userId]);
   const subscribe = useCallback((listener: () => void) => {

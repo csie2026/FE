@@ -75,7 +75,7 @@ export async function putMonthlyGoals(
   );
 }
 
-// A rounded percentage must not announce success before the actual target is reached.
+// 달성률 반올림 때문에 실제 목표에 도달하기 전에 달성으로 표시하지 않는다.
 export function goalProgress(actual: number | null, target: number | null) {
   if (
     actual === null ||

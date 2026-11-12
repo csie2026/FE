@@ -125,7 +125,7 @@ function App() {
     { length: currentYear - 1950 + 1 },
     (_, index) => currentYear - index,
   );
-  // Preserve an existing valid pre-1950 year without offering earlier years to new members.
+  // 1950년 이전의 유효한 기존 출생연도는 보존하되 신규 회원의 선택지에는 추가하지 않는다.
   if (me?.birthYear != null && me.birthYear >= 1900 && me.birthYear < 1950) {
     birthYearOptions.push(me.birthYear);
   }
@@ -772,8 +772,8 @@ function App() {
       },
     );
   };
-  // A stale response must not navigate away from a newer screen. The request may
-  // still commit on the server; re-entering the list always reads current data.
+  // 이전 화면의 늦은 응답으로 현재 화면을 이동시키지 않는다. 서버 저장은 완료될 수 있으므로
+  // 목록에 다시 진입할 때는 최신 데이터를 조회한다.
   const saveJournal = async () => {
     if (busy) return;
     if (!title.trim() || (!editing && (!selectedRecord || selectedRecord.journalId !== null))) {

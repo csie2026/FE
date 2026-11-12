@@ -15,8 +15,8 @@ import { jsonBytes } from './activityValidation.ts';
 export class RecoveryCapacityError extends Error {}
 const COMPLETION_METADATA_RESERVE_BYTES = 128;
 
-// Reserve the actual completion summary, plus room for later numeric timestamps and stop metadata.
-// The on-disk limit remains 1,000,000 UTF-8 bytes; this only gates further collection.
+// 실제 완료 요약과 이후 추가될 숫자형 시각·중지 메타데이터를 위한 여유 공간을 확보한다.
+// 저장 한도는 기존대로 UTF-8 기준 1,000,000바이트이며 이후 추가 수집만 제한한다.
 export function assertTrackingCapacity(
   session: Session,
   course: Pick<HikingCourse, 'mountainId' | 'courseId' | 'mountainName' | 'courseName'>,
@@ -55,7 +55,7 @@ export function resumeSession(session: Session, now = Date.now()): Session {
   return { ...session, state: 'TRACKING', activeSince: now, segments: [...session.segments, []] };
 }
 
-// Commit to storage before publishing evidence. A rejected sample never enters the session.
+// 화면에 GPS 증거를 반영하기 전에 저장하며 거부한 표본은 세션에 추가하지 않는다.
 export function recordTrackPoint(
   session: Session,
   point: GpsPoint,
@@ -93,12 +93,12 @@ export function recordTrackPoint(
     return { session: next };
   } catch (cause) {
     const reason = cause instanceof RecoveryCapacityError ? 'capacity-limit' : 'storage-error';
-    // Match the last committed evidence AND accumulated time, rather than advancing an unsaved clock.
+    // 저장하지 못한 시간으로 진행하지 않고 마지막 저장 성공 기록의 좌표와 누적 시간을 함께 복원한다.
     const stopped = stopTracking(lastCheckpoint, reason, now);
     try {
       persist(stopped);
     } catch {
-      /* The previous checkpoint remains untouched. */
+      /* 이전 저장 성공 기록은 그대로 보존한다. */
     }
     return {
       session: stopped,

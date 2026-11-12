@@ -236,10 +236,10 @@ test('sequence consumption rejects stale insertions, reversed/equal measurement 
   const next = mergeNativePage(
     first,
     page([
-      point(3, { timestamp: point(1).timestamp }), // Late insertion; never insert into past geometry.
+      point(3, { timestamp: point(1).timestamp }), // 늦게 삽입된 좌표를 과거 경로에 끼워 넣지 않는다.
       point(4, { timestamp: point(2).timestamp }),
       point(5, { accuracy: 51, timestamp: base + 25_000 }),
-      point(6, { latitude: 38, timestamp: base + 30_000 }), // Impossible speed within the same segment.
+      point(6, { latitude: 38, timestamp: base + 30_000 }), // 같은 구간에서 허용할 수 없는 속도로 이동한 표본
       point(7, { latitude: 37.0003, timestamp: base + 40_000 }),
     ]),
     course,
@@ -613,7 +613,7 @@ test('discard requires a stopped native identity and rechecks ownership before a
     stopNativeForDiscard(draft, 7, () => current, h.client),
     /소유권/,
   );
-  assert.equal(h.events.includes('stop'), false); // Stale owners cannot even request stop.
+  assert.equal(h.events.includes('stop'), false); // 소유권을 잃은 호출자는 중지 요청도 보내지 못한다.
   current = draft;
   h.client.stop = async () => status(initial);
   await assert.rejects(
@@ -623,7 +623,7 @@ test('discard requires a stopped native identity and rechecks ownership before a
   h.client.stop = stop;
   await stopNativeForDiscard(draft, 7, () => current, h.client);
   const stillStored = readRecovery(7, Date.now(), h.store);
-  assert.equal(stillStored.kind, 'ready'); // The helper never deletes either native rows or the web draft.
+  assert.equal(stillStored.kind, 'ready'); // 이 함수는 네이티브 원본과 웹 임시 기록을 모두 삭제하지 않는다.
 });
 
 test('an inconsistent final sequence after stop never freezes a completion request', async () => {
@@ -678,7 +678,7 @@ test('fresh stationary native fixes update display and summit distance without a
   initial.native = { ...nativeCheckpoint(), cursor: 1, lastTimestamp: old.timestamp, segment: 0 };
   const h = harness(initial, [
     point(2, { latitude: 37, timestamp: now - 10_000 }),
-    point(3, { latitude: 37.00001, timestamp: now }), // GPS drift less than 5 metres.
+    point(3, { latitude: 37.00001, timestamp: now }), // 5m 미만의 GPS 흔들림
   ]);
   const result = await synchronizeNativeSession(initial, 7, course, owner, h.commit, h.client);
   assert.equal(result.session.segments.flat().length, 1);
@@ -686,7 +686,7 @@ test('fresh stationary native fixes update display and summit distance without a
   assert.equal(result.session.native!.cursor, 3);
   assert.equal(result.position!.timestamp, now);
   assert.equal(result.position!.lat, 37.00001);
-  assert.equal(isUsablePoint(old, now), false); // The old UI incorrectly used this route point.
+  assert.equal(isUsablePoint(old, now), false); // 기존 UI는 이 오래된 경로 좌표를 표시용 위치로 잘못 사용했다.
   const display = latestNativeDisplayPosition(null, [result.position!], now);
   assert.ok(display);
   const remaining = display ? distanceMeters(display, course.summitPoint) : null;
@@ -702,7 +702,7 @@ test('fresh stationary native fixes update display and summit distance without a
     assert.equal('nativePosition' in recovery.draft, false);
     assert.equal(recovery.draft.pendingInput, null);
   }
-  // Polling without new rows neither replaces the display fix nor refreshes its timestamp.
+  // 새 표본이 없는 조회는 표시용 위치를 바꾸거나 해당 수신 시각을 갱신하지 않는다.
   const reads = h.events.filter((event) => event.startsWith('read-')).length;
   const repeated = await synchronizeNativeSession(
     result.session,

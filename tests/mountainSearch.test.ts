@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { filterMountains } from '../src/components/hiking/services/mountainSearch.ts';
 import type { MountainOption } from '../src/components/hiking/services/courseApi.ts';
 
-// Read the actual BE seed; no replacement mountain fixtures.
+// 예제 산 데이터를 새로 만들지 않고 실제 BE 초기 데이터를 읽어 검증한다.
 const sql = readFileSync(
   new URL('../../BE/src/main/resources/db/migration/V2__mountains.sql', import.meta.url),
   'utf8',

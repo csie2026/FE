@@ -21,7 +21,7 @@ function AvatarContent({ nickname, src, className }: Props) {
     </span>
   );
 }
-// Reset a failed image on every member or revision/source change, including deletion.
+// 회원·이미지 버전·주소가 변경되거나 사진이 삭제되면 이전 이미지의 로딩 실패 상태를 초기화한다.
 export default function ProfileAvatar(props: Props) {
   return <AvatarContent key={`${props.userId}:${props.src ?? 'none'}`} {...props} />;
 }

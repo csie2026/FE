@@ -10,7 +10,7 @@ export const MAX_RECOVERY_POINTS = 10_000;
 export const MAX_RECOVERY_BYTES = 1_000_000;
 export const recoveryKey = (userId: number) => `topeak.hikingSession.v1.${userId}`;
 export type TrackingStopReason = 'point-limit' | 'capacity-limit' | 'storage-error';
-// Local-only metadata. Never included in the server request or legacy drafts.
+// 로컬 전용 메타데이터이며 서버 요청에는 포함하지 않고 구버전 임시 기록에도 요구하지 않는다.
 export type NativeCheckpoint = {
   cursor: number;
   lastTimestamp: number | null;
@@ -86,7 +86,7 @@ export function activityInput(
   session: Session,
   course: Pick<HikingCourse, 'mountainId' | 'courseId'>,
 ): HikingActivityInput {
-  // Keep one originally filtered point for score eligibility, never a map-snapped coordinate.
+  // 점수 조건 확인용으로 필터를 통과한 원본 좌표 하나를 보존하며 지도 보정 좌표는 사용하지 않는다.
   const point = session.segments
     .flat()
     .find(
@@ -316,7 +316,7 @@ export function validateDraft(
     clientRequestId: d.clientRequestId,
   };
   const body = d.pendingInput;
-  // An ended pre-upgrade request has no evidence: preserve its UUID and exact original body.
+  // GPS 증거가 없는 구버전 종료 요청은 UUID와 원본 본문을 그대로 보존한다.
   if (body?.gpsEvidence !== undefined) expected.gpsEvidence = body.gpsEvidence;
   return (
     !!body &&

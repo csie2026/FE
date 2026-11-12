@@ -30,7 +30,7 @@ export function nativeCheckpoint(baseElapsedMs = 0): NonNullable<Session['native
   return { cursor: 0, lastTimestamp: null, segment: -1, baseElapsedMs };
 }
 
-/** Validate bridge data before treating the collector as running or finalizing a request. */
+/** 수집 중 상태나 완료 요청을 확정하기 전에 브리지 응답 데이터를 검증한다. */
 export function checkedNativeStatus(
   status: NativeLocationStatus,
   session: Session,
@@ -116,7 +116,7 @@ export function nativePoint(point: NativeLocationPoint): GpsPoint {
   };
 }
 
-/** Display-only state: fresh, accurate fixes do not need to pass the route's movement filter. */
+/** 표시용 위치는 최신성과 정확도로 판단하며 경로 기록용 이동 필터를 통과할 필요는 없다. */
 export function latestNativeDisplayPosition(
   previous: GpsPoint | null,
   candidates: readonly GpsPoint[],
@@ -130,7 +130,7 @@ export function latestNativeDisplayPosition(
   return latest;
 }
 
-/** Sequence is authoritative for consumption. Never retroactively edit an accepted route. */
+/** 처리 순서는 sequence를 기준으로 하며 이미 채택한 경로를 소급 수정하지 않는다. */
 export function mergeNativePage(
   session: Session,
   page: NativeLocationPage,
@@ -153,7 +153,7 @@ export function mergeNativePage(
     native: { ...session.native },
     segments: session.segments.map((s) => [...s]),
   };
-  // A legacy web route may predate this native checkpoint. Never append an older native row after it.
+  // 기존 웹 경로가 네이티브 체크포인트보다 먼저 존재할 수 있으므로 더 오래된 표본을 뒤에 붙이지 않는다.
   const lastAcceptedAt = session.segments.flat().at(-1)?.timestamp;
   if (
     lastAcceptedAt !== undefined &&
@@ -172,7 +172,7 @@ export function mergeNativePage(
       return invalid('GPS sequence 또는 구간 순서가 올바르지 않습니다.');
     }
     next.native.cursor = raw.sequence;
-    // Consume rejected rows too, but only the caller's successful durable commit advances the cursor.
+    // 거부한 표본도 처리하되 호출자가 영속 저장에 성공한 경우에만 커서를 갱신한다.
     if (
       !time(raw.timestamp) ||
       raw.timestamp < session.startedAt! ||
@@ -191,7 +191,7 @@ export function mergeNativePage(
     const point = nativePoint(raw);
     const previous = next.segments.at(-1)?.at(-1);
     const gap = previous && point.timestamp - previous.timestamp > GPS_FILTER.maxGapMs;
-    // Historical samples use their measurement time, never the current 15s freshness window.
+    // 과거 표본은 측정 시각을 기준으로 검사하며 현재 시각의 15초 최신성 조건을 적용하지 않는다.
     if (!acceptTrackPoint(point, gap ? undefined : previous, point.timestamp)) continue;
     if (count >= MAX_RECOVERY_POINTS || next.trackingStopReason) {
       next.trackingStopReason ??= 'point-limit';
@@ -217,7 +217,7 @@ export function mergeNativePage(
   return next;
 }
 
-/** Caller serializes operations and commits route + rejection cursor in one recovery snapshot. */
+/** 호출자는 작업을 순차 실행하고 경로와 거부 표본 커서를 하나의 복구 기록으로 저장한다. */
 export async function synchronizeNativeSession(
   session: Session,
   userId: number,
@@ -233,14 +233,14 @@ export async function synchronizeNativeSession(
   let n = checkedNativeStatus(status, session, userId);
   let next = sessionWithNativeStatus(session, status, userId);
   let position: GpsPoint | null = null;
-  const target = n.lastSequence; // Finite snapshot: do not chase newly arriving points indefinitely.
+  const target = n.lastSequence; // 조회 상한을 고정해 계속 도착하는 새 좌표를 끝없이 따라가지 않는다.
   while (next.native!.cursor < target) {
     const page = await client.readPoints({
       ...key,
       afterSequence: next.native!.cursor,
       limit: 500,
     });
-    // Validate the original page before clipping it to the status snapshot.
+    // 상태 조회 시점의 범위로 자르기 전에 원본 페이지 전체를 검증한다.
     mergeNativePage(next, page, course);
     const points = page.points.filter((p) => p.sequence <= target);
     if (!points.length) return invalid('GPS 페이지가 진행되지 않았습니다.');
@@ -260,7 +260,7 @@ export async function synchronizeNativeSession(
       assertTrackingCapacity(merged, course, userId, ownerToken);
     } catch (cause) {
       if (!(cause instanceof RecoveryCapacityError)) throw cause;
-      // Only the boundary page needs per-sample capacity checks. Ordinary backlogs are linear batches.
+      // 용량 한도에 걸치는 페이지만 표본별로 검사하고 나머지 누적 표본은 페이지 단위로 처리한다.
       merged = mergeNativePage(next, bounded, course, Date.now(), (candidate) =>
         assertTrackingCapacity(candidate, course, userId, ownerToken),
       );
@@ -275,7 +275,7 @@ export async function synchronizeNativeSession(
     status = await client.pause(key);
     checkedNativeStatus(status, next, userId);
   }
-  // Permission/service failures can arrive while JS awaits a page. Never publish the old snapshot's state.
+  // 페이지 조회 중 권한·서비스 오류가 생길 수 있으므로 이전 조회 상태를 그대로 화면에 반영하지 않는다.
   status = await client.getStatus(key);
   next = sessionWithNativeStatus(next, status, userId);
   commit(next);
@@ -284,7 +284,7 @@ export async function synchronizeNativeSession(
 
 export type NativeAction = 'start' | 'pause' | 'resume' | 'complete' | 'sync';
 
-/** The caller may delete its web draft only after this resolves. Native rows are retained. */
+/** 이 작업이 성공한 뒤에만 웹 임시 기록을 삭제할 수 있으며 네이티브 원본은 유지한다. */
 export async function stopNativeForDiscard(
   expected: RecoveryDraft,
   userId: number,
@@ -316,7 +316,7 @@ export async function stopNativeForDiscard(
   assertCurrent();
 }
 
-/** No pendingInput is created until native stop AND every snapshot page is durably processed. */
+/** 네이티브 중지와 모든 조회 페이지의 영속 저장이 끝나기 전에는 pendingInput을 만들지 않는다. */
 export async function updateNativeSession(
   action: NativeAction,
   session: Session,
@@ -328,7 +328,7 @@ export async function updateNativeSession(
   assertOwnership: () => void = () => {},
 ) {
   if (session.state === 'COMPLETED') {
-    // Existing frozen requests, including legacy requests, are never rebuilt.
+    // 구버전을 포함해 이미 확정된 요청 본문은 다시 생성하지 않는다.
     return { session, status: null, position: null };
   }
   const key = { userId, clientRequestId: session.clientRequestId! };

@@ -13,7 +13,7 @@ export async function withdrawAccount(userId: number, confirmation: string, sign
         throw new ApiError(409, '로그인 계정이 변경되었습니다. 다시 확인하십시오.');
     },
   );
-  // Only the documented empty 204 confirms deletion. A mismatched 2xx is an unknown outcome.
+  // 계약에 명시된 빈 204 응답만 탈퇴 성공으로 확정하고 다른 2xx 응답은 결과 미확인으로 처리한다.
   if (result !== undefined)
     throw new Error('회원탈퇴 완료 응답을 확인하지 못했습니다. 로그인 상태를 확인하십시오.');
 }

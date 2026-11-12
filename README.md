@@ -33,16 +33,16 @@ ToPeak은 경기도의 산을 대상으로 산 탐색, 등산 코스, GPS 기반
 
 `package.json` 선언 기준입니다.
 
-| 기술 | 버전/역할 |
-| --- | --- |
-| React / React DOM | ^19.2.8, 사용자 화면 |
-| TypeScript | ~6.0.2, 타입 검사 |
-| Vite / React plugin | ^8.3.0 / ^6.1.1, 개발 서버·빌드 |
-| d3-geo | ^3.1.1, 지역 지도 처리 |
-| Kakao Maps JavaScript SDK | 지도 및 코스·GPS 경로 표시 |
-| 브라우저 Geolocation API | 위치 수집 |
-| Oxlint / Prettier | ^1.81.0 / ^3.9.9, 정적 검사·서식 검사 |
-| Node.js test runner | TypeScript 테스트 실행 |
+| 기술                      | 버전/역할                             |
+| ------------------------- | ------------------------------------- |
+| React / React DOM         | ^19.2.8, 사용자 화면                  |
+| TypeScript                | ~6.0.2, 타입 검사                     |
+| Vite / React plugin       | ^8.3.0 / ^6.1.1, 개발 서버·빌드       |
+| d3-geo                    | ^3.1.1, 지역 지도 처리                |
+| Kakao Maps JavaScript SDK | 지도 및 코스·GPS 경로 표시            |
+| 브라우저 Geolocation API  | 위치 수집                             |
+| Oxlint / Prettier         | ^1.81.0 / ^3.9.9, 정적 검사·서식 검사 |
+| Node.js test runner       | TypeScript 테스트 실행                |
 
 API 공통 요청은 `src/api.ts`의 `fetch` 기반 client를 사용합니다. 화면 전환은 주로 `App.tsx`에서 관리합니다.
 
@@ -99,7 +99,19 @@ OAuth 로그인은 브라우저 이동으로 시작하며 성공 시 BE의 `FRON
 
 Vite 개발 proxy는 배포에 자동 적용되지 않습니다. 배포 환경에서는 같은 origin에서 위 경로를 BE에 전달하도록 proxy와 OAuth 주소를 구성해야 합니다.
 
-상세 API 명세는 DOCS Repository의 [ToPeak_API명세서.md](https://github.com/csie2026/DOCS/blob/main/ToPeak_API명세서.md)에서 관리합니다.
+상세 API 명세는 DOCS 저장소의 [ToPeak API 명세서](https://github.com/csie2026/DOCS/blob/dev/ToPeak%20API%20명세서.md)에서 관리합니다.
+
+## 기능별 구현·검증 문서
+
+기능 구현·검증 이력은 팀 공용 DOCS 저장소에서 관리하며, FE의 기존 `docs/` 경로에는 안내 링크를 유지합니다. 파일명이 같은 BE 문서와 구분하기 위해 DOCS의 FE 문서에는 `fe-` 접두사를 사용합니다.
+
+- [출생연도 선택](https://github.com/csie2026/DOCS/blob/dev/fe-profile-year-selection.md)
+- [설정·회원탈퇴](https://github.com/csie2026/DOCS/blob/dev/fe-settings-withdrawal.md)
+- [설정 화면 후속 개선](https://github.com/csie2026/DOCS/blob/dev/fe-settings-account-details.md)
+
+문서의 브랜치명과 테스트 결과는 작업 당시의 기록이며, 현재 상태는 최신 코드와 이슈·PR을 함께 확인합니다.
+
+코드와 함께 확인할 [iOS 백그라운드 GPS와 Mac 빌드·실기기 검증 안내](docs/ios-background-gps.md)는 FE에 유지합니다. 지도 데이터의 출처와 생성 안내도 [src/data/README.md](src/data/README.md)와 [src/data/MAP_SOURCE.md](src/data/MAP_SOURCE.md)에 유지합니다.
 
 ## 테스트 및 빌드
 

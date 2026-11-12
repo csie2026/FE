@@ -1,5 +1,5 @@
-// Validate only the DTOs consumed by the current screens. Unknown API paths keep
-// their existing behavior; this is not a replacement for server validation.
+// 현재 화면에서 사용하는 응답 DTO만 검증한다. 그 외 API 경로의 기존 처리는
+// 유지하며, 이 검증이 서버 검증을 대신하지는 않는다.
 type Check = (value: unknown) => boolean;
 const object = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -176,7 +176,7 @@ export function validApiResponse(path: string, method: string, value: unknown): 
   if (path === '/api/journals') return method === 'GET' ? array(journal)(value) : journal(value);
   if (/^\/api\/journals\/\d+$/.test(path)) return journal(value);
   if (/^\/api\/users\/(me|\d+)\/journals$/.test(path)) return array(journal)(value);
-  // POST is intentionally still confirmed against its frozen request by activitySave.
+  // POST 저장 성공 여부는 activitySave에서 확정된 원본 요청과 비교해 별도로 확인한다.
   if (path === '/api/users/me/hiking-records' && method === 'GET') return array(activity)(value);
   if (path === '/api/mountains') return array(mountain)(value);
   if (/^\/api\/mountains\/\d+\/courses$/.test(path)) return array(course)(value);

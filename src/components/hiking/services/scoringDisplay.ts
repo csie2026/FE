@@ -1,6 +1,6 @@
 import type { ActivityScoring } from '../../../api.ts';
 
-// Display the server result. FE never awards visit or journal points.
+// 서버에서 계산한 결과만 표시하며 FE에서 방문·일지 점수를 부여하지 않는다.
 export function scoringText(scoring?: ActivityScoring | null): string {
   if (!scoring) return '인증·점수 산정 결과를 확인하지 못했습니다.';
   switch (scoring.status) {

@@ -1,6 +1,6 @@
 import { Capacitor, registerPlugin } from '@capacitor/core';
 
-/** Browser/PWA, including iPhone Safari, keeps the existing browser implementation. */
+/** iPhone Safari를 포함한 브라우저·PWA는 기존 웹 위치 수집 방식을 유지한다. */
 export const isNativeIOS = () => Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'ios';
 export type LocationSessionKey = { userId: number; clientRequestId: string };
 export type LocationAuthorization =
@@ -61,7 +61,7 @@ export type NativeLocationPage = {
   hasMore: boolean;
 };
 
-/** All times are Unix milliseconds. Reading and stopping never delete records. */
+/** 모든 시각은 유닉스 밀리초이며 조회·중지 작업으로 기록을 삭제하지 않는다. */
 export interface BackgroundLocationPlugin {
   requestPermissions(): Promise<LocationPermissions>;
   start(options: LocationSessionKey): Promise<NativeLocationStatus>;
@@ -116,7 +116,7 @@ function sessionKey(options: LocationSessionKey): LocationSessionKey {
   return { userId: options.userId, clientRequestId: options.clientRequestId.toLowerCase() };
 }
 
-/** Supply the official Capacitor exports after installation; no web GPS fallback is used. */
+/** 공식 Capacitor 런타임을 주입받아 사용하며 네이티브 실패 시 웹 GPS로 대체하지 않는다. */
 export type LocationRuntime = {
   isNativePlatform(): boolean;
   getPlatform(): string;

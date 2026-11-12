@@ -35,7 +35,7 @@ export function useExploreMountains(userId: number | null) {
       });
     return () => controller.abort();
   }, [userId, request]);
-  // Do not expose the previous account's response during an account change.
+  // 계정 전환 중에는 이전 회원의 조회 결과를 노출하지 않는다.
   const current = userId !== null && result.request === request;
   return {
     items: current ? result.items : [],

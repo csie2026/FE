@@ -5,9 +5,9 @@ App/App/public
 DerivedData
 xcuserdata
 
-# Cordova plugins for Capacitor
+# Capacitor용 Cordova 플러그인
 capacitor-cordova-ios-plugins
 
-# Generated Config files
+# 자동 생성된 설정 파일
 App/App/capacitor.config.json
 App/App/config.xml

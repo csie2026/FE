@@ -1,4 +1,4 @@
-// In-memory only: never retain a deleted account's identity in browser storage.
+// 탈퇴 계정 식별자는 메모리에서만 관리하고 브라우저 저장소에 남기지 않는다.
 const retired = new Set<number>();
 const listeners = new Set<(userId: number) => void>();
 export const isRetiredAccount = (userId: number | null) => userId !== null && retired.has(userId);

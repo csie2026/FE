@@ -92,7 +92,7 @@
 }
 .about-content {
   padding-top: 24px;
-  /* The app shell already reserves the device safe area. */
+  /* 최상위 앱 컨테이너에서 기기의 안전 영역 여백을 이미 확보한다. */
   padding-bottom: 32px;
   overflow-wrap: anywhere;
 }

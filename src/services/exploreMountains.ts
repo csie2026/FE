@@ -1,7 +1,7 @@
 import { regions, type Mountain, type Region } from '../data/exploreRegions.ts';
 import type { MountainOption } from '../components/hiking/services/courseApi.ts';
 
-// No representative course is invented: lengths and difficulties belong to individual courses.
+// 거리와 난이도는 코스별 정보이므로 임의의 대표 코스 값을 만들지 않는다.
 export function toExploreMountain(item: MountainOption): Mountain {
   const region = regions.find((region) => region.cities.some((city) => city.name === item.city));
   return {
@@ -28,7 +28,7 @@ export function groupExploreMountains(mountains: Mountain[]): Region[] {
       mountains: mountains.filter((mountain) => mountain.city === city.name),
     })),
   }));
-  // Unknown cities remain discoverable rather than silently dropping BE records.
+  // 알 수 없는 시·군의 산도 서버 목록에서 제거하지 않고 검색할 수 있게 유지한다.
   const known = new Set(regions.flatMap((region) => region.cities.map((city) => city.name)));
   const unknown = [...new Set(mountains.map((mountain) => mountain.city))].filter(
     (city) => !known.has(city),

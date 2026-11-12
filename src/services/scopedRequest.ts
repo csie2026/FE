@@ -1,4 +1,4 @@
-// A navigation/account change invalidates callbacks, not the server write.
+// 화면·계정 전환 시 이전 콜백은 무효화하지만 서버 저장까지 취소된 것으로 간주하지 않는다.
 export function createScopedRequest() {
   let generation = 0;
   let pending: object | null = null;

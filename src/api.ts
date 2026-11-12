@@ -285,7 +285,7 @@ export async function api<T>(
   );
   try {
     if (controller.signal.aborted) return await cancelled;
-    // Race also bounds adapters/body readers that ignore AbortSignal. Never automatically retry.
+    // AbortSignal을 무시하는 어댑터나 응답 본문 읽기도 시간 제한을 적용하며 자동 재시도하지 않는다.
     return await Promise.race([
       apiRequest<T>(path, method, body, controller.signal, beforeSend),
       cancelled,
@@ -342,7 +342,7 @@ async function apiRequest<T>(
     headers[csrf.headerName] = csrf.token;
     if (body !== undefined && !multipart) headers['Content-Type'] = 'application/json';
   }
-  // Activity retries recheck the member after CSRF retrieval, immediately before sending.
+  // 산행 저장 재시도는 CSRF 조회 후 실제 요청 직전에 현재 회원을 다시 확인한다.
   if (beforeSend) await beforeSend(signal);
   if (signal?.aborted) throw new DOMException('요청이 취소되었습니다.', 'AbortError');
   const response = await fetchResponse(path, {
@@ -400,7 +400,7 @@ export async function uploadMemberImage(
   );
   return ownedImageResponse(member, expectedUserId);
 }
-// Read the resolved fallback again after deletion; no old uploaded URL is retained locally.
+// 이미지 삭제 후 서버의 기본 이미지 정보를 다시 조회해 이전 업로드 URL을 로컬에 남기지 않는다.
 export async function deleteMemberImage(
   kind: MemberImageKind,
   signal?: AbortSignal,

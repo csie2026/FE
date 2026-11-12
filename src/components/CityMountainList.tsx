@@ -19,7 +19,7 @@ type Props = {
   onFavoriteToggle: (id: string) => void;
 };
 
-// 상위 탐색 화면의 시·군 선택과 브라우저에 저장된 산 ID를 받아 목록·상세 모달을 연결한다.
+// 상위 탐색 화면의 시·군 선택과 회원별 즐겨찾기 산 ID를 받아 목록·상세 모달을 연결한다.
 export default function CityMountainList({
   onSelectCourse,
   loading,

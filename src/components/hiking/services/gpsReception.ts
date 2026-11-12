@@ -3,7 +3,7 @@ import type { HikingState } from '../types.ts';
 
 export type GpsReception = 'waiting' | 'receiving' | 'stale';
 
-// Successful watch callbacks refresh reception even when movement filters reject the point.
+// 이동 필터가 좌표를 거부하더라도 위치 수신 콜백이 성공하면 수신 시각은 갱신한다.
 export function gpsReception(
   watchStartedAt: number | null,
   lastReceivedAt: number | null,
