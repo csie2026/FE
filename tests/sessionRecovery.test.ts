@@ -1,7 +1,9 @@
 import { test } from "node:test";
+import { canAutoRestoreRecovery, AUTO_RECOVERY_MAX_AGE_MS } from '../src/components/hiking/services/recoveryPolicy.ts';
 import assert from "node:assert/strict";
 import {
   initialSession,
+  sessionStatistics,
   pauseSession,
   completeSession,
   draftFromSession,
@@ -77,7 +79,7 @@ function running(now = Date.now()): Session {
     segments: [[point(37, now - 10_000), point(37.0001, now - 5000)]],
   };
 }
-test("checkpoints restore paused with exact IDs, raw points, distance and no offline time", () => {
+test("web checkpoints preserve tracking, IDs, raw points and wall-clock time", () => {
   const now = Date.now(),
     session = running(now),
     owner = crypto.randomUUID();
@@ -85,11 +87,11 @@ test("checkpoints restore paused with exact IDs, raw points, distance and no off
   assert.equal(validateDraft(draft, 1, now), true);
   assert.equal(draft.accumulatedMs, 20_000);
   const restored = sessionFromDraft(draft);
-  assert.equal(restored.state, "PAUSED");
-  assert.equal(restored.activeSince, null);
+  assert.equal(restored.state, "TRACKING");
+  assert.equal(restored.activeSince, now);
   assert.deepEqual(restored.segments, session.segments);
   assert.equal(restored.clientRequestId, session.clientRequestId);
-  assert.equal(pauseSession(restored, now + 3_600_000).accumulatedMs, 20_000);
+  assert.equal(pauseSession(restored, now + 3_600_000).accumulatedMs, 3_620_000);
   assert.ok(draft.distanceMeters > 11 && draft.distanceMeters < 12);
   assert.equal(restored.reachedSummit, true);
 });
@@ -336,4 +338,129 @@ test("legacy paused evidence migrates, legacy ended evidence stays absent for UU
   assert.equal(restored.pendingInput!.gpsSegments, undefined);
   assert.equal(restored.clientRequestId, session.clientRequestId);
   assert.equal(draftFromSession(restored, course, 1, owner, now).version, 1);
+});
+
+test('manual pause survives reload and legacy drafts never automatically resume', () => {
+  const now = Date.now();
+  const paused = draftFromSession(
+    pauseSession(running(now), now),
+    course,
+    1,
+    crypto.randomUUID(),
+    now,
+  );
+  assert.equal(paused.webTracking, false);
+  const restored = sessionFromDraft(paused);
+  assert.equal(restored.state, 'PAUSED');
+  assert.equal(pauseSession(restored, now + 60000).accumulatedMs, paused.accumulatedMs);
+  delete paused.webTracking;
+  assert.equal(sessionFromDraft(paused).state, 'PAUSED');
+  const corrupted = { ...paused, webTracking: 'true' };
+  assert.equal(validateDraft(corrupted, 1, now), false);
+});
+
+test('suspended timer, checkpoints, manual resume and final payload use wall-clock active time', async () => {
+  const { resumeSession } = await import('../src/components/hiking/services/sessionTracking.ts');
+  const now = Date.now();
+  const first = running(now);
+  const checkpoint = draftFromSession(first, course, 1, crypto.randomUUID(), now);
+  const returned = sessionFromDraft(checkpoint);
+  const paused = pauseSession(returned, now + 60000);
+  assert.equal(paused.accumulatedMs, 80000);
+  const resumed = resumeSession(paused, now + 120000);
+  const ended = completeSession(resumed, course, now + 150000);
+  assert.equal(ended.pendingInput?.elapsedMs, 110000);
+  assert.equal(ended.pendingInput?.distanceMeters, checkpoint.distanceMeters);
+  const draft = draftFromSession(ended, course, 1, crypto.randomUUID(), now + 150000);
+  assert.equal(validateDraft(draft, 1, now + 150000), true);
+  assert.deepEqual(sessionFromDraft(draft).pendingInput, ended.pendingInput);
+});
+
+
+test('average speed refreshes on return and completion uses the exact same statistics', () => {
+  const now = Date.now();
+  const session = running(now);
+  const before = sessionStatistics(session, now);
+  const returned = sessionStatistics(session, now + 60000);
+  assert.equal(returned.elapsedMs, before.elapsedMs + 60000);
+  assert.equal(returned.distance, before.distance);
+  assert.ok(returned.averageSpeed < before.averageSpeed);
+  const paused = pauseSession(session, now + 60000);
+  assert.deepEqual(sessionStatistics(paused, now + 120000), returned);
+  const ended = completeSession(paused, course, now + 180000);
+  const final = sessionStatistics(ended, now + 240000);
+  assert.deepEqual(final, returned);
+  assert.equal(final.elapsedMs, ended.pendingInput?.elapsedMs);
+  assert.equal(final.distance, ended.pendingInput?.distanceMeters);
+  assert.equal(final.averageSpeed, final.distance / final.elapsedMs * 3600);
+  assert.equal(sessionStatistics(initialSession(), now).averageSpeed, 0);
+});
+
+test('same-tab active reload automatically restores TRACKING without modifying the stored draft', () => {
+  const now = Date.now(), owner = crypto.randomUUID(), store = new MemoryStorage();
+  const draft = draftFromSession(running(now), course, 1, owner, now);
+  writeRecovery(draft, 'create', store);
+  const before = store.getItem(recoveryKey(1));
+  const read = readRecovery(1, now + 5000, store);
+  assert.equal(canAutoRestoreRecovery(read, owner, now + 5000), true);
+  if (read.kind !== 'ready') assert.fail('expected valid recovery');
+  const restored = sessionFromDraft(read.draft);
+  assert.equal(restored.state, 'TRACKING');
+  assert.equal(sessionStatistics(restored, now + 5000).elapsedMs, draft.accumulatedMs + 5000);
+  assert.equal(store.getItem(recoveryKey(1)), before);
+});
+
+test('same-tab paused reload preserves PAUSED and never starts its clock', () => {
+  const now = Date.now(), owner = crypto.randomUUID();
+  const draft = draftFromSession(pauseSession(running(now), now), course, 1, owner, now);
+  const read = { kind: 'ready' as const, draft };
+  assert.equal(canAutoRestoreRecovery(read, owner, now + 5000), true);
+  const restored = sessionFromDraft(draft);
+  assert.equal(restored.state, 'PAUSED');
+  assert.equal(sessionStatistics(restored, now + 5000).elapsedMs, draft.accumulatedMs);
+});
+
+test('new tab, lost owner, legacy and completed drafts retain manual recovery', () => {
+  const now = Date.now(), owner = crypto.randomUUID();
+  const draft = draftFromSession(running(now), course, 1, owner, now);
+  const read = { kind: 'ready' as const, draft };
+  assert.equal(canAutoRestoreRecovery(read, null, now), false);
+  assert.equal(canAutoRestoreRecovery(read, crypto.randomUUID(), now), false);
+  const legacy = { ...draft };
+  delete legacy.webTracking;
+  assert.equal(canAutoRestoreRecovery({ kind: 'ready', draft: legacy }, owner, now), false);
+  const ended = draftFromSession(completeSession(running(now), course, now), course, 1, owner, now);
+  assert.equal(canAutoRestoreRecovery({ kind: 'ready', draft: ended }, owner, now), false);
+  assert.equal(canAutoRestoreRecovery({ kind: 'none' }, owner, now), false);
+});
+
+test('old, expired and corrupt records stay preserved and cannot automatically restore', () => {
+  const now = Date.now(), owner = crypto.randomUUID(), store = new MemoryStorage();
+  const draft = draftFromSession(running(now), course, 1, owner, now);
+  writeRecovery(draft, 'create', store);
+  const before = store.getItem(recoveryKey(1));
+  const old = readRecovery(1, now + AUTO_RECOVERY_MAX_AGE_MS + 1, store);
+  assert.equal(old.kind, 'ready');
+  assert.equal(canAutoRestoreRecovery(old, owner, now + AUTO_RECOVERY_MAX_AGE_MS + 1), false);
+  const expired = readRecovery(1, now + RECOVERY_TTL_MS + 1, store);
+  assert.equal(expired.kind, 'error');
+  assert.equal(canAutoRestoreRecovery(expired, owner, now + RECOVERY_TTL_MS + 1), false);
+  assert.equal(store.getItem(recoveryKey(1)), before);
+  store.setItem(recoveryKey(1), '{');
+  const corrupt = readRecovery(1, now, store);
+  assert.equal(corrupt.kind, 'error');
+  assert.equal(canAutoRestoreRecovery(corrupt, owner, now), false);
+  assert.equal(store.getItem(recoveryKey(1)), '{');
+});
+
+test('automatic restore recheck refuses ownership claimed by another tab', () => {
+  const now = Date.now(), owner = crypto.randomUUID(), store = new MemoryStorage();
+  const draft = draftFromSession(running(now), course, 1, owner, now);
+  writeRecovery(draft, 'create', store);
+  assert.equal(canAutoRestoreRecovery(readRecovery(1, now, store), owner, now), true);
+  const claimed = { ...draft, ownerToken: crypto.randomUUID() };
+  writeRecovery(claimed, 'claim', store);
+  assert.equal(canAutoRestoreRecovery(readRecovery(1, now, store), owner, now), false);
+  assert.equal(readRecovery(1, now, store).kind, 'ready');
+  assert.equal(store.getItem(recoveryKey(1)), JSON.stringify(claimed));
 });

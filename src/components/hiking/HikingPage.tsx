@@ -9,6 +9,7 @@ import HikingMap from './HikingMap';
 import HikingControls from './HikingControls';
 import MountainWeather from '../MountainWeather';
 import { trackingStopMessages } from './services/sessionTracking';
+import { canAutoRestoreRecovery } from './services/recoveryPolicy';
 import { gpsReception, gpsReceptionWarning } from './services/gpsReception';
 import { isNativeIOS } from '../../native/backgroundLocation';
 import { latestNativeDisplayPosition, stopNativeForDiscard } from './services/nativeTracking';
@@ -101,12 +102,24 @@ function HikingSessionPage(props: HikingPageProps) {
     setPendingRecovery(readRecovery(props.userId));
     setRecoveryError('');
   }, [props.userId]);
-  const restore = (draft: RecoveryDraft, finish: boolean) => {
+  const restore = (draft: RecoveryDraft, finish: boolean, automatic = false) => {
     if (recoveryBusyRef.current) return;
     try {
       const latest = readRecovery(props.userId);
       if (latest.kind !== 'ready' || latest.draft.clientRequestId !== draft.clientRequestId)
         throw new Error('복구 기록이 변경되었습니다. 다시 확인을 눌러 최신 기록을 확인해주세요.');
+      // 예약된 자동 복원 전에 다른 탭이 가져간 기록을 다시 빼앗지 않는다.
+      if (
+        automatic &&
+        !canAutoRestoreRecovery(
+          latest,
+          sessionStorage.getItem(recoveryKey(props.userId)),
+          Date.now(),
+        )
+      ) {
+        setPendingRecovery(latest);
+        return;
+      }
       draft = latest.draft;
       const ownerToken = crypto.randomUUID();
       const course = {
@@ -122,6 +135,11 @@ function HikingSessionPage(props: HikingPageProps) {
           : sessionFromDraft(draft);
       const claimed = draftFromSession(session, course, props.userId, ownerToken);
       writeRecovery(claimed, 'claim');
+      try {
+        sessionStorage.setItem(recoveryKey(props.userId), ownerToken);
+      } catch {
+        /* 탭 저장소를 사용할 수 없어도 산행 기록은 보존된다. */
+      }
       setRecovery({
         draft: claimed,
         ownerToken,
@@ -135,6 +153,25 @@ function HikingSessionPage(props: HikingPageProps) {
       );
     }
   };
+  const autoRestoreAttempted = useRef(false);
+  useEffect(() => {
+    if (autoRestoreAttempted.current) return;
+    autoRestoreAttempted.current = true;
+    // 같은 탭의 최근 웹 기록만 자동 복원한다. 다른 탭의 소유권은 자동으로 가져오지 않는다.
+    try {
+      if (
+        pendingRecovery.kind === 'ready' &&
+        canAutoRestoreRecovery(
+          pendingRecovery,
+          sessionStorage.getItem(recoveryKey(props.userId)),
+          Date.now(),
+        )
+      )
+        queueMicrotask(() => restore(pendingRecovery.draft, false, true));
+    } catch {
+      /* 탭 저장소를 사용할 수 없으면 기존 확인 UI를 유지한다. */
+    }
+  });
   const discard = async () => {
     if (recoveryBusyRef.current) return;
     if (
@@ -217,7 +254,9 @@ function HikingSessionPage(props: HikingPageProps) {
                 ? '산행은 종료되었습니다. 같은 저장 요청으로 재시도합니다.'
                 : isNativeIOS() && pendingRecovery.draft.native
                   ? '기존 UUID로 네이티브 GPS 상태와 저장 좌표를 확인합니다. 앱 강제 종료 후 수집이 중단된 시간과 이동은 임의로 더하지 않습니다.'
-                  : '새 산행을 시작하기 전에 기존 기록을 확인해주세요. 일시정지 상태로 복구하며, 수집이 중단된 시간과 이동은 더하지 않습니다.'}
+                  : pendingRecovery.draft.webTracking
+                    ? '진행 중이던 산행입니다. 마지막 저장 이후 시간도 반영하며 수집되지 않은 경로와 거리는 추가하지 않습니다.'
+                    : '일시정지 상태로 복구합니다. 계속하기를 누르기 전에는 시간이 늘어나지 않습니다.'}
             </p>
             <div className="recovery-actions">
               <button
@@ -632,11 +671,11 @@ function CoursePicker({
             </dd>
           </div>
           <div>
-            <dt>등산 시간 · 휴식 제외</dt>
+            <dt>등산 시간 · 일시정지 제외</dt>
             <dd>00:00:00</dd>
           </div>
           <div>
-            <dt>평균 이동 속도</dt>
+            <dt>평균 이동 속도 · 일시정지 제외</dt>
             <dd>
               0.0 <small>km/h</small>
             </dd>
@@ -648,12 +687,12 @@ function CoursePicker({
           </button>
         </div>
         <p className="hiking-note">
-          화면이 숨겨진 것을 감지하면 일시정지합니다. 앱 전환이나 잠금 중에는 GPS 수집이 제한될 수
-          있습니다. 복귀하면 산행 상태를 확인하고 계속하기를 눌러주세요.
+          화면 잠금이나 다른 앱 전환만으로 산행이 자동 일시정지되지는 않습니다. 모바일 브라우저
+          특성상 백그라운드 GPS 위치 수집은 제한될 수 있습니다.
         </p>
         <p className="hiking-note">
-          방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야 합니다.
-          일시정지한 시간은 산행 시간에 포함되지 않으며, 하루에 한 번만 인증받을 수 있습니다.
+          GPS 이동 거리 500m 이상과 일시정지 제외 20분 이상을 모두 충족하거나, 유효한 GPS로 정상
+          도달이 확인되면 인증됩니다. 같은 날 여러 산행도 각각 인증받을 수 있습니다.
         </p>
       </div>
     </section>
@@ -875,11 +914,11 @@ function ActiveHike({
             </dd>
           </div>
           <div>
-            <dt>등산 시간 · 휴식 제외</dt>
+            <dt>등산 시간 · 일시정지 제외</dt>
             <dd>{formatDuration(session.elapsedMs)}</dd>
           </div>
           <div>
-            <dt>평균 이동 속도</dt>
+            <dt>평균 이동 속도 · 일시정지 제외</dt>
             <dd>
               {session.averageSpeed.toFixed(1)} <small>km/h</small>
             </dd>
@@ -940,17 +979,21 @@ function ActiveHike({
             )}
           </div>
         )}
+        <p className="hiking-orientation-note" role="status">
+          세로로 돌리면 산행 화면을 더 편하게 볼 수 있어요. 기기의 세로 방향 잠금도 사용할 수
+          있습니다.
+        </p>
         <p className="hiking-note">
           정상 도달 반경 {SUMMIT_RADIUS_METERS}m · GPS 정확도 {GPS_FILTER.maxAccuracyMeters}m 이내
         </p>
         <p className="hiking-note">
           {session.nativeIOS
             ? '산행 중 화면 잠금이나 앱 전환 시에도 네이티브 GPS 기록을 유지하고 복귀 시 반영합니다. 일시정지는 버튼으로 요청하세요. 앱 강제 종료 후에는 기록을 확인하고 재개해야 합니다.'
-            : '화면이 숨겨진 것을 감지하면 일시정지합니다. 앱 전환이나 잠금 중에는 GPS 수집이 제한될 수 있습니다. 복귀하면 상태를 확인하세요. 등산 메뉴에서 마지막으로 저장된 기록을 7일간 복구할 수 있습니다.'}
+            : '화면 잠금·앱 전환 중에도 산행 시간은 유지됩니다. 시간을 멈추려면 일시정지를 누르세요. GPS 수집이 중단된 구간의 경로와 거리는 추정하지 않습니다. 임시 기록은 7일간 복구할 수 있습니다.'}
         </p>
         <p className="hiking-note">
-          방문 인증을 받으려면 GPS 이동 거리 500m 이상과 산행 시간 20분 이상을 모두 충족해야 합니다.
-          일시정지한 시간은 산행 시간에 포함되지 않으며, 하루에 한 번만 인증받을 수 있습니다.
+          GPS 이동 거리 500m 이상과 일시정지 제외 20분 이상을 모두 충족하거나, 유효한 GPS로 정상
+          도달이 확인되면 인증됩니다. 같은 날 여러 산행도 각각 인증받을 수 있습니다.
         </p>
       </div>
     </section>

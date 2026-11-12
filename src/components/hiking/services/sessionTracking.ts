@@ -94,7 +94,11 @@ export function recordTrackPoint(
   } catch (cause) {
     const reason = cause instanceof RecoveryCapacityError ? 'capacity-limit' : 'storage-error';
     // Match the last committed evidence AND accumulated time, rather than advancing an unsaved clock.
-    const stopped = stopTracking(lastCheckpoint, reason, now);
+    const stopped = stopTracking(
+      { ...lastCheckpoint, state: 'PAUSED', activeSince: null },
+      reason,
+      now,
+    );
     try {
       persist(stopped);
     } catch {

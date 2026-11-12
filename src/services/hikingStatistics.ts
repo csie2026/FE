@@ -1,5 +1,6 @@
 import type { HikingActivity } from '../api.ts';
 import { summarizeCompletedHikes } from './completedHikes.ts';
+import { isCertifiedActivity } from './activityCertification.ts';
 
 const KOREA_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -48,7 +49,7 @@ export function summarizeHikingActivities(activities: HikingActivity[], now = Da
     }
     totalDistanceMeters += activity.distanceMeters;
     if (startedAt >= month.start && startedAt < month.end) {
-      monthlyHikeCount++;
+      if (isCertifiedActivity(activity)) monthlyHikeCount++;
       monthlyDistanceMeters += activity.distanceMeters;
     }
   }
@@ -57,7 +58,7 @@ export function summarizeHikingActivities(activities: HikingActivity[], now = Da
   const completed = summarizeCompletedHikes(activities);
   const statistics: HikingStatistics = {
     month: month.key,
-    totalHikeCount: activities.length,
+    totalHikeCount: activities.filter(isCertifiedActivity).length,
     monthlyHikeCount,
     totalDistanceMeters,
     monthlyDistanceMeters,

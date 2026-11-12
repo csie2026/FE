@@ -1,4 +1,5 @@
 import type { HikingActivity } from '../api.ts';
+import { isCertifiedSummit } from './activityCertification.ts';
 
 export interface CompletedMountainSummary {
   mountainId: string;
@@ -6,12 +7,12 @@ export interface CompletedMountainSummary {
   latestStartedAt: string | null;
 }
 
-// The profile totals and collection share this exact completed=true grouping.
+// The profile totals and collection share the same server-certified summit grouping.
 // A repeated summit increases the activity count, while each mountain ID has one entry.
 export function summarizeCompletedHikes(activities: HikingActivity[]) {
   const completed = activities.filter(
     (activity) =>
-      activity.completed === true &&
+      isCertifiedSummit(activity) &&
       Number.isSafeInteger(activity.mountainId) &&
       activity.mountainId > 0,
   );

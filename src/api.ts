@@ -1,3 +1,4 @@
+import { beginPageQuery } from './services/lifecycleDiagnostics.ts';
 import { validApiResponse } from './services/responseValidation.ts';
 import {
   getErrorMessage,
@@ -283,13 +284,21 @@ export async function api<T>(
     () => controller.abort(new DOMException('요청 시간이 초과되었습니다.', 'TimeoutError')),
     API_TIMEOUT_MS,
   );
+  const finishDiagnostic = beginPageQuery(path, method);
   try {
     if (controller.signal.aborted) return await cancelled;
     // Race also bounds adapters/body readers that ignore AbortSignal. Never automatically retry.
-    return await Promise.race([
+    const result = await Promise.race([
       apiRequest<T>(path, method, body, controller.signal, beforeSend),
       cancelled,
     ]);
+    finishDiagnostic?.('success');
+    return result;
+  } catch (cause) {
+    const outcome = cause instanceof ApiError && cause.code === 'request_timeout'
+      ? 'timeout' : signal?.aborted ? 'cancelled' : 'error';
+    finishDiagnostic?.(outcome, cause instanceof ApiError ? cause.status : undefined);
+    throw cause;
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', forwardAbort);
