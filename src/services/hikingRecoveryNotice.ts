@@ -29,7 +29,7 @@ export function visibleHikingRecoveryNotice(
   return notice?.userId === userId && notice.clientRequestId !== dismissedRequestId ? notice : null;
 }
 
-// Recheck ownership and existence at click time; the existing hiking page performs recovery.
+// 클릭 시 기록의 존재 여부와 소유자를 다시 확인하고 실제 복구는 기존 산행 화면에 맡긴다.
 export function openHikingRecoveryNotice(
   notice: HikingRecoveryNotice,
   currentUserId: number,

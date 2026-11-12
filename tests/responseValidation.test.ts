@@ -44,7 +44,17 @@ const weather = weatherResponse(1, [
 ]);
 const cases: [string, unknown][] = [
   ['/api/users/me', memberResponse()],
-  ['/api/users/1/profile', { userId: 1, nickname: null, profileImageUrl: null, score: null }],
+  [
+    '/api/users/1/profile',
+    {
+      userId: 1,
+      nickname: null,
+      profileImageUrl: null,
+      score: null,
+      totalHikeCount: 0,
+      completedHikeCount: 0,
+    },
+  ],
   ['/api/journals', [journalResponse()]],
   ['/api/users/me/journals', [journalResponse()]],
   ['/api/users/1/journals', [journalResponse()]],
@@ -95,7 +105,7 @@ for (const [path, valid] of cases) {
     for (const key of Object.keys(record as object)) {
       const missing = { ...(record as object) } as Record<string, unknown>;
       delete missing[key];
-      // Optional metadata is intentionally compatible with older saved records.
+      // 선택적 메타데이터가 없는 기존 저장 기록도 호환되도록 허용한다.
       if (['provider', 'email', 'joinedAt', 'scoring', 'gpsValidationVersion'].includes(key))
         continue;
       malformed.push(Array.isArray(valid) ? [missing] : missing);

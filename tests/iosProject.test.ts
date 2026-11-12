@@ -6,7 +6,7 @@ import { basename, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import capacitorConfig from '../capacitor.config.ts';
 
-// Reuse the installed Capacitor CLI's XML parsers. No additional dependency is required.
+// 설치된 Capacitor CLI의 XML 파서를 재사용하며 새 의존성을 추가하지 않는다.
 const cliRequire = createRequire(
   new URL('../node_modules/@capacitor/cli/package.json', import.meta.url),
 );
@@ -29,8 +29,8 @@ const list = (value: Value): string[] => {
   return value as string[];
 };
 
-// Read the OpenStep dictionaries/arrays used by this Xcode project, including comments and quoted flags.
-// Parsing the whole document detects broken syntax and duplicate object IDs, unlike text searches.
+// 주석과 따옴표로 감싼 값을 포함해 Xcode 프로젝트의 OpenStep 딕셔너리·배열을 해석한다.
+// 문서 전체를 파싱해 단순 텍스트 검색으로 놓칠 수 있는 문법 오류와 중복 객체 ID를 찾는다.
 function parseProject(source: string): Record<string, Value> {
   const lexer = /\s+|\/\*[\s\S]*?\*\/|\/\/[^\r\n]*|"(?:\\.|[^"\\])*"|[{}()=;,]|[^\s{}()=;,"]+/gy;
   const tokens: string[] = [];
@@ -257,7 +257,7 @@ test('initial storyboard loads the controller that registers the same plugin nam
     methods.sort(),
     ['requestPermissions', 'start', 'pause', 'resume', 'stop', 'getStatus', 'readPoints'].sort(),
   );
-  // Verify against the installed SDK, not a remembered registration API.
+  // 기억에 의존하지 않고 설치된 SDK의 실제 플러그인 등록 API와 대조한다.
   assert.match(
     read('node_modules/@capacitor/ios/Capacitor/Capacitor/CAPBridgeViewController.swift'),
     /capacitorDidLoad\(\)/,

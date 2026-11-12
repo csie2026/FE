@@ -3,7 +3,7 @@ import { ApiError, getHikingRecords, type HikingActivity } from '../api';
 import { koreanMonthBounds, summarizeHikingActivities } from '../services/hikingStatistics';
 import { readRefreshState } from '../services/refreshState';
 
-// One owned-activity request supplies both the mountain collection and all profile statistics.
+// 본인 산행 기록을 한 번 조회해 완등한 산 목록과 프로필 산행 통계에 함께 사용한다.
 export function useCompletedHikes(userId: number | null, enabled: boolean, refreshKey = 0) {
   const [attempt, setAttempt] = useState(0);
   const [month, setMonth] = useState(() => koreanMonthBounds().key);
@@ -20,7 +20,7 @@ export function useCompletedHikes(userId: number | null, enabled: boolean, refre
     getHikingRecords(controller.signal)
       .then((activities) => {
         if (!controller.signal.aborted) {
-          // Reject unusable data instead of displaying a successful zero or partial total.
+          // 잘못된 데이터를 정상적인 0이나 일부 합계로 표시하지 않고 오류로 처리한다.
           summarizeHikingActivities(activities);
           setMonth(koreanMonthBounds().key);
           setResult({ request, data: activities, error: '' });
@@ -43,7 +43,7 @@ export function useCompletedHikes(userId: number | null, enabled: boolean, refre
     if (!enabled || userId === null) return;
     let timer: number;
     const schedule = () => {
-      // Limit long month timers to avoid the browser's 32-bit timeout overflow.
+      // 월 전환까지 남은 시간이 길어도 브라우저 타이머의 32비트 범위를 넘지 않게 나눠 예약한다.
       const delay = Math.min(86_400_000, Math.max(1, koreanMonthBounds().end - Date.now() + 20));
       timer = window.setTimeout(() => {
         setMonth(koreanMonthBounds().key);
@@ -56,7 +56,7 @@ export function useCompletedHikes(userId: number | null, enabled: boolean, refre
   const view = readRefreshState(enabled && userId !== null, request, result);
   const summary = useMemo(
     () => summarizeHikingActivities(view.data ?? [], Date.parse(`${month}-01T00:00:00+09:00`)),
-    // The month key invalidates cached totals when the KST month changes on an open page.
+    // 화면이 열린 상태에서 한국 시간 기준 월이 바뀌면 월 키를 갱신해 통계를 다시 계산한다.
     [view.data, month],
   );
   return {

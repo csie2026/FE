@@ -34,7 +34,7 @@ export default function HikingRecoveryNotice({
       return null;
     }
   }, [userId]);
-  // Read a fresh snapshot on navigation too: same-tab saves do not emit storage events.
+  // 같은 탭의 저장은 storage 이벤트를 발생시키지 않으므로 화면 이동 시에도 최신 기록을 읽는다.
   useSyncExternalStore(subscribe, snapshot, () => null);
   const notice = visibleHikingRecoveryNotice(
     readHikingRecoveryNotice(userId),

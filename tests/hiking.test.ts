@@ -49,7 +49,7 @@ test('summit radius is 30m while GPS accuracy allowance remains 50m', () => {
   assert.equal(SUMMIT_RADIUS_METERS, 30);
   assert.equal(GPS_FILTER.maxAccuracyMeters, 50);
   assert.equal(hasReachedSummit(point(37.0002), { lat: 37, lng: 127 }), true);
-  // This approximately 33m sample used to count with the old 50m summit radius.
+  // 약 33m 떨어진 이 표본은 구버전의 정상 반경 50m에서는 정상 도달로 판정되었다.
   assert.equal(hasReachedSummit(point(37.0003), { lat: 37, lng: 127 }), false);
 });
 

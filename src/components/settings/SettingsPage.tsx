@@ -44,7 +44,7 @@ export default function SettingsPage({
     setPending(true);
     setError('');
     try {
-      // Explicit checkbox consent and final click preserve the existing API confirmation contract.
+      // 동의 체크와 최종 버튼 클릭 후 기존 API 계약에 맞는 확인 값을 전달한다.
       await onWithdraw('탈퇴');
     } catch (cause) {
       setError(getErrorMessage(cause, '탈퇴 완료 여부를 확인하지 못했습니다. 다시 확인하십시오.'));

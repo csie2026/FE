@@ -184,7 +184,7 @@ function HikingSessionPage(props: HikingPageProps) {
     setRecoveryBusy(true);
     try {
       if (isNativeIOS()) {
-        // Even expired drafts must identify their owner/UUID before native collection is stopped.
+        // 만료된 임시 기록도 소유자와 UUID를 확인한 뒤에만 네이티브 수집을 중지한다.
         const draft: unknown = JSON.parse(
           localStorage.getItem(recoveryKey(props.userId)) ?? 'null',
         );
@@ -737,7 +737,7 @@ function ActiveHike({
         retry: session.retryNative,
       }
     : webGps;
-  // A native poll in flight does not invalidate an already fresh display fix.
+  // 네이티브 조회 중에도 이미 수신한 최신 표시용 위치는 유효하게 유지한다.
   const usable =
     (session.nativeIOS || gps.status === 'AVAILABLE') &&
     gps.position &&

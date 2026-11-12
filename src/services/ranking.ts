@@ -1,6 +1,6 @@
 import { getRankingSummary, type RankingSummary } from '../api.ts';
 
-// Keep callbacks scoped to the mounted account even if an adapter ignores abort.
+// 어댑터가 요청 취소를 무시해도 콜백은 화면에 연결된 회원의 요청에만 적용한다.
 export function startRankingRequest(
   userId: number,
   handlers: {

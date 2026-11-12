@@ -201,7 +201,7 @@ test('byte capacity stops collection below 10000 while reserving a durable compl
   const ended = completeSession(result.session, course, now + 60000);
   const finalDraft = draftFromSession(ended, course, 1, h.owner, now + 60000);
   assert.ok(jsonBytes(finalDraft) <= MAX_RECOVERY_BYTES);
-  // writeRecovery uses the actual current clock, so store the same evidence with a present end instant.
+  // writeRecovery는 실제 현재 시각을 사용하므로 종료 시각을 현재로 지정해 동일한 GPS 증거를 저장한다.
   h.persist(completeSession(result.session, course, now));
   const loaded = readRecovery(1, now, h.store);
   assert.equal(loaded.kind, 'ready');

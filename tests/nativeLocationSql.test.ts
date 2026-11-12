@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
-// Execute the SQL from the Swift source on Node SQLite. This does not compile Swift or test iOS.
+// Swift 소스의 SQL을 Node SQLite에서 실행하며 Swift 컴파일이나 iOS 동작을 검증하지는 않는다.
 const source = readFileSync(new URL('../native/ios/LocationStore.swift', import.meta.url), 'utf8');
 const multiline = [...source.matchAll(/try execute\("""\s*([\s\S]*?)\s*"""/g)].map((m) => m[1]);
 const sql = (prefix: string) => {
@@ -59,7 +59,7 @@ test('v1 SQLite migration preserves UUID/user/raw points/sequence and allows pau
     assert.equal(old.id, 'old');
     assert.equal(old.user_id, 7);
     assert.equal(old.state, 'interrupted');
-    assert.equal(old.accumulated_ms, 0); // No invented legacy active time.
+    assert.equal(old.accumulated_ms, 0); // 구버전에 없는 활동 시간을 추측해서 만들지 않는다.
     const point = db.prepare('SELECT * FROM points').get()!;
     assert.equal(point.sequence, 42);
     assert.equal(point.latitude, 37);

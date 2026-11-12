@@ -86,7 +86,7 @@ test('native calls preserve user and UUID identity and register only once', asyn
     ['status', canonicalKey],
   ]);
   assert.equal(environment.registrations(), 1);
-  // This checks bridge calls, not native idempotency; the latter requires an iPhone test.
+  // 브리지 호출만 검사하며 네이티브 작업의 멱등성은 iPhone에서 별도로 검증해야 한다.
 });
 
 test('invalid identities and paging bounds never reach native storage', async () => {

@@ -4,7 +4,7 @@ import { isCertifiedActivity } from './activityCertification.ts';
 
 const KOREA_OFFSET_MS = 9 * 60 * 60 * 1000;
 
-// All devices use the same month, independently of their own locale/time zone.
+// 기기의 언어·시간대와 관계없이 모든 기기에서 한국 시간 기준으로 월을 구분한다.
 export function koreanMonthBounds(now: number = Date.now()) {
   if (!Number.isFinite(now)) throw new Error('통계 기준 시각을 확인할 수 없습니다.');
   const korea = new Date(now + KOREA_OFFSET_MS);
@@ -72,7 +72,7 @@ export function summarizeHikingActivities(activities: HikingActivity[], now = Da
   };
 }
 
-// Sum the original meters first; round only the final displayed km (up to 2 decimals).
+// 원본 미터 값을 먼저 합산하고 최종 km 표시값만 소수 둘째 자리까지 반올림한다.
 export function distanceKmText(meters: number) {
   return (meters / 1000).toLocaleString('ko-KR', { maximumFractionDigits: 2 });
 }

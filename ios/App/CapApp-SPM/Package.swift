@@ -1,7 +1,7 @@
 // swift-tools-version: 5.9
 import PackageDescription
 
-// DO NOT MODIFY THIS FILE - managed by Capacitor CLI commands
+// 직접 수정 금지: Capacitor CLI가 관리하는 파일이다.
 let package = Package(
     name: "CapApp-SPM",
     platforms: [.iOS(.v15)],

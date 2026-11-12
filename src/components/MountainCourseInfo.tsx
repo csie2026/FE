@@ -5,7 +5,7 @@ import type { HikingSelection } from './hiking/services/hikingNavigation';
 
 const difficultyLabels: Record<string, string> = { EASY: '쉬움', NORMAL: '보통', HARD: '어려움' };
 
-// Mounted only when a detail is open; stale responses cannot overwrite another mountain.
+// 상세 화면이 열린 동안만 조회하고 이전 응답이 다른 산의 정보를 덮어쓰지 않게 한다.
 export default function MountainCourseInfo({
   mountainId,
   onSelectCourse,

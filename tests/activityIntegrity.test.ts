@@ -80,7 +80,7 @@ test('zero metrics, nullable course and paused time remain allowed without new h
       now,
     ),
   );
-  // Well-formed data does not prove a physical hike or summit. This guard is not anti-cheat.
+  // 형식이 유효해도 실제 산행·정상 도달을 입증하지 않으며 이 검증은 부정행위 탐지 기능이 아니다.
   assert.ok(
     isValidActivityInput({ ...input, distanceMeters: 0, elapsedMs: 0, completed: true }, now),
   );
@@ -160,7 +160,7 @@ test('raw accepted GPS reaches the frozen saved completion flag; display positio
       assert.equal(saved.completed, meters <= 30);
       assert.equal(posts.at(-1)?.completed, meters <= 30);
       assert.equal(posts.at(-1)?.clientRequestId, input.clientRequestId);
-      assert.equal(frozen.distanceMeters, 0); // A single accepted point adds no distance.
+      assert.equal(frozen.distanceMeters, 0); // 채택한 좌표가 하나뿐이면 이동 거리는 늘어나지 않는다.
     }
   } finally {
     globalThis.fetch = original;

@@ -9,7 +9,7 @@ export function clearWithdrawnAccountData(
   userId: number,
   stores: (() => RemovableStorage)[] = [() => window.localStorage, () => window.sessionStorage],
 ) {
-  retireAccount(userId); // Prevent an unmount checkpoint or stale tab from writing the draft back.
+  retireAccount(userId); // 화면 해제 시점의 저장이나 오래된 탭이 임시 기록을 다시 쓰지 못하게 한다.
   let failed = false;
   for (const getStorage of stores) {
     for (const key of accountStorageKeys(userId)) {
@@ -52,7 +52,7 @@ export function completeAccountWithdrawal(userId: number) {
   try {
     channel?.postMessage({ type: 'withdrawn', userId });
   } catch {
-    /* Server also rejects every old session. */
+    /* 서버에서도 탈퇴 계정의 기존 세션을 모두 거부한다. */
   }
   return result;
 }

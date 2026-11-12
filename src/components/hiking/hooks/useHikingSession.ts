@@ -145,7 +145,7 @@ export function useHikingSession(
       setNativeBusy(true);
       if (action !== 'sync') setNativeError('');
       const assertOwnership = () => {
-        // Recheck after every await. An old screen may not overwrite a newly claimed draft.
+        // 각 await 이후 소유권을 다시 확인해 이전 화면이 새 소유자의 임시 기록을 덮어쓰지 못하게 한다.
         if (!mounted.current || !ownsSession(current.clientRequestId!))
           throw new Error('산행 화면 또는 소유권이 변경되었습니다.');
       };
@@ -184,7 +184,7 @@ export function useHikingSession(
           cause instanceof Error ? cause.message : '네이티브 GPS 상태 확인에 실패했습니다.';
         setNativeError(message);
         setNativeKnown(false);
-        // Best effort fail-closed. Do not declare PAUSED until the native collector confirms it.
+        // 오류 시 수집 중지를 시도하되 네이티브 확인 전에는 PAUSED로 확정하지 않는다.
         if (ownsSession(current.clientRequestId)) {
           try {
             const status = await nativeLocation.pause({
@@ -208,7 +208,7 @@ export function useHikingSession(
             }
             setNativeKnown(true);
           } catch {
-            // The UI explicitly shows unknown state and blocks completion/restart, never web fallback.
+            // 상태 미확인을 화면에 표시하고 완료·재시작을 차단하며 웹 GPS로 대체하지 않는다.
           }
         }
         return false;
@@ -216,7 +216,7 @@ export function useHikingSession(
         nativeBusyRef.current = false;
         setNativeBusy(false);
         if (!mounted.current && ownsSession(current.clientRequestId)) {
-          // Handles navigation while start/resume was in flight.
+          // 시작·재개 요청이 진행되는 동안 화면을 이동한 경우에도 수집 상태를 정리한다.
           void nativeLocation
             .pause({ userId, clientRequestId: current.clientRequestId })
             .catch(() => {});
@@ -307,7 +307,7 @@ export function useHikingSession(
     mounted.current = true;
     const sync = () => {
       if (!document.hidden && sessionRef.current.native) {
-        // Expire pre-background display fixes immediately, without waiting for bridge/storage I/O.
+        // 브리지·저장소 작업을 기다리지 않고 백그라운드 진입 전 표시용 위치를 즉시 만료시킨다.
         const timestamp = Date.now();
         setNow(timestamp);
         setNativePosition((previous) => latestNativeDisplayPosition(previous, [], timestamp));
@@ -343,7 +343,7 @@ export function useHikingSession(
             }
           })
           .catch(() => {
-            /* The draft and native records remain available for reconciliation. */
+            /* 이후 상태 대조를 위해 임시 기록과 네이티브 원본을 보존한다. */
           });
       });
     };
@@ -378,7 +378,7 @@ export function useHikingSession(
         try {
           persist(current);
         } catch {
-          /* The last successful checkpoint is retained; storage errors are shown while mounted. */
+          /* 마지막 저장 성공 기록을 유지하고 화면이 열려 있으면 저장 오류를 표시한다. */
         }
       }
     };

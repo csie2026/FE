@@ -30,7 +30,7 @@ export function useMemberImage(kind: MemberImageKind, options: MemberImageOption
   );
 
   async function changeImage(file?: File) {
-    // Do not let duplicate taps reorder writes to the same server image.
+    // 연속 클릭으로 동일한 서버 이미지의 변경 요청 순서가 뒤바뀌지 않게 한다.
     if (pending.current) return;
     const controller = new AbortController();
     pending.current = controller;

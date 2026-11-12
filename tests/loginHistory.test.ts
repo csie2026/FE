@@ -33,7 +33,7 @@ test('server-confirmed login and subsequent 401 distinguish anonymous, expiry, i
     globalThis.fetch = async () => unauthorized();
     await assert.rejects(api('/api/users/me'));
     await assert.rejects(api('/api/mountains'));
-    assert.equal(notices, 0); // first visit and anonymous protected API
+    assert.equal(notices, 0); // 첫 방문에서 비로그인 상태로 보호된 API를 호출한 경우
 
     for (const reason of ['idle expiry', 'server restart']) {
       globalThis.fetch = async () => Response.json(memberResponse(7));
@@ -44,7 +44,7 @@ test('server-confirmed login and subsequent 401 distinguish anonymous, expiry, i
       await assert.rejects(api('/api/users/me'));
       assert.equal(notices, reason === 'idle expiry' ? 1 : 2);
       await assert.rejects(api('/api/users/me'));
-      assert.equal(shouldNotifySessionExpiry(), false); // consumed once
+      assert.equal(shouldNotifySessionExpiry(), false); // 만료 안내는 한 번만 표시한다.
     }
 
     confirmLogin();
@@ -72,15 +72,15 @@ test('server-confirmed login and subsequent 401 distinguish anonymous, expiry, i
     assert.equal(notices, 2);
 
     confirmLogin();
-    values.clear(); // explicit logout in another tab
+    values.clear(); // 다른 탭에서 명시적으로 로그아웃한 상황
     await assert.rejects(api('/api/users/me'));
     assert.equal(notices, 2);
 
     forgetLogin();
-    values.set('topeak:server-confirmed-login', '1'); // reload retains only notice evidence
+    values.set('topeak:server-confirmed-login', '1'); // 새로고침 후에는 만료 안내용 로그인 이력만 남는다.
     globalThis.fetch = async () => Response.json(memberResponse(7));
     await api('/api/users/me');
-    assert.equal(notices, 2); // stored history alone never triggers expiry
+    assert.equal(notices, 2); // 저장된 로그인 이력만으로 만료 안내를 발생시키지 않는다.
     globalThis.fetch = async () => unauthorized();
     await assert.rejects(api('/api/users/me'));
     assert.equal(notices, 3);

@@ -23,7 +23,7 @@ struct StoredLocationSession {
     let segment: Int64
 }
 
-/// Accessed only on the main queue by LocationRecorder. No JavaScript dependency.
+/// LocationRecorder가 메인 큐에서만 접근하며 JavaScript 실행에 의존하지 않는다.
 final class LocationStore {
     private var db: OpaquePointer?
     private let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
@@ -61,8 +61,8 @@ final class LocationStore {
             guard version >= 0 && version <= 2 else {
                 throw LocationFailure(code: "STORAGE_ERROR", message: "Unsupported location database version.")
             }
-            // Rebuild only the v1 sessions table to extend its CHECK constraint.
-            // Foreign keys are restored and checked before this connection is exposed.
+            // CHECK 제약을 확장하기 위해 v1 sessions 테이블만 다시 구성한다.
+            // 연결을 사용하기 전에 외래 키 검사를 다시 켜고 참조 무결성을 확인한다.
             if version == 1 { try execute("PRAGMA foreign_keys = OFF") }
             try transaction {
                 if version == 1 {
@@ -115,7 +115,7 @@ final class LocationStore {
                     """)
                 try execute("CREATE INDEX IF NOT EXISTS points_session_sequence ON points(session_id, sequence)")
                 try execute("PRAGMA user_version = 2")
-                // A new process cannot claim that the previous process is still collecting.
+                // 새 프로세스에서는 이전 프로세스의 위치 수집이 계속된다고 간주하지 않는다.
                 try execute("""
                     UPDATE sessions SET state = 'interrupted', error_code = 'SERVICE_INTERRUPTED',
                         accumulated_ms = accumulated_ms + CASE WHEN active_since IS NULL THEN 0
@@ -180,7 +180,7 @@ final class LocationStore {
         )
     }
 
-    /// The entire CLLocation batch commits before the caller updates lastRecordedAt.
+    /// 전체 CLLocation 묶음의 저장을 완료한 뒤 호출자가 lastRecordedAt을 갱신한다.
     func append(_ locations: [CLLocation], to session: StoredLocationSession) throws {
         try transaction {
             for location in locations {
@@ -250,7 +250,7 @@ final class LocationStore {
             try execute("COMMIT")
             return result
         } catch {
-            // Rollback is best effort; never replace the original storage error.
+            // 롤백을 시도하되 롤백 실패로 최초 저장 오류를 덮어쓰지 않는다.
             try? execute("ROLLBACK")
             throw error
         }

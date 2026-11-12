@@ -24,8 +24,8 @@ export function parseFavoriteIds(raw: string | null): string[] {
   return Array.isArray(value) ? [...new Set(value.filter(isMountainId))] : [];
 }
 
-// No legacy shared-key reads or automatic migration: the old list has no known owner.
-// Snapshots are scoped to the authenticated member and stable for useSyncExternalStore.
+// 구버전 공용 목록은 소유자를 알 수 없으므로 읽거나 자동 이전하지 않는다.
+// 스냅샷을 인증된 회원별로 분리하고 useSyncExternalStore에서 참조를 안정적으로 유지한다.
 export function createMemberFavoritesStore(storage: () => FavoriteStorage) {
   const cache = new Map<string, { raw: string | null | undefined; snapshot: FavoriteSnapshot }>();
   const volatile = new Map<string, FavoriteSnapshot>();
@@ -71,7 +71,7 @@ export function createMemberFavoritesStore(storage: () => FavoriteStorage) {
       volatile.delete(key);
       cache.set(key, { raw, snapshot: { ids, error: '' } });
     } catch {
-      // Keep the unsaved interaction in this member's memory only; never spill into another account.
+      // 저장하지 못한 변경은 해당 회원의 메모리에만 유지해 다른 계정에 섞이지 않게 한다.
       volatile.set(key, {
         ids,
         error:

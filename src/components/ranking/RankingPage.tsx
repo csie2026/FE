@@ -58,7 +58,7 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
     error,
   } = readRefreshState(currentUserId !== null, request, result);
 
-  // Abort superseded requests on navigation, refresh or account changes.
+  // 화면 이동·새로고침·계정 변경으로 불필요해진 이전 요청을 취소한다.
   useEffect(() => {
     if (currentUserId === null) return;
     return startRankingRequest(currentUserId, {
