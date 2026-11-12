@@ -2,9 +2,9 @@ name: ToPeak FE CI
 
 on:
   pull_request:
-    branches: [main]
+    branches: [dev, main]
   push:
-    branches: [main]
+    branches: [dev, main]
 
 jobs:
   test-and-build:
