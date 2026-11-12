@@ -13,18 +13,31 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+        with:
+          path: FE
+    
+      - name: Checkout backend test fixtures
+        uses: actions/checkout@v4
+        with:
+          repository: csie2026/BE
+          ref: dev
+          path: BE
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
+          cache-dependency-path: FE/package-lock.json
 
       - name: Install dependencies
+        working-directory: FE
         run: npm ci
 
       - name: Run tests
+        working-directory: FE
         run: npm test
 
       - name: Build frontend
+        working-directory: FE
         run: npm run build
