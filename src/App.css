@@ -1344,3 +1344,52 @@ button:disabled {
   color: #53665a;
   font-size: 13px;
 }
+
+.diary-card .journal-content {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.public-profile__name {
+  margin: 0;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.public-profile__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 8px;
+}
+.public-profile__stats > div {
+  padding: 16px 8px;
+  border: 1px solid #e0e4dc;
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+}
+.public-profile__stats dt {
+  color: #657268;
+  font-size: 12px;
+}
+.public-profile__stats dd {
+  margin: 10px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #176044;
+  overflow-wrap: anywhere;
+}
+.public-profile__note {
+  font-size: 11px;
+  color: #657268;
+  line-height: 1.6;
+}
+.public-profile__error button {
+  padding: 10px 16px;
+  border: 1px solid #c5d3c5;
+  border-radius: 10px;
+  background: #fff;
+  color: #176044;
+  cursor: pointer;
+}

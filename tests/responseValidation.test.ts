@@ -44,7 +44,17 @@ const weather = weatherResponse(1, [
 ]);
 const cases: [string, unknown][] = [
   ['/api/users/me', memberResponse()],
-  ['/api/users/1/profile', { userId: 1, nickname: null, profileImageUrl: null, score: null }],
+  [
+    '/api/users/1/profile',
+    {
+      userId: 1,
+      nickname: null,
+      profileImageUrl: null,
+      score: null,
+      totalHikeCount: 0,
+      completedHikeCount: 0,
+    },
+  ],
   ['/api/journals', [journalResponse()]],
   ['/api/users/me/journals', [journalResponse()]],
   ['/api/users/1/journals', [journalResponse()]],
