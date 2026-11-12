@@ -26,7 +26,7 @@ const mainMenus: { destination: DrawerDestination; label: string }[] = [
   { destination: 'profile', label: '마이페이지' },
 ];
 const utilities: { destination: DrawerDestination; label: string }[] = [
-  { destination: 'accountSettings', label: '계정 설정' },
+  { destination: 'accountSettings', label: '계정' },
   { destination: 'about', label: '앱 정보' },
 ];
 
@@ -98,7 +98,7 @@ export default function SideDrawer({
         <nav className="side-drawer__main" aria-label="메인 메뉴">
           {mainMenus.map((item) => menu(item.destination, item.label))}
         </nav>
-        <nav className="side-drawer__utilities" aria-label="설정 메뉴">
+        <nav className="side-drawer__utilities" aria-label="계정 메뉴">
           {utilities.map((item) => menu(item.destination, item.label))}
           <button
             type="button"

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>산행 중 현재 위치와 이동 경로를 기록하기 위해 위치를 사용합니다.</string>
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>산행 중 화면을 잠그거나 다른 앱을 사용해도 이동 경로를 기록하기 위해 위치를 사용합니다.</string>
+    <key>UIBackgroundModes</key>
+    <array>
+        <string>location</string>
+    </array>
+</dict>
+</plist>

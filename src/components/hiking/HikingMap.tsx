@@ -1,6 +1,7 @@
+import { getErrorMessage } from '../../utils/errorMessages';
 import { useEffect, useRef, useState } from 'react';
 import { loadMapSdk, type KakaoMaps } from './services/mapSdk';
-import { courseProgressPath, nearestCoursePosition } from './mapDisplayPath';
+import { courseProgressPath, matchCoursePosition } from './mapDisplayPath';
 import type { GpsPoint, HikingCourse, HikingState } from './types';
 
 type Props = {
@@ -15,7 +16,7 @@ type MapObjects = {
   marker: InstanceType<KakaoMaps['CustomOverlay']>;
   progress: InstanceType<KakaoMaps['Polyline']>;
 };
-// 지도 표시용 코스 진행선과 원본 GPS 기록을 구분하며, 지도 객체는 코스 변경 시 정리한다.
+// 예정 코스와 원본 GPS 기록을 구분하며, 지도 객체는 코스 변경 시 정리한다.
 export default function HikingMap({ course, position, segments, state }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const objects = useRef<MapObjects | null>(null);
@@ -91,7 +92,8 @@ export default function HikingMap({ course, position, segments, state }: Props) 
         setReady(true);
       })
       .catch((cause) => {
-        if (active) setError(cause instanceof Error ? cause.message : '지도 로딩 실패');
+        if (active)
+          setError(getErrorMessage(cause, '지도를 불러오지 못했습니다. 다시 시도해주세요.'));
       });
     return () => {
       active = false;
@@ -101,18 +103,20 @@ export default function HikingMap({ course, position, segments, state }: Props) 
   useEffect(() => {
     const current = objects.current;
     if (!current) return;
-    const projection = position && nearestCoursePosition(position, course.path);
-    if (!projection) {
+    if (!position) {
       current.marker.setMap(null);
       return;
     }
-    const coordinate = new current.sdk.LatLng(projection.coordinate.lat, projection.coordinate.lng);
+    // 코스에서 멀어진 현재 위치는 등산로 위로 강제 이동해 표시하지 않는다.
+    const matched = matchCoursePosition(position, course.path)?.coordinate ?? position;
+    const coordinate = new current.sdk.LatLng(matched.lat, matched.lng);
     current.marker.setPosition(coordinate);
     current.marker.setMap(current.map);
   }, [course, position, ready]);
   useEffect(() => {
     const current = objects.current;
     if (!current) return;
+    // 진행선은 코스 위 표시 전용이다. 거리·속도 계산용 GPS 기록을 변경하지 않는다.
     const displayPath = courseProgressPath(course.path, segments);
     current.progress.setPath(displayPath.map((p) => new current.sdk.LatLng(p.lat, p.lng)));
     current.progress.setMap(displayPath.length > 1 ? current.map : null);

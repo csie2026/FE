@@ -1,57 +1,105 @@
-import { useState } from 'react';
+import { getErrorMessage } from '../utils/errorMessages';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ApiError } from '../api';
+import { readRefreshState } from '../services/refreshState';
+import {
+  EMPTY_GOALS,
+  getMonthlyGoals,
+  putMonthlyGoals,
+  type MonthlyGoals,
+  type MonthlyGoalResponse,
+} from '../services/monthlyGoals';
+export type { MonthlyGoals } from '../services/monthlyGoals';
 
-export interface MonthlyGoals {
-  distanceKm: number | null;
-  hikeCount: number | null;
-}
-
-const STORAGE_KEY = 'topeak.monthlyGoals';
-const isGoal = (value: unknown): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value >= 1 && value <= 1000;
-
-function readGoals(): MonthlyGoals {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored !== null) {
-      const value: unknown = JSON.parse(stored);
-      if (value && typeof value === 'object') {
-        const goals = value as Record<string, unknown>;
-        return {
-          distanceKm: isGoal(goals.distanceKm) ? goals.distanceKm : null,
-          hikeCount:
-            isGoal(goals.hikeCount) && Number.isInteger(goals.hikeCount) ? goals.hikeCount : null,
-        };
+export function useMonthlyGoals(
+  userId: number | null,
+  enabled: boolean,
+  month: string,
+  refreshKey: number,
+  onAuthError: (error: unknown) => void,
+) {
+  const scope = useMemo(() => ({ userId, enabled, month }), [userId, enabled, month]);
+  const [attempt, setAttempt] = useState(0);
+  const request = useMemo(() => ({ scope, refreshKey, attempt }), [scope, refreshKey, attempt]);
+  const active = useRef<typeof scope | null>(null);
+  const writer = useRef<AbortController | null>(null);
+  const [result, setResult] = useState<{
+    request: typeof request | null;
+    data: MonthlyGoalResponse | null;
+    error: string;
+  }>({ request: null, data: null, error: '' });
+  const [write, setWrite] = useState<{
+    scope: typeof scope | null;
+    pending: boolean;
+    error: string;
+  }>({ scope: null, pending: false, error: '' });
+  const saving = write.scope === scope && write.pending;
+  useEffect(() => {
+    active.current = scope;
+    return () => {
+      active.current = null;
+      writer.current?.abort();
+      writer.current = null;
+    };
+  }, [scope]);
+  useEffect(() => {
+    if (userId === null || !enabled || saving) return;
+    const controller = new AbortController();
+    getMonthlyGoals(userId, month, controller.signal)
+      .then((data) => {
+        if (!controller.signal.aborted) setResult({ request, data, error: '' });
+      })
+      .catch((cause: unknown) => {
+        if (controller.signal.aborted) return;
+        setResult({
+          request,
+          data: null,
+          error: getErrorMessage(cause, '이번 달 목표를 불러오지 못했습니다. 다시 시도해주세요.'),
+        });
+        if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
+      });
+    return () => controller.abort();
+  }, [userId, enabled, month, request, saving, onAuthError]);
+  const saveGoals = useCallback(
+    async (next: MonthlyGoals) => {
+      if (userId === null || !enabled || active.current !== scope || writer.current) return false;
+      const controller = new AbortController();
+      writer.current = controller;
+      setWrite({ scope, pending: true, error: '' });
+      try {
+        const data = await putMonthlyGoals(userId, month, next, controller.signal);
+        if (active.current !== scope || controller.signal.aborted) return false;
+        setResult({ request, data, error: '' });
+        return true;
+      } catch (cause) {
+        if (active.current === scope && !controller.signal.aborted) {
+          setWrite({
+            scope,
+            pending: false,
+            error: getErrorMessage(cause, '목표를 저장하지 못했습니다. 다시 시도해주세요.'),
+          });
+          if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
+        }
+        return false;
+      } finally {
+        if (writer.current === controller) writer.current = null;
+        if (active.current === scope)
+          setWrite((current) =>
+            current.scope === scope ? { ...current, pending: false } : current,
+          );
       }
-    }
-    // 새 목표 형식이 없으면 기존 거리 목표를 읽어 브라우저에 남아 있는 설정을 이어받는다.
-    const legacyGoal = Number(localStorage.getItem('topeak.monthlyGoalKm'));
-    return { distanceKm: isGoal(legacyGoal) ? legacyGoal : null, hikeCount: null };
-  } catch {
-    return { distanceKm: null, hikeCount: null };
-  }
-}
-
-export function useMonthlyGoals() {
-  const [goals, setGoals] = useState<MonthlyGoals>(readGoals);
-  const [error, setError] = useState('');
-
-  function saveGoals(next: MonthlyGoals) {
-    if (
-      (next.distanceKm !== null && !isGoal(next.distanceKm)) ||
-      (next.hikeCount !== null && (!isGoal(next.hikeCount) || !Number.isInteger(next.hikeCount)))
-    ) {
-      setError('목표는 1~1,000 사이로 입력해 주세요. 산행 횟수는 정수로 입력해 주세요.');
-      return false;
-    }
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      setGoals(next);
-      setError('');
-      return true;
-    } catch {
-      setError('목표를 저장하지 못했어요. 브라우저 저장 공간을 확인해 주세요.');
-      return false;
-    }
-  }
-  return { goals, saveGoals, error };
+    },
+    [userId, enabled, month, scope, request, onAuthError],
+  );
+  const view = readRefreshState(enabled && userId !== null, request, result);
+  const ready = view.data !== null;
+  return {
+    goals: view.data ?? EMPTY_GOALS,
+    ready,
+    saving,
+    loading: view.loading,
+    error: view.error || (write.scope === scope ? write.error : ''),
+    saveGoals,
+    retry: () => setAttempt((value) => value + 1),
+  };
 }

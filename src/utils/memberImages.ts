@@ -1,10 +1,10 @@
-// Unscoped legacy images must never be assigned to the currently signed-in account.
+// 회원 구분 없이 저장된 구버전 이미지를 현재 로그인한 계정에 연결하지 않는다.
 export function clearLegacyMemberImages() {
   for (const key of ['topeak_custom_avatar', 'topeak_custom_banner']) {
     try {
       localStorage.removeItem(key);
     } catch {
-      // Storage may be blocked; these keys are no longer read anywhere.
+      // 저장소 접근이 차단될 수 있지만 구버전 키는 더 이상 읽지 않으므로 정리 실패를 허용한다.
     }
   }
 }

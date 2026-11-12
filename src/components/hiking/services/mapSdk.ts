@@ -29,7 +29,7 @@ export function loadMapSdk(): Promise<KakaoMaps> {
   const key = import.meta.env.VITE_KAKAO_MAP_JAVASCRIPT_KEY?.trim();
   if (!key)
     return Promise.reject(
-      new Error('지도 키가 설정되지 않았습니다. VITE_KAKAO_MAP_JAVASCRIPT_KEY를 확인해주세요.'),
+      new Error('지도 서비스가 아직 준비되지 않았습니다. 잠시 후 다시 이용해주세요.'),
     );
   pending = new Promise<KakaoMaps>((resolve, reject) => {
     const script = document.createElement('script');
@@ -39,11 +39,7 @@ export function loadMapSdk(): Promise<KakaoMaps> {
       settled = true;
       window.clearTimeout(timer);
       script.remove();
-      reject(
-        new Error(
-          '지도를 불러오지 못했습니다. 네트워크, JavaScript 키와 등록 도메인을 확인해주세요.',
-        ),
-      );
+      reject(new Error('지도를 불러오지 못했습니다. 네트워크 연결을 확인하고 다시 시도해주세요.'));
     };
     const timer = window.setTimeout(fail, 20_000);
     const ready = () => {

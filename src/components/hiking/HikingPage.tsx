@@ -1,7 +1,20 @@
+import { getErrorMessage } from '../../utils/errorMessages';
+import { scoringText } from './services/scoringDisplay';
+import {
+  submitPendingActivity,
+  describeSaveFailure,
+  type ActivitySaveFailure,
+} from './services/activitySave';
 import HikingMap from './HikingMap';
 import HikingControls from './HikingControls';
-import { useEffect, useRef, useState } from 'react';
-import { ApiError, saveHikingRecord, type HikingActivity } from '../../api';
+import MountainWeather from '../MountainWeather';
+import { trackingStopMessages } from './services/sessionTracking';
+import { canAutoRestoreRecovery } from './services/recoveryPolicy';
+import { gpsReception, gpsReceptionWarning } from './services/gpsReception';
+import { isNativeIOS } from '../../native/backgroundLocation';
+import { latestNativeDisplayPosition, stopNativeForDiscard } from './services/nativeTracking';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ApiError, type HikingActivity } from '../../api';
 import { filterMountains } from './services/mountainSearch';
 import {
   getMountains,
@@ -16,6 +29,21 @@ import { useHikingSession } from './hooks/useHikingSession';
 import { distanceMeters, formatDuration, isUsablePoint } from './trackUtils';
 import type { HikingCourse, LocationStatus } from './types';
 import './HikingPage.css';
+import { GPS_FILTER, SUMMIT_RADIUS_METERS } from './config';
+import { loadHikingSelection, type HikingSelection } from './services/hikingNavigation';
+import {
+  readRecovery,
+  writeRecovery,
+  removeRecovery,
+  recoveryKey,
+  sessionFromDraft,
+  completeSession,
+  draftFromSession,
+  validateDraft,
+  type RecoveryRead,
+  type RecoveryDraft,
+  type RecoveryContext,
+} from './services/sessionRecovery';
 
 const messages: Record<LocationStatus, string> = {
   IDLE: '현재 위치 확인 준비',
@@ -31,8 +59,359 @@ const labels = {
   PAUSED: '일시정지',
   COMPLETED: '산행 완료',
 };
+type HikingPageProps = {
+  onOpenRecords: () => void;
+  userId: number;
+  onRestoreSelection: (selection: HikingSelection) => void;
+  initialSelection: HikingSelection | null;
+  onClearSelection: () => void;
+  onWriteJournal: (record: HikingActivity) => void;
+};
+
+type SessionProps = {
+  onOpenRecords: () => void;
+  userId: number;
+  recovery: RecoveryContext | null;
+  onRecoveryRequired: () => void;
+};
+export default function HikingPage(props: HikingPageProps) {
+  if (
+    (!isNativeIOS() && !window.isSecureContext) ||
+    typeof window.crypto?.randomUUID !== 'function'
+  )
+    return (
+      <section className="hiking-page">
+        <p role="alert">
+          GPS 산행을 이용하려면 HTTPS 주소를 지원하는 최신 브라우저에서 열어주세요.
+        </p>
+      </section>
+    );
+  return <HikingSessionPage {...props} />;
+}
+
+function HikingSessionPage(props: HikingPageProps) {
+  const [pendingRecovery, setPendingRecovery] = useState<RecoveryRead>(() =>
+    readRecovery(props.userId),
+  );
+  const [recovery, setRecovery] = useState<RecoveryContext | null>(null);
+  const [recoveryError, setRecoveryError] = useState('');
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const recoveryBusyRef = useRef(false);
+  const checkRecovery = useCallback(() => {
+    setRecovery(null);
+    setPendingRecovery(readRecovery(props.userId));
+    setRecoveryError('');
+  }, [props.userId]);
+  const restore = (draft: RecoveryDraft, finish: boolean, automatic = false) => {
+    if (recoveryBusyRef.current) return;
+    try {
+      const latest = readRecovery(props.userId);
+      if (latest.kind !== 'ready' || latest.draft.clientRequestId !== draft.clientRequestId)
+        throw new Error('복구 기록이 변경되었습니다. 다시 확인을 눌러 최신 기록을 확인해주세요.');
+      // 예약된 자동 복원 전에 다른 탭이 가져간 기록을 다시 빼앗지 않는다.
+      if (
+        automatic &&
+        !canAutoRestoreRecovery(
+          latest,
+          sessionStorage.getItem(recoveryKey(props.userId)),
+          Date.now(),
+        )
+      ) {
+        setPendingRecovery(latest);
+        return;
+      }
+      draft = latest.draft;
+      const ownerToken = crypto.randomUUID();
+      const course = {
+        mountainId: String(draft.mountainId),
+        courseId: String(draft.courseId),
+        mountainName: draft.mountainName,
+        courseName: draft.courseName,
+      };
+      const nativeFinish = finish && isNativeIOS() && !!draft.native && draft.state !== 'COMPLETED';
+      const session =
+        finish && !nativeFinish
+          ? completeSession(sessionFromDraft(draft), course)
+          : sessionFromDraft(draft);
+      const claimed = draftFromSession(session, course, props.userId, ownerToken);
+      writeRecovery(claimed, 'claim');
+      try {
+        sessionStorage.setItem(recoveryKey(props.userId), ownerToken);
+      } catch {
+        /* 탭 저장소를 사용할 수 없어도 산행 기록은 보존된다. */
+      }
+      setRecovery({
+        draft: claimed,
+        ownerToken,
+        ...(nativeFinish ? { finishRequested: true } : {}),
+      });
+      setRecoveryError('');
+      props.onRestoreSelection({ mountainId: draft.mountainId, courseId: draft.courseId });
+    } catch (cause) {
+      setRecoveryError(
+        getErrorMessage(cause, '산행 기록을 복구하지 못했습니다. 다시 시도해주세요.'),
+      );
+    }
+  };
+  const autoRestoreAttempted = useRef(false);
+  useEffect(() => {
+    if (autoRestoreAttempted.current) return;
+    autoRestoreAttempted.current = true;
+    // 같은 탭의 최근 웹 기록만 자동 복원한다. 다른 탭의 소유권은 자동으로 가져오지 않는다.
+    try {
+      if (
+        pendingRecovery.kind === 'ready' &&
+        canAutoRestoreRecovery(
+          pendingRecovery,
+          sessionStorage.getItem(recoveryKey(props.userId)),
+          Date.now(),
+        )
+      )
+        queueMicrotask(() => restore(pendingRecovery.draft, false, true));
+    } catch {
+      /* 탭 저장소를 사용할 수 없으면 기존 확인 UI를 유지한다. */
+    }
+  });
+  const discard = async () => {
+    if (recoveryBusyRef.current) return;
+    if (
+      !window.confirm(
+        '서버에 저장되지 않은 이 산행 임시 기록을 삭제할까요? 삭제 후에는 복구할 수 없습니다.',
+      )
+    )
+      return;
+    recoveryBusyRef.current = true;
+    setRecoveryBusy(true);
+    try {
+      if (isNativeIOS()) {
+        // 만료된 임시 기록도 소유자와 UUID를 확인한 뒤에만 네이티브 수집을 중지한다.
+        const draft: unknown = JSON.parse(
+          localStorage.getItem(recoveryKey(props.userId)) ?? 'null',
+        );
+        if (!validateDraft(draft, props.userId))
+          throw new Error(
+            '기록 소유권을 확인하지 못해 삭제하지 않았습니다. 원본 기록을 보존했습니다.',
+          );
+        if (
+          pendingRecovery.kind === 'ready' &&
+          (draft.clientRequestId !== pendingRecovery.draft.clientRequestId ||
+            draft.ownerToken !== pendingRecovery.draft.ownerToken)
+        )
+          throw new Error(
+            '기록 소유권이 변경되어 네이티브 GPS를 중지하지 않았습니다. 다시 확인해주세요.',
+          );
+        if (pendingRecovery.kind !== 'ready' && readRecovery(props.userId).kind === 'ready')
+          throw new Error('복구 기록이 변경되었습니다. 다시 확인해주세요.');
+        await stopNativeForDiscard(
+          draft,
+          props.userId,
+          () => JSON.parse(localStorage.getItem(recoveryKey(props.userId)) ?? 'null') as unknown,
+        );
+      }
+      if (pendingRecovery.kind === 'ready')
+        removeRecovery(props.userId, pendingRecovery.draft.clientRequestId);
+      else {
+        if (readRecovery(props.userId).kind === 'ready')
+          throw new Error('복구 기록이 변경되었습니다. 다시 확인해주세요.');
+        localStorage.removeItem(recoveryKey(props.userId));
+      }
+      checkRecovery();
+    } catch (cause) {
+      setRecoveryError(cause instanceof Error ? cause.message : '임시 기록을 삭제하지 못했습니다.');
+    } finally {
+      recoveryBusyRef.current = false;
+      setRecoveryBusy(false);
+    }
+  };
+  const changeCourse = () => {
+    checkRecovery();
+    props.onClearSelection();
+  };
+  if (!recovery && pendingRecovery.kind !== 'none')
+    return (
+      <section className="hiking-page recovery-panel">
+        {pendingRecovery.kind === 'ready' ? (
+          <>
+            <h1>
+              {pendingRecovery.draft.state === 'COMPLETED'
+                ? '저장을 기다리는 산행이 있어요'
+                : '이어서 진행할 산행이 있어요'}
+            </h1>
+            {pendingRecovery.draft.version === 1 && pendingRecovery.draft.state === 'COMPLETED' && (
+              <p role="alert">
+                구버전 종료 기록의 GPS 증거가 유실되었습니다. 기존 UUID로 서버 저장 여부를
+                확인합니다. 미저장 기록은 새 API로 저장할 수 없으며 임시 기록은 보존됩니다.
+              </p>
+            )}
+            <b>{pendingRecovery.draft.mountainName}</b>
+            <p>{pendingRecovery.draft.courseName}</p>
+            <p>
+              기록 시간 {formatDuration(pendingRecovery.draft.accumulatedMs)} ·{' '}
+              {(pendingRecovery.draft.distanceMeters / 1000).toFixed(2)}km
+            </p>
+            <p>
+              {pendingRecovery.draft.state === 'COMPLETED'
+                ? '산행은 종료되었습니다. 같은 저장 요청으로 재시도합니다.'
+                : isNativeIOS() && pendingRecovery.draft.native
+                  ? '기존 UUID로 네이티브 GPS 상태와 저장 좌표를 확인합니다. 앱 강제 종료 후 수집이 중단된 시간과 이동은 임의로 더하지 않습니다.'
+                  : pendingRecovery.draft.webTracking
+                    ? '진행 중이던 산행입니다. 마지막 저장 이후 시간도 반영하며 수집되지 않은 경로와 거리는 추가하지 않습니다.'
+                    : '일시정지 상태로 복구합니다. 계속하기를 누르기 전에는 시간이 늘어나지 않습니다.'}
+            </p>
+            <div className="recovery-actions">
+              <button
+                type="button"
+                disabled={recoveryBusy}
+                onClick={() => restore(pendingRecovery.draft, false)}
+              >
+                {pendingRecovery.draft.state === 'COMPLETED'
+                  ? '종료 기록 저장 재시도'
+                  : '이어서 진행'}
+              </button>
+              {pendingRecovery.draft.state !== 'COMPLETED' && (
+                <button
+                  type="button"
+                  disabled={recoveryBusy}
+                  onClick={() => restore(pendingRecovery.draft, true)}
+                >
+                  산행 종료하고 저장
+                </button>
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <h1>산행 임시 기록 확인</h1>
+            <p role="alert">{pendingRecovery.message}</p>
+          </>
+        )}
+        {recoveryError && <p role="alert">{recoveryError}</p>}
+        <div className="recovery-actions">
+          <button type="button" disabled={recoveryBusy} onClick={checkRecovery}>
+            다시 확인
+          </button>
+          <button type="button" disabled={recoveryBusy} onClick={() => void discard()}>
+            임시 기록 삭제
+          </button>
+        </div>
+        <p className="hiking-note">
+          임시 위치 기록은 이 브라우저에 저장됩니다. 마지막 저장 후 7일간 복구할 수 있고, 만료된
+          기록은 자동 복구가 중단되며 직접 삭제할 때까지 보관됩니다. 공용 기기에서는 저장 완료 또는
+          임시 기록 삭제를 확인해주세요. 화면 잠금 중 GPS 수집은 보장되지 않습니다.
+        </p>
+      </section>
+    );
+  const selection = recovery
+    ? { mountainId: recovery.draft.mountainId, courseId: recovery.draft.courseId }
+    : props.initialSelection;
+  if (selection)
+    return (
+      <LinkedHike
+        key={`${selection.mountainId}:${selection.courseId}`}
+        selection={recovery ? recovery.draft : selection}
+        userId={props.userId}
+        recovery={recovery}
+        onRecoveryRequired={checkRecovery}
+        onChangeCourse={changeCourse}
+        onOpenRecords={props.onOpenRecords}
+        onWriteJournal={props.onWriteJournal}
+      />
+    );
+  return (
+    <CoursePicker
+      userId={props.userId}
+      recovery={null}
+      onRecoveryRequired={checkRecovery}
+      onOpenRecords={props.onOpenRecords}
+      onWriteJournal={props.onWriteJournal}
+    />
+  );
+}
+
+function LinkedHike({
+  userId,
+  recovery,
+  onRecoveryRequired,
+  selection,
+  onChangeCourse,
+  onOpenRecords,
+  onWriteJournal,
+}: SessionProps & {
+  selection: HikingSelection;
+  onChangeCourse: () => void;
+  onWriteJournal: (record: HikingActivity) => void;
+}) {
+  const [attempt, setAttempt] = useState(0);
+  const request = useMemo(() => ({ ...selection, attempt }), [selection, attempt]);
+  const [result, setResult] = useState<{
+    request: typeof request | null;
+    course: HikingCourse | null;
+    error: string;
+  }>({ request: null, course: null, error: '' });
+  useEffect(() => {
+    const controller = new AbortController();
+    loadHikingSelection(selection, controller.signal)
+      .then((course) => {
+        if (!controller.signal.aborted) setResult({ request, course, error: '' });
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted)
+          setResult({
+            request,
+            course: null,
+            error:
+              cause instanceof ApiError && cause.status === 401
+                ? '로그인 세션이 만료되었습니다. 다시 로그인해주세요.'
+                : cause instanceof ApiError && cause.status === 404
+                  ? '선택한 산 또는 등산로를 찾을 수 없습니다. 다시 선택해주세요.'
+                  : getErrorMessage(
+                      cause,
+                      '선택한 산행 경로를 불러오지 못했습니다. 다시 시도해주세요.',
+                    ),
+          });
+      });
+    return () => controller.abort();
+  }, [request, selection]);
+  if (result.request !== request)
+    return (
+      <section className="hiking-page">
+        <p role="status">선택한 산과 등산로를 확인하는 중…</p>
+      </section>
+    );
+  if (!result.course)
+    return (
+      <section className="hiking-page">
+        <div role="alert">
+          <p>{result.error}</p>
+          <button type="button" onClick={() => setAttempt((value) => value + 1)}>
+            다시 시도
+          </button>
+          <button type="button" onClick={onChangeCourse}>
+            다른 산·등산로 선택
+          </button>
+        </div>
+      </section>
+    );
+  return (
+    <ActiveHike
+      course={result.course}
+      onChangeCourse={onChangeCourse}
+      onOpenRecords={onOpenRecords}
+      onWriteJournal={onWriteJournal}
+      userId={userId}
+      recovery={recovery}
+      onRecoveryRequired={onRecoveryRequired}
+    />
+  );
+}
+
 // 실제 DB 산 목록에서 산·코스를 고른 뒤 상세 경로를 검증해 화면 내 GPS 기록 세션으로 연결한다.
-export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record: HikingActivity) => void }) {
+function CoursePicker({
+  userId,
+  onRecoveryRequired,
+  onOpenRecords,
+  onWriteJournal,
+}: SessionProps & { onWriteJournal: (record: HikingActivity) => void }) {
   const [choosing, setChoosing] = useState(false);
   const [mountains, setMountains] = useState<MountainOption[]>([]);
   const [mountain, setMountain] = useState<MountainOption | null>(null);
@@ -42,6 +421,8 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const courseRequest = useRef<AbortController | null>(null);
+  useEffect(() => () => courseRequest.current?.abort(), []);
   // 산 선택에 따라 산 목록 또는 해당 산의 코스를 조회하며, 선택 변경 뒤 이전 응답은 반영하지 않는다.
   useEffect(() => {
     if (!choosing || selected) return;
@@ -62,7 +443,7 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
             '산·코스 조회 API를 찾을 수 없습니다. 백엔드에 최신 조회 API가 적용되었는지 확인해주세요.',
           );
         } else {
-          setError(cause instanceof Error ? cause.message : '목록을 불러오지 못했습니다.');
+          setError(getErrorMessage(cause, '목록을 불러오지 못했습니다. 다시 시도해주세요.'));
         }
       })
       .finally(() => {
@@ -75,14 +456,21 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
 
   async function selectCourse(option: CourseOption) {
     if (!mountain) return;
+    courseRequest.current?.abort();
+    const controller = new AbortController();
+    courseRequest.current = controller;
     setLoading(true);
     setError('');
     try {
-      setSelected(toHikingCourse(mountain, await getCourse(option.id)));
+      const detail = await getCourse(option.id, controller.signal);
+      if (controller.signal.aborted) return;
+      if (detail.course.id !== option.id) throw new Error('선택한 등산로가 일치하지 않습니다.');
+      setSelected(toHikingCourse(mountain, detail));
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '경로를 불러오지 못했습니다.');
+      if (!controller.signal.aborted)
+        setError(getErrorMessage(cause, '경로를 불러오지 못했습니다. 다시 시도해주세요.'));
     } finally {
-      setLoading(false);
+      if (!controller.signal.aborted) setLoading(false);
     }
   }
 
@@ -91,6 +479,10 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
       <ActiveHike
         key={selected.courseId}
         course={selected}
+        userId={userId}
+        recovery={null}
+        onRecoveryRequired={onRecoveryRequired}
+        onOpenRecords={onOpenRecords}
         onWriteJournal={onWriteJournal}
         onChangeCourse={() => {
           setSelected(null);
@@ -114,20 +506,6 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
         <div className="hiking-selection">
           {!choosing ? (
             <div className="hiking-welcome">
-              <span className="hiking-welcome-icon" aria-hidden="true">
-                <svg
-                  width="44"
-                  height="44"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.7"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M2 20 9 6l5 9 3-6 5 11H2Z M7 10l2 2 2-2" />
-                </svg>
-              </span>
               <h1>어느 산에 오를까요?</h1>
               <p>산과 코스를 선택하고 산행을 시작해보세요.</p>
               <button
@@ -158,21 +536,24 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
                     setError('');
                   }}
                 >
-                  ← {mountain ? '산 목록' : '돌아가기'}</button>
+                  ← {mountain ? '산 목록' : '돌아가기'}
+                </button>
                 <h1>{mountain ? mountain.name : '산 선택하기'}</h1>
                 <p>
                   {mountain
                     ? `${mountain.city} · 높이 ${mountain.height.toLocaleString()}m`
                     : '오르고 싶은 산을 선택해주세요.'}
                 </p>
-                {!mountain && <input
+                {!mountain && (
+                  <input
                     className="hiking-search"
                     type="search"
                     aria-label="산 이름 또는 시군 검색"
                     placeholder="산 이름 또는 시·군 검색"
                     value={query}
-                    onChange={event => setQuery(event.target.value)}
-                  />}
+                    onChange={(event) => setQuery(event.target.value)}
+                  />
+                )}
               </div>
               {loading && (
                 <p className="hiking-list-message" role="status">
@@ -290,11 +671,11 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
             </dd>
           </div>
           <div>
-            <dt>등산 시간 · 휴식 제외</dt>
+            <dt>등산 시간 · 일시정지 제외</dt>
             <dd>00:00:00</dd>
           </div>
           <div>
-            <dt>평균 이동 속도</dt>
+            <dt>평균 이동 속도 · 일시정지 제외</dt>
             <dd>
               0.0 <small>km/h</small>
             </dd>
@@ -306,8 +687,12 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
           </button>
         </div>
         <p className="hiking-note">
-          화면을 켠 상태에서 이용해주세요. 화면 이탈·새로고침 시 기록이 사라집니다. 화면이
-          비활성화되면 자동 일시정지됩니다.
+          화면 잠금이나 다른 앱 전환만으로 산행이 자동 일시정지되지는 않습니다. 모바일 브라우저
+          특성상 백그라운드 GPS 위치 수집은 제한될 수 있습니다.
+        </p>
+        <p className="hiking-note">
+          GPS 이동 거리 500m 이상과 일시정지 제외 20분 이상을 모두 충족하거나, 유효한 GPS로 정상
+          도달이 확인되면 인증됩니다. 같은 날 여러 산행도 각각 인증받을 수 있습니다.
         </p>
       </div>
     </section>
@@ -317,40 +702,89 @@ export default function HikingPage({ onWriteJournal }: { onWriteJournal: (record
 // 위치 수신과 기록 상태를 분리해 일시정지 중에는 기록 누적을 멈추고 완료 시 위치 감시도 종료한다.
 // 종료한 세션의 요약을 저장한 뒤 사용자가 일지 작성을 선택한다.
 function ActiveHike({
+  userId,
+  recovery,
+  onRecoveryRequired,
   course,
   onChangeCourse,
+  onOpenRecords,
   onWriteJournal,
-}: {
+}: SessionProps & {
   course: HikingCourse;
   onChangeCourse: () => void;
   onWriteJournal: (record: HikingActivity) => void;
 }) {
-  const session = useHikingSession(course);
-  const gps = useGeolocation(session.state !== 'COMPLETED', session.onPosition);
-  const usable = gps.status === 'AVAILABLE' && gps.position && isUsablePoint(gps.position);
+  const session = useHikingSession(course, userId, recovery, onRecoveryRequired);
+  const webGps = useGeolocation(
+    !session.nativeIOS && session.state !== 'COMPLETED' && !session.trackingStopReason,
+    session.onPosition,
+  );
+  const gps = session.nativeIOS
+    ? {
+        position: latestNativeDisplayPosition(session.nativePosition, [], session.receptionNow),
+        status: (session.nativeBusy || !session.nativeKnown
+          ? 'REQUESTING'
+          : session.nativeError
+            ? 'UNAVAILABLE'
+            : session.state === 'READY'
+              ? 'IDLE'
+              : 'AVAILABLE') as LocationStatus,
+        reception: gpsReception(
+          session.startedAt,
+          session.nativeLastReceivedAt,
+          session.receptionNow,
+        ),
+        retry: session.retryNative,
+      }
+    : webGps;
+  // 네이티브 조회 중에도 이미 수신한 최신 표시용 위치는 유효하게 유지한다.
+  const usable =
+    (session.nativeIOS || gps.status === 'AVAILABLE') &&
+    gps.position &&
+    isUsablePoint(gps.position);
+  const warning = gpsReceptionWarning(session.state, gps.reception);
+  const receptionWarning = session.nativeIOS
+    ? warning?.replace('브라우저 위치 권한', 'iOS 위치 권한')
+    : warning;
   const remaining = usable ? distanceMeters(gps.position!, course.summitPoint) : null;
   const [saved, setSaved] = useState<HikingActivity | null>(null);
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState('');
+  const [saveError, setSaveError] = useState<ActivitySaveFailure | null>(null);
   const [saveAttempt, setSaveAttempt] = useState(0);
-  const pending = useRef(false);
+  const { state: sessionState, pendingInput, isDurable, markSaved } = session;
   useEffect(() => {
-    if (session.state !== 'COMPLETED' || saved || pending.current ||
-        session.startedAt === null || session.endedAt === null || !session.clientRequestId) return;
-    pending.current = true;
-    setSaving(true);
-    setSaveError('');
-    saveHikingRecord({
-      mountainId: Number(course.mountainId), courseId: Number(course.courseId),
-      startedAt: new Date(session.startedAt).toISOString(),
-      endedAt: new Date(session.endedAt).toISOString(), distanceMeters: session.distance,
-      elapsedMs: session.accumulatedMs, completed: session.reachedSummit,
-      clientRequestId: session.clientRequestId,
-    }).then(setSaved).catch((cause: unknown) => {
-      setSaveError(cause instanceof Error ? cause.message : '등산기록을 저장하지 못했습니다.');
-    }).finally(() => { pending.current = false; setSaving(false); });
-  }, [session.state, session.startedAt, session.endedAt, session.clientRequestId,
-      session.distance, session.accumulatedMs, session.reachedSummit, course, saved, saveAttempt]);
+    if (sessionState !== 'COMPLETED' || !pendingInput || !isDurable || saved) return;
+    const controller = new AbortController();
+    let active = true;
+    queueMicrotask(() => {
+      if (active) {
+        setSaving(true);
+        setSaveError(null);
+      }
+    });
+    submitPendingActivity(
+      pendingInput,
+      userId,
+      controller.signal,
+      undefined,
+      recovery?.draft.version === 1 && recovery.draft.state === 'COMPLETED',
+    )
+      .then((record) => {
+        if (!active) return;
+        markSaved();
+        setSaved(record);
+      })
+      .catch((cause: unknown) => {
+        if (active) setSaveError(describeSaveFailure(cause));
+      })
+      .finally(() => {
+        if (active) setSaving(false);
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [sessionState, pendingInput, isDurable, markSaved, saved, saveAttempt, userId, recovery]);
   return (
     <section className="hiking-page" aria-label="GPS 등산 트래킹">
       <div className="hiking-course-heading">
@@ -359,7 +793,15 @@ function ActiveHike({
           <small>{course.courseName}</small>
         </div>
         <div className="hiking-heading-actions">
-          <span className="hiking-state">{labels[session.state]}</span>
+          <span className="hiking-state">
+            {session.nativeIOS && (session.nativeBusy || !session.nativeKnown)
+              ? 'GPS 상태 확인 중'
+              : session.trackingStopReason && session.state === 'PAUSED'
+                ? 'GPS 기록 중단'
+                : session.state === 'TRACKING' && gps.reception !== 'receiving'
+                  ? 'GPS 수신 대기'
+                  : labels[session.state]}
+          </span>
           {(session.state === 'READY' || (session.state === 'COMPLETED' && saved)) && (
             <button type="button" className="hiking-back" onClick={onChangeCourse}>
               경로 변경
@@ -374,24 +816,88 @@ function ActiveHike({
         state={session.state}
       />
       <div className="hiking-panel">
+        {session.nativeError && (
+          <div role="alert" className="recovery-storage-error">
+            <p>{session.nativeError}</p>
+            {!session.nativeKnown && (
+              <p>GPS 중지 여부를 확인하지 못했습니다. 상태 확인 전에는 산행을 완료하지 않습니다.</p>
+            )}
+            <button type="button" disabled={session.nativeBusy} onClick={session.retryNative}>
+              GPS 상태 다시 확인
+            </button>
+          </div>
+        )}
+        {session.state === 'READY' && <MountainWeather mountainId={course.mountainId} />}
+        {recovery &&
+          session.clientRequestId === recovery.draft.clientRequestId &&
+          session.state !== 'READY' && (
+            <p className="hiking-note" role="status">
+              {session.state === 'COMPLETED'
+                ? '종료된 산행의 저장을 확인하고 있습니다.'
+                : session.state === 'TRACKING'
+                  ? '복구한 산행을 기록 중입니다.'
+                  : '산행 기록을 복구했습니다. 위치를 확인하고 계속하기를 눌러주세요.'}
+            </p>
+          )}
+        {session.trackingStopReason && session.state !== 'COMPLETED' && (
+          <p role="alert" className="recovery-storage-error">
+            {trackingStopMessages[session.trackingStopReason]}
+          </p>
+        )}
+        {session.storageError && (
+          <div role="alert" className="recovery-storage-error">
+            <p>{session.storageError}</p>
+            {session.state === 'READY' ? (
+              <p>저장 공간을 확인한 뒤 등산 시작을 다시 눌러주세요.</p>
+            ) : (
+              <button type="button" onClick={session.retryCheckpoint}>
+                임시 저장 다시 시도
+              </button>
+            )}
+          </div>
+        )}
         <div className="hiking-gps-status" role="status">
           {session.state === 'COMPLETED'
-            ? saved ? 'GPS 추적 종료 · 등산기록이 저장되었습니다.' : 'GPS 추적 종료 · 등산기록을 저장해주세요.'
-            : messages[gps.status]}
-          {session.state !== 'COMPLETED' && gps.status === 'AVAILABLE' && gps.position && (
-            <small>
-              정확도 ±{Math.round(gps.position.accuracy)}m
-              {!usable ? ' · 유효한 GPS 좌표를 기다립니다' : ''}
-            </small>
-          )}
+            ? saved
+              ? 'GPS 추적 종료 · 등산기록이 저장되었습니다.'
+              : 'GPS 추적 종료 · 등산기록을 저장해주세요.'
+            : session.trackingStopReason
+              ? 'GPS 수집 중단'
+              : session.state === 'PAUSED' && gps.status === 'AVAILABLE'
+                ? '산행 기록 일시정지 · 계속하기를 누르면 기록을 재개합니다.'
+                : gps.reception === 'stale' && gps.status === 'AVAILABLE'
+                  ? '새 GPS 위치 수신이 지연되고 있습니다.'
+                  : gps.reception === 'waiting' && gps.status === 'AVAILABLE'
+                    ? '새 GPS 위치를 기다리고 있습니다.'
+                    : session.nativeIOS && session.state === 'READY'
+                      ? '등산 시작 시 iOS 위치 권한을 확인합니다.'
+                      : messages[gps.status]}
           {session.state !== 'COMPLETED' &&
-            ['DENIED', 'UNAVAILABLE', 'TIMEOUT'].includes(gps.status) && (
+            !session.trackingStopReason &&
+            gps.status === 'AVAILABLE' &&
+            gps.position && (
+              <small>
+                정확도 ±{Math.round(gps.position.accuracy)}m
+                {gps.position.accuracy > GPS_FILTER.maxAccuracyMeters
+                  ? ' · 정확도가 낮아 이 위치는 기록하지 않습니다. 탁 트인 곳에서 기다려주세요.'
+                  : !usable && ' · 유효한 GPS 좌표를 기다립니다'}
+              </small>
+            )}
+          {session.state !== 'COMPLETED' &&
+            !session.trackingStopReason &&
+            (['DENIED', 'UNAVAILABLE', 'TIMEOUT'].includes(gps.status) ||
+              gps.reception === 'stale') && (
               <button type="button" onClick={gps.retry}>
                 위치 다시 확인
               </button>
             )}
         </div>
-        {session.reachedSummit && (
+        {receptionWarning && (
+          <p className="hiking-gps-warning" role={gps.reception === 'stale' ? 'alert' : 'status'}>
+            {receptionWarning}
+          </p>
+        )}
+        {(saved ? saved.completed : session.reachedSummit) && (
           <p className="hiking-summit" role="status">
             정상 도달
           </p>
@@ -408,32 +914,86 @@ function ActiveHike({
             </dd>
           </div>
           <div>
-            <dt>등산 시간 · 휴식 제외</dt>
+            <dt>등산 시간 · 일시정지 제외</dt>
             <dd>{formatDuration(session.elapsedMs)}</dd>
           </div>
           <div>
-            <dt>평균 이동 속도</dt>
+            <dt>평균 이동 속도 · 일시정지 제외</dt>
             <dd>
               {session.averageSpeed.toFixed(1)} <small>km/h</small>
             </dd>
           </div>
         </dl>
         {session.state !== 'COMPLETED' ? (
-          <HikingControls {...session} canStart={Boolean(usable)} />
+          <fieldset
+            disabled={session.nativeBusy || !session.nativeKnown}
+            style={{ border: 0, padding: 0, margin: 0 }}
+          >
+            <HikingControls {...session} canStart={session.nativeIOS || Boolean(usable)} />
+          </fieldset>
         ) : (
           <div className="hiking-controls">
             {saving && <p role="status">등산기록 저장 중…</p>}
-            {saveError && <p role="alert">{saveError}</p>}
-            {!saved && !saving && <button type="button" onClick={() => setSaveAttempt(value => value + 1)}>저장 다시 시도</button>}
-            {saved && <>
-              <button type="button" className="hiking-primary" onClick={() => onWriteJournal(saved)}>등산일지 작성</button>
-              <button type="button" onClick={() => { setSaved(null); setSaveError(''); session.reset(); }}>새 산행 준비</button>
-            </>}
+            {saveError && <p role="alert">{saveError.message}</p>}
+            {!saved &&
+              !saving &&
+              saveError?.kind !== 'conflict' &&
+              saveError?.kind !== 'rejected' && (
+                <button
+                  type="button"
+                  disabled={!session.isDurable}
+                  onClick={() => setSaveAttempt((value) => value + 1)}
+                >
+                  저장 다시 시도
+                </button>
+              )}
+            {!saved &&
+              saveError &&
+              (saveError.kind === 'conflict' || saveError.kind === 'rejected') && (
+                <button type="button" onClick={onOpenRecords}>
+                  저장된 산행 확인
+                </button>
+              )}
+            {saved && (
+              <>
+                <p role="status">{scoringText(saved.scoring)}</p>
+                <button
+                  type="button"
+                  className="hiking-primary"
+                  onClick={() => onWriteJournal(saved)}
+                >
+                  등산일지 작성
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (session.reset()) {
+                      setSaved(null);
+                      setSaveError(null);
+                    }
+                  }}
+                >
+                  새 산행 준비
+                </button>
+              </>
+            )}
           </div>
         )}
+        <p className="hiking-orientation-note" role="status">
+          세로로 돌리면 산행 화면을 더 편하게 볼 수 있어요. 기기의 세로 방향 잠금도 사용할 수
+          있습니다.
+        </p>
         <p className="hiking-note">
-          화면을 켠 상태에서 이용해주세요. 저장 전 화면 이탈·새로고침 시 기록이 사라집니다. 화면이
-          비활성화되면 자동 일시정지됩니다.
+          정상 도달 반경 {SUMMIT_RADIUS_METERS}m · GPS 정확도 {GPS_FILTER.maxAccuracyMeters}m 이내
+        </p>
+        <p className="hiking-note">
+          {session.nativeIOS
+            ? '산행 중 화면 잠금이나 앱 전환 시에도 네이티브 GPS 기록을 유지하고 복귀 시 반영합니다. 일시정지는 버튼으로 요청하세요. 앱 강제 종료 후에는 기록을 확인하고 재개해야 합니다.'
+            : '화면 잠금·앱 전환 중에도 산행 시간은 유지됩니다. 시간을 멈추려면 일시정지를 누르세요. GPS 수집이 중단된 구간의 경로와 거리는 추정하지 않습니다. 임시 기록은 7일간 복구할 수 있습니다.'}
+        </p>
+        <p className="hiking-note">
+          GPS 이동 거리 500m 이상과 일시정지 제외 20분 이상을 모두 충족하거나, 유효한 GPS로 정상
+          도달이 확인되면 인증됩니다. 같은 날 여러 산행도 각각 인증받을 수 있습니다.
         </p>
       </div>
     </section>

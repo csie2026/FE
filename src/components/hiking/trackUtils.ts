@@ -24,8 +24,8 @@ export function isUsablePoint(point: GpsPoint, now = Date.now()): boolean {
   );
 }
 // 오래된·부정확한 표본과 불가능한 속도·시간 역전을 걸러 GPS 흔들림이 산행 거리로 누적되는 것을 줄인다.
-export function acceptTrackPoint(point: GpsPoint, previous?: GpsPoint): boolean {
-  if (!isUsablePoint(point)) return false;
+export function acceptTrackPoint(point: GpsPoint, previous?: GpsPoint, now = Date.now()): boolean {
+  if (!isUsablePoint(point, now)) return false;
   if (!previous) return true;
   const seconds = (point.timestamp - previous.timestamp) / 1000;
   const distance = distanceMeters(previous, point);
@@ -43,8 +43,8 @@ export function trackDistance(segments: GpsPoint[][]): number {
     0,
   );
 }
-export function hasReachedSummit(point: GpsPoint, summit: Coordinate): boolean {
-  return isUsablePoint(point) && distanceMeters(point, summit) <= SUMMIT_RADIUS_METERS;
+export function hasReachedSummit(point: GpsPoint, summit: Coordinate, now = Date.now()): boolean {
+  return isUsablePoint(point, now) && distanceMeters(point, summit) <= SUMMIT_RADIUS_METERS;
 }
 // 각 코스 선분에 투영한 최소 거리. 짧은 산행 코스용 지역 평면 근사입니다.
 export function distanceToCourse(point: Coordinate, path: Coordinate[]): number {

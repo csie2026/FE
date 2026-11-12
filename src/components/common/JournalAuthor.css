@@ -1,0 +1,46 @@
+.journal-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.journal-author__button {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 6px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+.journal-author__button:focus-visible {
+  outline: 2px solid #176044;
+  outline-offset: 2px;
+}
+.journal-author__avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid #d5e2d4;
+  border-radius: 50%;
+  background: #e5efe0;
+  color: #315f42;
+  font-size: 12px;
+  font-weight: 700;
+}
+.journal-author__avatar img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.journal-author__name {
+  overflow-wrap: anywhere;
+}
+.journal-detail__meta > .journal-detail__author-row {
+  align-items: center;
+}

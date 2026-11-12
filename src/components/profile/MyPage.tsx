@@ -1,30 +1,31 @@
-import { useEffect, useRef, useState } from 'react';
-import type { Member, Journal, ApiError, MemberImageKind } from '../../api';
+import ProfileAvatar from '../common/ProfileAvatar';
+import { goalProgress } from '../../services/monthlyGoals';
+import { useRef, useState } from 'react';
+import { scoreText, type Member, type ApiError, type MemberImageKind } from '../../api';
 import { useCustomAvatar } from '../../hooks/useCustomAvatar';
 import { useCustomBanner } from '../../hooks/useCustomBanner';
 import type { MonthlyGoals } from '../../hooks/useMonthlyGoals';
+import { distanceKmText, type HikingStatistics } from '../../services/hikingStatistics';
 import './MyPage.css';
 
 type Props = {
   member: Member;
   onMemberUpdated: (member: Member, kind: MemberImageKind) => void;
   onAuthError: (error: ApiError) => void;
-  journals: Journal[];
-  completedCount: number;
-  totalDistanceKm: number;
-  monthlyDistanceKm: number;
+  journalCount: number | null;
+  statistics: HikingStatistics | null;
   monthlyGoals: MonthlyGoals;
-  onSaveGoals: (goals: MonthlyGoals) => boolean;
+  onSaveGoals: (goals: MonthlyGoals) => Promise<boolean>;
+  goalsReady: boolean;
+  goalsLoading: boolean;
+  goalsSaving: boolean;
+  goalsMonth: string;
+  onRetryGoals: () => void;
   goalsError: string;
   onSettings: () => void;
   onEditProfile: () => void;
   onNavigate: (screen: 'myJournals' | 'favorites' | 'conquered' | 'hikingRecords') => void;
 };
-
-function currentMonthKey() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-}
 
 function OutdoorIcon({ name }: { name: string }) {
   const paths: Record<string, string> = {
@@ -57,13 +58,16 @@ export default function MyPage({
   member,
   onMemberUpdated,
   onAuthError,
-  journals,
-  completedCount,
-  totalDistanceKm,
-  monthlyDistanceKm,
+  journalCount,
+  statistics,
   monthlyGoals,
   onSaveGoals,
   goalsError,
+  goalsReady,
+  goalsLoading,
+  goalsSaving,
+  goalsMonth,
+  onRetryGoals,
   onSettings,
   onEditProfile,
   onNavigate,
@@ -87,29 +91,18 @@ export default function MyPage({
     saveAvatar,
     removeAvatar,
   } = useCustomAvatar({ member, onMemberUpdated, onAuthError });
-  const [failedImages, setFailedImages] = useState<string[]>([]);
-  const avatarSource =
-    customAvatar && !failedImages.includes(customAvatar)
-      ? customAvatar
-      : member.profileImageUrl && !failedImages.includes(member.profileImageUrl)
-        ? member.profileImageUrl
-        : null;
-  const initials = Array.from(member.nickname.trim()).slice(-2).join('') || '나';
   const [editingGoal, setEditingGoal] = useState(false);
   const [distanceEnabled, setDistanceEnabled] = useState(monthlyGoals.distanceKm !== null);
   const [hikesEnabled, setHikesEnabled] = useState(monthlyGoals.hikeCount !== null);
   const [distanceDraft, setDistanceDraft] = useState(String(monthlyGoals.distanceKm ?? 80));
   const [hikesDraft, setHikesDraft] = useState(String(monthlyGoals.hikeCount ?? 4));
-  const [monthKey, setMonthKey] = useState(currentMonthKey);
-  useEffect(() => {
-    const timer = window.setInterval(() => setMonthKey(currentMonthKey()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
-  // 월간 산행 횟수는 일지 날짜로 집계하며, 거리 값은 부모가 전달하는 별도 지표를 사용한다.
-  const monthlyHikes = journals.filter((journal) => journal.hikingDate.startsWith(monthKey)).length;
+  const monthlyHikes = statistics?.monthlyHikeCount ?? null;
+  const monthlyDistanceKm = statistics ? statistics.monthlyDistanceMeters / 1000 : null;
+  const totalDistanceKm = statistics ? statistics.totalDistanceMeters / 1000 : null;
+  const completedCount = statistics?.completedHikeCount ?? null;
   const stats: {
     label: string;
-    value: number;
+    value: number | null;
     unit: string;
     icon: string;
     goal?: number | null;
@@ -119,24 +112,31 @@ export default function MyPage({
       value: monthlyHikes,
       unit: '회',
       icon: 'route',
-      goal: monthlyGoals.hikeCount,
+      goal: goalsReady ? monthlyGoals.hikeCount : null,
     },
     {
       label: '이번 달 거리',
       value: monthlyDistanceKm,
       unit: 'km',
-      goal: monthlyGoals.distanceKm,
+      goal: goalsReady ? monthlyGoals.distanceKm : null,
       icon: 'distance',
     },
     {
       label: '내 점수',
-      value: member.score ?? 0,
+      value: member.score,
       unit: '점',
       icon: 'star',
     },
     { label: '완등 횟수', value: completedCount, unit: '회', icon: 'mountain' },
-    { label: '총 산행', value: journals.length, unit: '회', icon: 'flag' },
+    { label: '총 산행', value: statistics?.totalHikeCount ?? null, unit: '회', icon: 'flag' },
     { label: '총 거리', value: totalDistanceKm, unit: 'km', icon: 'distance' },
+    {
+      label: '완등한 산',
+      value: statistics?.completedMountainCount ?? null,
+      unit: '개',
+      icon: 'mountain',
+    },
+    { label: '등산일지', value: journalCount, unit: '개', icon: 'camera' },
   ];
   const goalItems = [
     {
@@ -146,9 +146,10 @@ export default function MyPage({
       unit: 'km',
     },
     { label: '이번 달 산행', current: monthlyHikes, target: monthlyGoals.hikeCount, unit: '회' },
-  ].filter((item) => item.target !== null);
+  ].filter((item) => goalsReady && item.target !== null);
 
   function openGoalSettings() {
+    if (!goalsReady || goalsLoading || goalsSaving) return;
     setDistanceEnabled(monthlyGoals.distanceKm !== null);
     setHikesEnabled(monthlyGoals.hikeCount !== null);
     setDistanceDraft(String(monthlyGoals.distanceKm ?? 80));
@@ -157,9 +158,10 @@ export default function MyPage({
     goalDialogRef.current?.showModal();
   }
 
-  function saveGoal(event: React.FormEvent<HTMLFormElement>) {
+  async function saveGoal(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const saved = onSaveGoals({
+    if (goalsSaving) return;
+    const saved = await onSaveGoals({
       distanceKm: distanceEnabled ? Number(distanceDraft) : null,
       hikeCount: hikesEnabled ? Number(hikesDraft) : null,
     });
@@ -240,18 +242,12 @@ export default function MyPage({
             disabled={isSaving}
             onClick={() => fileInputRef.current?.click()}
           >
-            <span className={`my-profile-card__avatar${avatarSource ? '' : ' is-initials'}`}>
-              {avatarSource ? (
-                <img
-                  src={avatarSource}
-                  alt={`${member.nickname}님의 프로필 사진`}
-                  referrerPolicy="no-referrer"
-                  onError={() => setFailedImages((previous) => [...previous, avatarSource])}
-                />
-              ) : (
-                initials
-              )}
-            </span>
+            <ProfileAvatar
+              userId={member.userId}
+              nickname={member.nickname}
+              src={member.profileImageUrl}
+              className="my-profile-card__avatar"
+            />
             <span className="my-avatar-camera" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M8 6 9.5 3h5L16 6h4v14H4V6h4Z" />
@@ -269,7 +265,6 @@ export default function MyPage({
               const file = event.currentTarget.files?.[0];
               event.currentTarget.value = '';
               if (file) {
-                setFailedImages([]);
                 void saveAvatar(file);
               }
             }}
@@ -316,9 +311,15 @@ export default function MyPage({
             <div key={label}>
               <OutdoorIcon name={icon} />
               <strong>
-                {value.toLocaleString()}
-                <small> {unit}</small>
-                {goal != null && (
+                {label === '내 점수'
+                  ? scoreText(member.score)
+                  : value === null
+                    ? '—'
+                    : unit === 'km'
+                      ? distanceKmText(value * 1000)
+                      : value.toLocaleString()}
+                {label !== '내 점수' && <small> {unit}</small>}
+                {goal != null && value !== null && (
                   <small>
                     {' '}
                     / {goal.toLocaleString()} {unit}
@@ -326,7 +327,7 @@ export default function MyPage({
                 )}
               </strong>
               <span>{label}</span>
-              {goal != null && (
+              {goal != null && value !== null && (
                 <div className="stat-goal">
                   <div
                     className="stat-goal__bar"
@@ -334,17 +335,20 @@ export default function MyPage({
                     aria-label={`${label} 목표 달성률`}
                     aria-valuemin={0}
                     aria-valuemax={100}
-                    aria-valuenow={Math.min(100, Math.round((value / goal) * 100))}
+                    aria-valuenow={goalProgress(value, goal) ?? 0}
                   >
-                    <span style={{ width: `${Math.min(100, (value / goal) * 100)}%` }} />
+                    <span style={{ width: `${goalProgress(value, goal) ?? 0}%` }} />
                   </div>
-                  <small>{Math.min(100, Math.round((value / goal) * 100))}% 달성</small>
+                  <small>{goalProgress(value, goal) ?? 0}% 달성</small>
                 </div>
               )}
             </div>
           ))}
         </div>
-        <p className="my-stats-note">산행 횟수는 등산일지 기준 · 완등은 직접 등록한 산 기준</p>
+        <p className="my-stats-note">
+          산행 횟수는 인증된 활동, 완등 횟수는 GPS 정상 도달이 검증되고 인증된 활동 기준입니다.
+          거리는 저장된 전체 활동 기준이며, 등산일지 개수와 별도로 계산됩니다.
+        </p>
       </section>
       <section className="monthly-challenge">
         <div className="monthly-challenge__heading">
@@ -352,55 +356,81 @@ export default function MyPage({
             <span>ToPeak Challenge</span>
             <h2>이번 달 정복 목표</h2>
           </div>
-          <button type="button" aria-label="이번 달 목표 수정" onClick={openGoalSettings}>
+          <button
+            type="button"
+            aria-label="이번 달 목표 수정"
+            disabled={!goalsReady || goalsLoading || goalsSaving}
+            onClick={openGoalSettings}
+          >
             ✎
           </button>
         </div>
-        {goalItems.length === 0 && (
+        <p className="monthly-challenge__note">{goalsMonth.replace('-', '년 ')}월 목표</p>
+        {goalsLoading && <p role="status">이번 달 목표를 불러오는 중…</p>}
+        {!goalsReady && goalsError && (
+          <div role="alert">
+            <p>{goalsError}</p>
+            <button type="button" onClick={onRetryGoals}>
+              목표 다시 불러오기
+            </button>
+          </div>
+        )}
+        {goalsReady && goalItems.length === 0 && (
           <p className="monthly-challenge__empty">
             거리 또는 산행 횟수를 선택해 나만의 목표를 설정해보세요.
           </p>
         )}
         {goalItems.map((item) => {
-          const progress = Math.min(100, Math.round((item.current / (item.target ?? 1)) * 100));
+          const progress = goalProgress(item.current, item.target);
           return (
             <div className="monthly-challenge__goal" key={item.label}>
               <div className="monthly-challenge__content">
                 <strong>{item.label}</strong>
                 <b className="monthly-challenge__amount">
-                  {item.current.toLocaleString()}
-                  {' '}
+                  {item.current === null
+                    ? '—'
+                    : item.unit === 'km'
+                      ? distanceKmText(item.current * 1000)
+                      : item.current.toLocaleString()}{' '}
                   <small>
                     / {item.target?.toLocaleString()} {item.unit}
                   </small>
                 </b>
               </div>
-              <div
-                className="monthly-challenge__track"
-                role="progressbar"
-                aria-label={`${item.label} 목표 달성률`}
-                aria-valuenow={progress}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <span
-                  className="monthly-challenge__indicator"
-                  style={{ left: `clamp(10px, ${progress}%, calc(100% - 10px))` }}
-                >
-                  <OutdoorIcon name="flag" />
-                </span>
-                <div className="monthly-challenge__bar">
-                  <span style={{ width: `${progress}%` }} />
-                </div>
-              </div>
-              <div className="monthly-challenge__footer">
-                <span>{progress === 100 ? '목표를 달성했어요!' : '나의 발걸음'}</span>
-                <b>{progress}% 달성</b>
-              </div>
+              {progress === null ? (
+                <p className="monthly-challenge__note">
+                  산행 통계를 확인한 뒤 달성률을 표시합니다.
+                </p>
+              ) : (
+                <>
+                  <div
+                    className="monthly-challenge__track"
+                    role="progressbar"
+                    aria-label={`${item.label} 목표 달성률`}
+                    aria-valuenow={progress}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                  >
+                    <span
+                      className="monthly-challenge__indicator"
+                      style={{ left: `clamp(10px, ${progress}%, calc(100% - 10px))` }}
+                    >
+                      <OutdoorIcon name="flag" />
+                    </span>
+                    <div className="monthly-challenge__bar">
+                      <span style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+                  <div className="monthly-challenge__footer">
+                    <span>{progress === 100 ? '목표를 달성했어요!' : '나의 발걸음'}</span>
+                    <b>{progress}% 달성</b>
+                  </div>
+                </>
+              )}
             </div>
           );
         })}
-        {monthlyGoals.distanceKm !== null && monthlyDistanceKm === 0 && (
+        {goalsReady && monthlyGoals.distanceKm !== null && monthlyDistanceKm === 0 && (
           <small className="monthly-challenge__note">
             산행 거리 데이터가 있는 기록이 아직 없습니다.
           </small>
@@ -441,13 +471,16 @@ export default function MyPage({
         ref={goalDialogRef}
         className="my-goal-dialog"
         onClose={() => setEditingGoal(false)}
+        onCancel={(event) => {
+          if (goalsSaving) event.preventDefault();
+        }}
         aria-labelledby="my-goal-title"
       >
         {editingGoal && (
           <form onSubmit={saveGoal} onClick={(event) => event.stopPropagation()}>
             <h2 id="my-goal-title">이번 달 정복 목표</h2>
-            <p>원하는 목표를 선택해 설정하세요.</p>
-            <fieldset className="my-goal-option">
+            <p>{goalsMonth.replace('-', '년 ')}월 목표를 설정하세요. 이전 달 목표는 유지됩니다.</p>
+            <fieldset className="my-goal-option" disabled={goalsSaving}>
               <label>
                 <input
                   type="checkbox"
@@ -463,7 +496,7 @@ export default function MyPage({
                   type="number"
                   min="1"
                   max="1000"
-                  step="0.1"
+                  step="0.001"
                   disabled={!distanceEnabled}
                   required={distanceEnabled}
                   value={distanceDraft}
@@ -471,7 +504,7 @@ export default function MyPage({
                 />
               </label>
             </fieldset>
-            <fieldset className="my-goal-option">
+            <fieldset className="my-goal-option" disabled={goalsSaving}>
               <label>
                 <input
                   type="checkbox"
@@ -501,10 +534,16 @@ export default function MyPage({
               </p>
             )}
             <div>
-              <button type="button" onClick={() => goalDialogRef.current?.close()}>
+              <button
+                type="button"
+                disabled={goalsSaving}
+                onClick={() => goalDialogRef.current?.close()}
+              >
                 취소
               </button>
-              <button type="submit">저장</button>
+              <button type="submit" disabled={goalsSaving}>
+                {goalsSaving ? '저장 중…' : '저장'}
+              </button>
             </div>
           </form>
         )}

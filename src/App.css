@@ -56,7 +56,8 @@
   color: #17261f;
   font-size: 22px;
   padding: 5px;
-  min-width: 38px;
+  min-width: 44px;
+  min-height: 44px;
 }
 .back {
   font-size: 23px;
@@ -88,6 +89,118 @@
 }
 .scroll-content::-webkit-scrollbar {
   display: none;
+}
+.about-content {
+  padding-top: 24px;
+  /* 최상위 앱 컨테이너에서 기기의 안전 영역 여백을 이미 확보한다. */
+  padding-bottom: 32px;
+  overflow-wrap: anywhere;
+}
+.about-content p,
+.about-content li {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #526357;
+}
+.about-intro {
+  text-align: center;
+  padding: 8px 4px 24px;
+}
+.about-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin-bottom: 12px;
+}
+.about-intro h1 {
+  margin: 0 0 10px;
+  font-size: 28px;
+  color: #244d36;
+}
+.about-content .about-tagline {
+  color: #244d36;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.about-intro > p:last-child {
+  margin-bottom: 0;
+}
+.about-section {
+  margin-bottom: 28px;
+}
+.scroll-content.about-content h2 {
+  font-size: 17px;
+  margin: 0 0 14px;
+}
+.about-features {
+  display: grid;
+  gap: 10px;
+}
+.about-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #fbfbf7;
+  border: 1px solid #d8ddd5;
+  border-radius: 14px;
+}
+.about-feature > div {
+  min-width: 0;
+}
+.about-feature-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: #e4e9df;
+  color: #244d36;
+}
+.about-feature-icon svg {
+  width: 24px;
+  height: 24px;
+}
+.about-content .about-feature h3 {
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+.about-feature p {
+  margin: 0;
+}
+.about-steps {
+  padding-left: 24px;
+  margin: 0;
+}
+.about-steps li {
+  padding: 5px 0 5px 5px;
+}
+.about-steps li::marker {
+  color: #244d36;
+  font-weight: 700;
+}
+.about-notice {
+  padding: 18px;
+  border-radius: 14px;
+  background: #e4e9df;
+}
+.about-notice ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.about-notice li + li {
+  margin-top: 8px;
+}
+.about-project {
+  border-top: 1px solid #d8ddd5;
+  padding-top: 20px;
+  text-align: center;
+}
+.about-project p {
+  margin: 4px 0 0;
+  font-size: 12px;
 }
 .search {
   height: 42px;
@@ -281,13 +394,10 @@
   border: 1px solid #e2e5df;
   background: white;
   border-radius: 14px;
-  padding: 8px;
+  padding: 0;
   margin: 7px 0;
   text-align: left;
   color: #17261f;
-}
-.mountain-card {
-  padding: 0;
 }
 .mountain-card__main {
   min-width: 0;
@@ -295,7 +405,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px;
+  padding: 12px 14px;
   border: 0;
   background: transparent;
   color: inherit;
@@ -327,34 +437,12 @@
   background: #edf6ee;
   color: #2e7d32;
 }
-.mountain-card__main .mountain-art.small {
-  width: 57px;
-  height: 48px;
-  flex: none;
-}
 .mountain-card__main .mountain-info {
   min-width: 0;
+  flex: 1;
 }
 .mountain-card__main .badge {
   margin-left: auto;
-}
-.mountain-art {
-  height: 170px;
-  width: 100%;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #dce9db;
-}
-.mountain-art svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.mountain-art.small {
-  width: 57px;
-  height: 48px;
-  flex: none;
-  border-radius: 9px;
 }
 .mountain-info {
   min-width: 0;
@@ -457,77 +545,6 @@
   background: #176044;
   color: #fff;
 }
-.trail-map {
-  flex: 1;
-  min-height: 0;
-  position: relative;
-  overflow: hidden;
-}
-.trail-map .map-pattern {
-  inset: -40px;
-}
-.trail-line {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.live-pill {
-  position: absolute;
-  top: 14px;
-  left: 16px;
-  background: #fff;
-  border-radius: 20px;
-  padding: 7px 10px;
-  font-size: 11px;
-  color: #235a40;
-}
-.map-control {
-  position: absolute;
-  right: 14px;
-  top: 14px;
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  background: #fff;
-  display: grid;
-  place-items: center;
-}
-.map-control.second {
-  top: 55px;
-}
-.trail-start {
-  position: absolute;
-  bottom: 30px;
-  left: 39%;
-  background: #fff;
-  border-radius: 4px;
-  padding: 3px 7px;
-  font-size: 10px;
-}
-.hike-panel {
-  flex: none;
-  padding: 8px 18px 0;
-  background: #fff;
-  border-radius: 18px 18px 0 0;
-}
-.hike-stats {
-  display: flex;
-  justify-content: space-between;
-  padding: 5px 10px;
-}
-.hike-stats b {
-  font-size: 20px;
-}
-.hike-stats.timer {
-  padding-top: 6px;
-}
-.timer b:first-child {
-  font-size: 24px;
-}
-.hike-panel .bottom-actions {
-  padding: 12px 0 16px;
-}
 .diary-card {
   position: relative;
   display: flex;
@@ -539,7 +556,8 @@
   border: 1px solid #e0e4dd;
   border-radius: 14px;
 }
-.diary-card > div:nth-child(2) {
+.diary-card > .diary-card__body {
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 5px;
@@ -792,9 +810,9 @@
   text-align: center;
   color: #14563f;
 }
-.brand-mark svg {
-  width: 170px;
-  height: 145px;
+.brand-mark img {
+  width: 238px;
+  height: 203px;
   display: block;
   margin: auto;
 }
@@ -818,6 +836,7 @@
 }
 .social {
   flex: none;
+  color: #000;
   height: 48px;
   border: 1px solid #dfe3db;
   border-radius: 12px;
@@ -906,9 +925,34 @@
   font-size: 14px;
   line-height: 1.8;
 }
-.diary-card > div:nth-child(2) {
+.diary-card > .diary-card__body {
   min-width: 0;
   padding-right: 35px;
+}
+.hiking-recovery-notice {
+  padding: 12px 16px;
+  background: #eef5e7;
+  color: #284633;
+  border-bottom: 1px solid #bacbb1;
+}
+.hiking-recovery-notice p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.hiking-recovery-notice > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.hiking-recovery-notice button {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid #bacbb1;
+  border-radius: 8px;
+  background: #fff;
+  color: #284633;
+  cursor: pointer;
 }
 .error-banner {
   padding: 12px;
@@ -1120,10 +1164,10 @@ button:disabled {
   background: radial-gradient(ellipse at 50% 43%, #e6efe3 0%, transparent 57%), #fafaf5;
 }
 .brand-mark {
-  width: min(290px, 100%);
+  width: min(294px, 100%);
 }
-.brand-mark svg {
-  width: min(210px, 100%);
+.brand-mark img {
+  width: min(294px, 100%);
   height: auto;
 }
 .brand-mark strong {
@@ -1176,26 +1220,6 @@ button:disabled {
 .collection-mountain {
   margin: 9px 0;
 }
-.collection-complete,
-.collection-dialog-complete {
-  width: 100%;
-  min-height: 38px;
-  margin-top: 6px;
-  border: 1px solid #cfdcce;
-  border-radius: 12px;
-  background: #fff;
-  color: #365941;
-  font-size: 11px;
-  font-weight: 700;
-}
-.collection-complete.is-complete {
-  border-color: #2d4b39;
-  background: #2d4b39;
-  color: #fff;
-}
-.collection-dialog-complete {
-  padding: 0 12px;
-}
 @media (prefers-reduced-motion: reduce) {
   .auth-loading__spinner,
   .monthly-challenge__bar span,
@@ -1242,4 +1266,130 @@ button:disabled {
   height: 7px;
   border-radius: 50%;
   background: #246245;
+}
+
+.mountain-course-info {
+  margin: 16px 0;
+}
+.mountain-course-info p {
+  font-size: 12px;
+  color: #53665a;
+}
+.mountain-course-info ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.mountain-course-info li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid #dce5df;
+  overflow-wrap: anywhere;
+}
+.mountain-course-info li > b {
+  grid-column: 1 / -1;
+  font-size: 15px;
+  font-weight: 600;
+}
+.mountain-course-info li span {
+  font-size: 12px;
+  color: #617164;
+}
+
+.course-start-button {
+  grid-column: 2;
+  grid-row: 2;
+  justify-self: end;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  border: 1px solid #d4dfd4;
+  border-radius: 8px;
+  padding: 6px 10px;
+  background: #edf3ed;
+  color: #3c5e4b;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.course-start-button svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (hover: hover) {
+  .course-start-button:hover {
+    background: #e1ece1;
+    border-color: #b9cdbb;
+  }
+}
+.course-start-button:focus-visible {
+  outline: 3px solid #7cad88;
+  outline-offset: 3px;
+}
+
+.completion-message {
+  margin: 12px 16px;
+  color: #53665a;
+  font-size: 13px;
+}
+
+.diary-card .journal-content {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.public-profile__name {
+  margin: 0;
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.public-profile__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 8px;
+}
+.public-profile__stats > div {
+  padding: 16px 8px;
+  border: 1px solid #e0e4dc;
+  border-radius: 14px;
+  background: #fff;
+  text-align: center;
+}
+.public-profile__stats dt {
+  color: #657268;
+  font-size: 12px;
+}
+.public-profile__stats dd {
+  margin: 10px 0 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #176044;
+  overflow-wrap: anywhere;
+}
+.public-profile__note {
+  font-size: 11px;
+  color: #657268;
+  line-height: 1.6;
+}
+.public-profile__error button {
+  padding: 10px 16px;
+  border: 1px solid #c5d3c5;
+  border-radius: 10px;
+  background: #fff;
+  color: #176044;
+  cursor: pointer;
 }

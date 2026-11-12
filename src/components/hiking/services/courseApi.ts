@@ -1,4 +1,5 @@
-import { api } from '../../../api.ts';
+import { validApiResponse } from '../../../services/responseValidation.ts';
+import { api, ApiError } from '../../../api.ts';
 import type { HikingCourse } from '../types';
 
 export type MountainOption = {
@@ -25,15 +26,31 @@ export type CourseOption = {
   source: 'FOREST' | 'OSM';
 };
 export type CourseDetail = { course: CourseOption; path: [number, number][] };
-export const getMountains = () => api<MountainOption[]>('/api/mountains');
-export const getCourses = (id: number) => api<CourseOption[]>(`/api/mountains/${id}/courses`);
-export const getCourse = (id: number) => api<CourseDetail>(`/api/courses/${id}`);
+export const getMountains = (signal?: AbortSignal) =>
+  api<MountainOption[]>('/api/mountains', 'GET', undefined, signal);
+export const getCourses = (id: number, signal?: AbortSignal) =>
+  api<CourseOption[]>(`/api/mountains/${id}/courses`, 'GET', undefined, signal);
+export const getCourse = (id: number, signal?: AbortSignal) =>
+  api<CourseDetail>(`/api/courses/${id}`, 'GET', undefined, signal);
 
 // 선택한 산과 코스의 DB 관계를 확인하고 GeoJSON의 [경도, 위도]를 지도용 좌표 객체로 바꾼다.
 // 문자열 ID로 변환해도 원래 산·코스 ID의 연결은 유지한다.
 export function toHikingCourse(mountain: MountainOption, detail: CourseDetail): HikingCourse {
   if (
+    !validApiResponse('/api/mountains', 'GET', [mountain]) ||
+    !validApiResponse('/api/courses/1', 'GET', detail) ||
+    !Number.isSafeInteger(mountain.id) ||
+    mountain.id <= 0 ||
+    !Number.isSafeInteger(detail.course.id) ||
+    detail.course.id <= 0 ||
     detail.course.mountainId !== mountain.id ||
+    ![mountain.lat, mountain.lng, detail.course.startLat, detail.course.startLng].every(
+      Number.isFinite,
+    ) ||
+    Math.abs(mountain.lat) > 90 ||
+    Math.abs(mountain.lng) > 180 ||
+    Math.abs(detail.course.startLat) > 90 ||
+    Math.abs(detail.course.startLng) > 180 ||
     detail.path.length < 2 ||
     detail.path.some(
       (p) =>
@@ -44,7 +61,11 @@ export function toHikingCourse(mountain: MountainOption, detail: CourseDetail): 
         Math.abs(p[1]) > 90,
     )
   ) {
-    throw new Error('코스 경로를 확인할 수 없습니다. 다른 코스를 선택해주세요.');
+    throw new ApiError(
+      200,
+      '코스 경로를 확인할 수 없습니다. 다른 코스를 선택해주세요.',
+      'invalid_response',
+    );
   }
   return {
     courseId: String(detail.course.id),

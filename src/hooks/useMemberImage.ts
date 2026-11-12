@@ -1,3 +1,4 @@
+import { getErrorMessage } from '../utils/errorMessages';
 import { useEffect, useRef, useState } from 'react';
 import {
   ApiError,
@@ -29,7 +30,7 @@ export function useMemberImage(kind: MemberImageKind, options: MemberImageOption
   );
 
   async function changeImage(file?: File) {
-    // Do not let duplicate taps reorder writes to the same server image.
+    // 연속 클릭으로 동일한 서버 이미지의 변경 요청 순서가 뒤바뀌지 않게 한다.
     if (pending.current) return;
     const controller = new AbortController();
     pending.current = controller;
@@ -44,9 +45,9 @@ export function useMemberImage(kind: MemberImageKind, options: MemberImageOption
           kind === 'profile' ? 0.85 : 0.75,
         );
         if (controller.signal.aborted) return;
-        updated = await uploadMemberImage(kind, prepared, controller.signal);
+        updated = await uploadMemberImage(kind, prepared, controller.signal, member.userId);
       } else {
-        updated = await deleteMemberImage(kind, controller.signal);
+        updated = await deleteMemberImage(kind, controller.signal, member.userId);
       }
       if (controller.signal.aborted) return;
       // 요청 중 서버 세션의 계정이 바뀌어도 다른 회원의 이미지 상태가 현재 화면에 섞이지 않게 한다.
@@ -55,9 +56,7 @@ export function useMemberImage(kind: MemberImageKind, options: MemberImageOption
       onMemberUpdated(updated, kind);
     } catch (cause) {
       if (controller.signal.aborted) return;
-      setError(
-        cause instanceof Error ? cause.message : '사진을 변경하지 못했어요. 다시 시도해 주세요.',
-      );
+      setError(getErrorMessage(cause, '사진을 변경하지 못했어요. 다시 시도해 주세요.'));
       if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
     } finally {
       if (pending.current === controller) {

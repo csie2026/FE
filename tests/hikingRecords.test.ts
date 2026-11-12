@@ -1,3 +1,4 @@
+import { activityResponse, journalResponse } from './fixtures.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createJournal, updateJournal, getHikingRecords, saveHikingRecord, ApiError } from '../src/api.ts';
@@ -9,7 +10,7 @@ test('journal creation selects an owned record without submitting mountain or da
     requests.push([String(url), init]);
     return new Response(JSON.stringify(String(url) === '/api/csrf'
       ? { headerName: 'X-CSRF-TOKEN', token: 'current-session' }
-      : { id: 9, hikingRecordId: 42 }));
+      : journalResponse()));
   };
   try {
     await createJournal({ hikingRecordId: 42, title: 'Trip', content: 'Review', isPublic: false });
@@ -49,7 +50,7 @@ test('activity save retries keep their idempotency key and list retains journal 
       writes.push(JSON.parse(init.body as string));
       return new Response(JSON.stringify({ id: 4, journalId: null }));
     }
-    return new Response(JSON.stringify([{ id: 4, journalId: 9 }, { id: 5, journalId: null }]));
+    return new Response(JSON.stringify([activityResponse({ id: 4, journalId: 9 }), activityResponse({ id: 5, journalId: null })]));
   };
   try {
     assert.equal((await saveHikingRecord(input)).id, 4);

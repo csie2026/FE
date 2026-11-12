@@ -1,29 +1,38 @@
-import { useState } from 'react';
+import { useCallback, useMemo, useSyncExternalStore } from 'react';
+import { createMemberFavoritesStore, EMPTY_FAVORITES } from '../services/memberFavorites';
 
-const readIds = (key: string): string[] => {
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem(key) ?? '[]');
-    return Array.isArray(value) && value.every((id) => typeof id === 'string') ? value : [];
-  } catch {
-    return [];
-  }
-};
+const favorites = createMemberFavoritesStore(() => window.localStorage);
 
-// 관심·완등 표시를 브라우저 저장소에 유지하는 UI 상태이며 회원별 서버 기록과는 별개다.
-export function usePersistentIds(key: string) {
-  const [ids, setIds] = useState<string[]>(() => readIds(key));
-
-  function toggle(id: string) {
-    setIds((current) => {
-      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
-      try {
-        localStorage.setItem(key, JSON.stringify(next));
-      } catch {
-        // Keep the in-memory interaction available when browser storage is disabled.
+// 저장 키를 userId에 맞춰 즉시 전환해 로그인·로그아웃·계정 변경 후
+// 이펙트 실행을 기다리는 동안에도 이전 회원의 목록이 노출되지 않게 한다.
+export function usePersistentIds(userId: number | null, knownMountainIds: ReadonlySet<string>) {
+  const getSnapshot = useCallback(() => favorites.snapshot(userId), [userId]);
+  const subscribe = useCallback((listener: () => void) => {
+    const unsubscribe = favorites.subscribe(listener);
+    const sync = (event: StorageEvent) => {
+      if (event.storageArea !== null) {
+        try {
+          if (event.storageArea !== window.localStorage) return;
+        } catch {
+          return;
+        }
       }
-      return next;
-    });
-  }
-
-  return { ids, toggle };
+      favorites.externalChange(event.key);
+    };
+    window.addEventListener('storage', sync);
+    return () => {
+      unsubscribe();
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+  const current = useSyncExternalStore(subscribe, getSnapshot, () => EMPTY_FAVORITES);
+  const ids = useMemo(
+    () => current.ids.filter((id) => knownMountainIds.has(id)),
+    [current, knownMountainIds],
+  );
+  const toggle = useCallback(
+    (id: string) => favorites.toggle(userId, id, knownMountainIds),
+    [userId, knownMountainIds],
+  );
+  return { ids, toggle, error: current.error };
 }

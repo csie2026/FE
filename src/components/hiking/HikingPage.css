@@ -24,19 +24,8 @@
   padding: 36px 24px;
   text-align: center;
 }
-.hiking-welcome-icon {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
-  background: #e4eddc;
-  color: #31583e;
-  font-size: 44px;
-}
 .hiking-welcome h1 {
-  margin: 24px 0 8px;
+  margin: 0 0 8px;
   font-size: 24px;
   color: #284633;
 }
@@ -70,6 +59,8 @@
   font-size: 13px;
 }
 .hiking-back {
+  min-height: 44px;
+  min-width: 44px;
   align-self: flex-start;
   border: 0;
   background: transparent;
@@ -89,7 +80,7 @@
   padding: 13px;
   background: white;
   font: inherit;
-  font-size: 14px;
+  font-size: 16px;
 }
 .hiking-option-list {
   padding: 0 18px 24px;
@@ -321,6 +312,16 @@
   display: block;
   font-size: 10px;
 }
+.hiking-gps-warning {
+  margin: 10px 0;
+  padding: 10px 12px;
+  border: 1px solid #d6a64a;
+  border-radius: 8px;
+  background: #fff5db;
+  color: #674615;
+  font-size: 13px;
+  line-height: 1.6;
+}
 .hiking-gps-status button {
   display: block;
   margin-top: 7px;
@@ -357,10 +358,19 @@
 }
 .hiking-controls {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
+.hiking-controls > p {
+  flex: 0 0 100%;
+  min-width: 0;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
 .hiking-controls button {
-  flex: 1;
+  flex: 1 1 140px;
   min-width: 0;
   min-height: 46px;
   padding: 10px 6px;
@@ -370,6 +380,7 @@
   background: #f3f6ec;
   font-weight: 700;
   font-size: 13px;
+  white-space: nowrap;
 }
 .hiking-controls .hiking-primary {
   background: #31583e;
@@ -397,5 +408,54 @@
   }
   .hiking-state {
     font-size: 10px;
+  }
+}
+
+.recovery-panel {
+  padding: 24px 20px;
+  gap: 10px;
+}
+.recovery-panel h1 {
+  font-size: 21px;
+  margin: 0 0 12px;
+  color: #284633;
+}
+.recovery-panel p {
+  line-height: 1.7;
+  font-size: 13px;
+  margin: 4px 0 10px;
+}
+.recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+.recovery-actions button,
+.recovery-storage-error button {
+  border: 1px solid #c9d8ca;
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: #edf3ed;
+  color: #31583e;
+  font: inherit;
+  font-size: 13px;
+}
+.recovery-storage-error {
+  padding: 10px;
+  border: 1px solid #d8c6a7;
+  border-radius: 8px;
+  background: #fff8ed;
+  font-size: 12px;
+}
+
+.hiking-orientation-note {
+  display: none;
+}
+@media (orientation: landscape) and (pointer: coarse) and (max-height: 600px) {
+  .hiking-orientation-note {
+    display: block;
+    font-size: 12px;
+    color: #31583e;
   }
 }

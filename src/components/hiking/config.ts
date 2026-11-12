@@ -5,4 +5,4 @@ export const GPS_FILTER = {
   maxSampleAgeMs: 15_000,
   maxGapMs: 30_000,
 } as const;
-export const SUMMIT_RADIUS_METERS = 50;
+export const SUMMIT_RADIUS_METERS = 30;
