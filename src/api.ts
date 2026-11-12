@@ -11,6 +11,10 @@ export interface PublicProfile {
   profileImageUrl: string | null;
   score: number | null;
 }
+export interface PublicProfileDetails extends PublicProfile {
+  totalHikeCount: number;
+  completedHikeCount: number;
+}
 export interface RankingMember {
   userId: number;
   nickname: string | null;

@@ -49,6 +49,14 @@ const profileFields = {
   score: nullable(nonnegative),
 };
 const profile = fields(profileFields);
+const publicProfileDetails: Check = (value) =>
+  fields({
+    ...profileFields,
+    totalHikeCount: (count) => integer(count) && nonnegative(count),
+    completedHikeCount: (count) => integer(count) && nonnegative(count),
+  })(value) &&
+  object(value) &&
+  (value.completedHikeCount as number) <= (value.totalHikeCount as number);
 const member = fields({
   ...profileFields,
   backgroundImageUrl: nullable(text),
@@ -170,7 +178,7 @@ export function validApiResponse(path: string, method: string, value: unknown): 
     /^\/api\/users\/me\/images\/(profile|background)$/.test(path)
   )
     return member(value);
-  if (/^\/api\/users\/\d+\/profile$/.test(path)) return profile(value);
+  if (/^\/api\/users\/\d+\/profile$/.test(path)) return publicProfileDetails(value);
   if (path === '/api/rankings/summary') return ranking(value);
   if (path === '/api/rankings') return array(profile)(value);
   if (path === '/api/journals') return method === 'GET' ? array(journal)(value) : journal(value);

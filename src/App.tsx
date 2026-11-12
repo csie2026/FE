@@ -1,7 +1,9 @@
+import { getPublicProfileView } from './services/publicProfile';
 import { createScopedRequest } from './services/scopedRequest';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
 import ProfileAvatar from './components/common/ProfileAvatar';
+import JournalAuthor from './components/common/JournalAuthor';
 import { createLogout } from './services/logout';
 import { confirmLogin, forgetLogin, shouldNotifySessionExpiry } from './services/loginHistory';
 import { koreanMonthBounds } from './services/hikingStatistics';
@@ -59,6 +61,7 @@ import {
   type Member,
   type Journal,
   type PublicProfile,
+  type PublicProfileDetails,
 } from './api';
 
 const RegionExplorer = lazy(() => import('./components/RegionExplorer'));
@@ -135,7 +138,7 @@ function App() {
   const [journalId, setJournalId] = useState<number | null>(null);
   const [journalDetail, setJournalDetail] = useState<Journal | null>(null);
   const [deletingJournalId, setDeletingJournalId] = useState<number | null>(null);
-  const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
+  const [publicProfile, setPublicProfile] = useState<PublicProfileDetails | null>(null);
   const [publicId, setPublicId] = useState<number | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
   useLayoutEffect(() => {
@@ -606,25 +609,14 @@ function App() {
                 update(setJournals),
               )
             : screen === 'publicProfile' && publicId
-              ? Promise.all([
-                  api<PublicProfile>(
-                    `/api/users/${publicId}/profile`,
-                    'GET',
-                    undefined,
-                    controller.signal,
-                  ),
-                  api<Journal[]>(
-                    `/api/users/${publicId}/journals`,
-                    'GET',
-                    undefined,
-                    controller.signal,
-                  ),
-                ]).then(([profile, records]) => {
-                  if (active && version === accountVersion.current) {
-                    setPublicProfile(profile);
-                    setJournals(records);
-                  }
-                })
+              ? getPublicProfileView(publicId, controller.signal).then(
+                  ({ profile, journals: records }) => {
+                    if (active && version === accountVersion.current) {
+                      setPublicProfile(profile);
+                      setJournals(records);
+                    }
+                  },
+                )
               : screen === 'profile'
                 ? Promise.all([
                     api<Member>('/api/users/me', 'GET', undefined, controller.signal),
@@ -678,6 +670,7 @@ function App() {
     document.title = 'ToPeak';
   }, []);
   const openProfile = (id: number) => {
+    setError('');
     setBusy(true);
     setPublicProfile(null);
     setJournals([]);
@@ -900,7 +893,9 @@ function App() {
         </article>
       ))
     ) : (
-      <p className="muted">아직 등산일지가 없습니다.</p>
+      <p className="muted">
+        {screen === 'publicProfile' ? '공개된 등산일지가 없습니다.' : '아직 등산일지가 없습니다.'}
+      </p>
     );
   if (loading)
     return (
@@ -1264,6 +1259,10 @@ function App() {
           <section className="scroll-content journal-detail">
             {busy ? (
               <p role="status">불러오는 중…</p>
+            ) : journalReadError ? (
+              <p role="status">
+                등산일지를 확인할 수 없습니다. 삭제되었거나 공개 상태가 변경되었을 수 있습니다.
+              </p>
             ) : journalDetail ? (
               <>
                 <article className="journal-detail__body">
@@ -1278,9 +1277,16 @@ function App() {
                       <dt>등산 날짜</dt>
                       <dd>{journalDetail.hikingDate}</dd>
                     </div>
-                    <div>
+                    <div className="journal-detail__author-row">
                       <dt>작성자</dt>
-                      <dd>{journalDetail.nickname}</dd>
+                      <dd>
+                        <JournalAuthor
+                          key={journalDetail.userId}
+                          userId={journalDetail.userId}
+                          nickname={journalDetail.nickname}
+                          onSelect={openProfile}
+                        />
+                      </dd>
                     </div>
                   </dl>
                   <p className="journal-detail__content">{journalDetail.content}</p>
@@ -1511,24 +1517,54 @@ function App() {
       )}
       {screen === 'publicProfile' && (
         <>
-          {header('사용자 프로필', true)}
+          {header('공개 프로필', true)}
           <div className="scroll-content profile-content">
             {busy ? (
               <p role="status">불러오는 중…</p>
+            ) : journalReadError ? (
+              <div className="public-profile__error">
+                <p role="status">공개 프로필을 불러오지 못했습니다. 다시 시도해 주세요.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setError('');
+                    setBusy(true);
+                    setProfileRefresh((value) => value + 1);
+                  }}
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : publicProfile ? (
+              <>
+                <article className="profile-card">
+                  {avatar(publicProfile)}
+                  <div>
+                    <h2 className="public-profile__name">{publicProfile.nickname ?? '탐험가'}</h2>
+                  </div>
+                </article>
+                <dl className="public-profile__stats" aria-label="산행 통계">
+                  <div>
+                    <dt>점수</dt>
+                    <dd>{scoreText(publicProfile.score)}</dd>
+                  </div>
+                  <div>
+                    <dt>등반 횟수</dt>
+                    <dd>{publicProfile.totalHikeCount}회</dd>
+                  </div>
+                  <div>
+                    <dt>완등 횟수</dt>
+                    <dd>{publicProfile.completedHikeCount}회</dd>
+                  </div>
+                </dl>
+                <p className="public-profile__note">
+                  등반·완등 횟수는 저장된 GPS 산행 활동을 기준으로 합니다.
+                </p>
+                <h3>공개 등산일지</h3>
+                {journalList()}
+              </>
             ) : (
-              publicProfile && (
-                <>
-                  <article className="profile-card">
-                    {avatar(publicProfile)}
-                    <div>
-                      <b>{publicProfile.nickname}</b>
-                      <small>{scoreText(publicProfile.score)}</small>
-                    </div>
-                  </article>
-                  <h3>등산일지</h3>
-                  {journalList()}
-                </>
-              )
+              <p role="status">공개 프로필을 확인할 수 없습니다.</p>
             )}
           </div>
         </>
