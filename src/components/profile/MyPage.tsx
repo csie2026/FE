@@ -346,8 +346,8 @@ export default function MyPage({
           ))}
         </div>
         <p className="my-stats-note">
-          산행 횟수·거리·완등 통계는 저장된 GPS 산행 활동 기준이며, 등산일지 개수와 별도로
-          계산됩니다.
+          산행 횟수는 인증된 활동, 완등 횟수는 GPS 정상 도달이 검증되고 인증된 활동 기준입니다.
+          거리는 저장된 전체 활동 기준이며, 등산일지 개수와 별도로 계산됩니다.
         </p>
       </section>
       <section className="monthly-challenge">

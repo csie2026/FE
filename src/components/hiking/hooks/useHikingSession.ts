@@ -1,6 +1,6 @@
+import { subscribeWebSessionLifecycle } from '../services/webSessionLifecycle';
 import { getErrorMessage } from '../../../utils/errorMessages';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { trackDistance } from '../trackUtils';
 import type { GpsPoint, HikingCourse } from '../types';
 import { isNativeIOS, nativeLocation } from '../../../native/backgroundLocation';
 import {
@@ -18,6 +18,7 @@ import {
 } from '../services/sessionTracking';
 import {
   initialSession,
+  sessionStatistics,
   pauseSession,
   completeSession,
   draftFromSession,
@@ -41,7 +42,9 @@ export function useHikingSession(
     recovery ? sessionFromDraft(recovery.draft) : initialSession(),
   );
   const sessionRef = useRef(session);
-  const lastCommitted = useRef(session);
+  const lastCommitted = useRef(
+    pauseSession(session, recovery?.draft.updatedAt ?? session.activeSince ?? 0),
+  );
   const [ownerToken] = useState(() => recovery?.ownerToken ?? crypto.randomUUID());
   const retired = useRef(false);
   const [storageError, setStorageError] = useState('');
@@ -80,7 +83,12 @@ export function useHikingSession(
       assertTrackingCapacity(next, course, userId, ownerToken, timestamp);
       const draft = draftFromSession(next, course, userId, ownerToken, timestamp);
       writeRecovery(draft, mode);
-      lastCommitted.current = sessionFromDraft(draft);
+      try {
+        sessionStorage.setItem(recoveryKey(userId), ownerToken);
+      } catch {
+        /* 탭 저장소 접근 실패 시 자동 복구만 제한한다. */
+      }
+      lastCommitted.current = pauseSession(sessionFromDraft(draft), timestamp);
       lastCheckpoint.current = timestamp;
       setStorageError('');
       setDurable(next.state === 'COMPLETED');
@@ -341,8 +349,12 @@ export function useHikingSession(
     };
   }, [nativeIOS, runNative, recovery?.finishRequested, ownsSession, userId, persist]);
   useEffect(() => {
-    const hide = () => {
-      if (document.hidden && !nativeIOS) pause();
+    // 화면 잠금은 사용자 일시정지가 아니다. 상태를 보존하고 복귀 시 시계를 갱신한다.
+    const checkpointWeb = () => {
+      if (nativeIOS || retired.current || !sessionRef.current.clientRequestId) return;
+      setNow(Date.now());
+      if (!checkpoint(sessionRef.current))
+        publish(stopTracking(lastCommitted.current, 'storage-error'));
     };
     const ownership = (event: StorageEvent) => {
       if (
@@ -354,27 +366,23 @@ export function useHikingSession(
       const stored = readRecovery(userId);
       if (stored.kind !== 'ready' || stored.draft.ownerToken !== ownerToken) onRecoveryRequired();
     };
-    document.addEventListener('visibilitychange', hide);
-    if (!nativeIOS) {
-      window.addEventListener('pagehide', pause);
-      window.addEventListener('beforeunload', pause);
-    }
+    const unsubscribe = nativeIOS
+      ? () => {}
+      : subscribeWebSessionLifecycle(window, document, checkpointWeb);
     window.addEventListener('storage', ownership);
     return () => {
-      document.removeEventListener('visibilitychange', hide);
-      window.removeEventListener('pagehide', pause);
-      window.removeEventListener('beforeunload', pause);
+      unsubscribe();
       window.removeEventListener('storage', ownership);
       const current = sessionRef.current;
       if (!nativeIOS && !retired.current && current.clientRequestId) {
         try {
-          persist(pauseSession(current));
+          persist(current);
         } catch {
           /* 마지막 저장 성공 기록을 유지하고 화면이 열려 있으면 저장 오류를 표시한다. */
         }
       }
     };
-  }, [userId, ownerToken, pause, persist, onRecoveryRequired, nativeIOS]);
+  }, [userId, ownerToken, checkpoint, publish, persist, onRecoveryRequired, nativeIOS]);
   const markSaved = useCallback(() => {
     retired.current = true;
     try {
@@ -401,15 +409,9 @@ export function useHikingSession(
       return false;
     }
   };
-  const elapsedMs =
-    session.accumulatedMs +
-    (session.activeSince === null ? 0 : Math.max(0, now - session.activeSince));
-  const distance = session.pendingInput?.distanceMeters ?? trackDistance(session.segments);
   return {
     ...session,
-    elapsedMs,
-    distance,
-    averageSpeed: elapsedMs ? (distance / elapsedMs) * 3600 : 0,
+    ...sessionStatistics(session, now),
     onPosition,
     start,
     pause,

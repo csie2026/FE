@@ -4,6 +4,7 @@
   "description": "나만의 산행을 기록하는 ToPeak",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#f8f9fa",
   "theme_color": "#2d4b39",
   "icons": [

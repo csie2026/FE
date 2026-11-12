@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ApiError, scoreText, type RankingMember, type RankingSummary } from '../../api';
 import './RankingPage.css';
 import { startRankingRequest } from '../../services/ranking';
+import { subscribeForegroundRefresh } from '../../services/foregroundRefresh';
+import { readRefreshState } from '../../services/refreshState';
 
 type Props = {
   currentUserId: number | null;
@@ -44,25 +46,27 @@ function points(member: RankingMember) {
 // 서버가 정렬한 공개 회원 목록을 사용하고, 사용자 선택은 상위 화면의 타인 프로필 이동으로 연결한다.
 export default function RankingPage({ currentUserId, onSelectUser, onAuthError }: Props) {
   const [attempt, setAttempt] = useState(0);
-  const request = useMemo(() => ({ currentUserId, attempt }), [currentUserId, attempt]);
+  const request = useMemo(() => ({ scope: currentUserId, attempt }), [currentUserId, attempt]);
   const [result, setResult] = useState<{
-    request: typeof request;
-    summary?: RankingSummary;
-    error?: string;
-  } | null>(null);
-  const current = result?.request === request ? result : null;
-  const summary = current?.summary;
-  const loading = currentUserId !== null && current === null;
-  const error = current?.error ?? '';
+    request: typeof request | null;
+    data: RankingSummary | null;
+    error: string;
+  }>({ request: null, data: null, error: '' });
+  const {
+    data: summary,
+    loading,
+    error,
+  } = readRefreshState(currentUserId !== null, request, result);
 
   // 화면 이동·새로고침·계정 변경으로 불필요해진 이전 요청을 취소한다.
   useEffect(() => {
     if (currentUserId === null) return;
     return startRankingRequest(currentUserId, {
-      success: (summary) => setResult({ request, summary }),
+      success: (summary) => setResult({ request, data: summary, error: '' }),
       failure: (cause) => {
         setResult({
           request,
+          data: null,
           error: getErrorMessage(cause, '랭킹을 불러오지 못했어요. 다시 시도해주세요.'),
         });
         if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
@@ -74,17 +78,7 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
     setAttempt((value) => value + 1);
   }
   useEffect(() => {
-    const foreground = () => {
-      if (!document.hidden) {
-        setAttempt((value) => value + 1);
-      }
-    };
-    window.addEventListener('focus', foreground);
-    document.addEventListener('visibilitychange', foreground);
-    return () => {
-      window.removeEventListener('focus', foreground);
-      document.removeEventListener('visibilitychange', foreground);
-    };
+    return subscribeForegroundRefresh(window, document, () => setAttempt((value) => value + 1));
   }, []);
 
   const members = summary?.members ?? [];

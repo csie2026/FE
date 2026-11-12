@@ -167,6 +167,6 @@ test("all server certification statuses and legacy missing results have distinct
   };
   assert.match(scoringText(base), /200점.*70점/);
   assert.match(scoringText({ ...base, status: "GPS_REQUIRED" }), /GPS 근거/);
-  assert.match(scoringText({ ...base, status: "DAILY_LIMIT" }), /해당 날짜/);
+  assert.match(scoringText({ ...base, status: "DAILY_LIMIT" }), /이전 정책/);
   assert.match(scoringText(null), /확인하지 못/);
 });

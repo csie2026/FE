@@ -1,5 +1,8 @@
 import { getPublicProfileView } from './services/publicProfile';
 import { createScopedRequest } from './services/scopedRequest';
+import { subscribeForegroundRefresh } from './services/foregroundRefresh';
+import { recordLifecycle } from './services/lifecycleDiagnostics';
+import { isCertifiedSummit } from './services/activityCertification';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
 import ProfileAvatar from './components/common/ProfileAvatar';
@@ -99,6 +102,12 @@ function App() {
   const [screen, setCurrentScreen] = useState<Screen>('login');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+  useEffect(() => { recordLifecycle('screen-change', { screen }); }, [screen]);
+  useEffect(() => {
+    recordLifecycle('app-mount');
+    return () => recordLifecycle('app-unmount');
+  }, []);
+  useEffect(() => { recordLifecycle('global-loading', { loading }); }, [loading]);
   const [busy, setBusy] = useState(false);
   const [oauthFailure] = useState(() => readOAuthFailure(window.location.href));
   const [error, setError] = useState(oauthFailure?.message ?? '');
@@ -422,6 +431,7 @@ function App() {
       );
       setCurrentScreen(next);
     };
+    recordLifecycle('auth-start');
     api<Member>('/api/users/me', 'GET', undefined, controller.signal)
       .then((user) => {
         if (!active || version !== accountVersion.current) return;
@@ -487,6 +497,7 @@ function App() {
       })
       .finally(() => {
         if (active) {
+          recordLifecycle('auth-finish');
           setLoading(false);
           if (oauthFailure) setError(oauthFailure.message);
         }
@@ -570,19 +581,11 @@ function App() {
   }, [me, screen, publicId]);
   useEffect(() => {
     if (screen !== 'profile' && screen !== 'publicProfile' && screen !== 'conquered') return;
-    const refresh = () => {
-      if (!document.hidden) {
-        setBusy(true);
-        setError('');
-        setProfileRefresh((value) => value + 1);
-      }
-    };
-    window.addEventListener('focus', refresh);
-    document.addEventListener('visibilitychange', refresh);
-    return () => {
-      window.removeEventListener('focus', refresh);
-      document.removeEventListener('visibilitychange', refresh);
-    };
+    // 복귀 시 재검증은 유지하되, 이미 열린 화면을 로딩 화면으로 교체하지 않는다.
+    return subscribeForegroundRefresh(window, document, () => {
+      setError('');
+      setProfileRefresh((value) => value + 1);
+    });
   }, [screen]);
   // 화면별로 본인 일지·공개 일지·타인 프로필을 조회하고, 화면 이탈이나 계정 변경 뒤의 응답은 버린다.
   useEffect(() => {
@@ -1502,7 +1505,7 @@ function App() {
                 description={
                   screen === 'favorites'
                     ? '마음에 담아둔 산을 모아봤어요.'
-                    : 'GPS 산행 활동에서 정상 도달로 저장된 산을 모았어요.'
+                    : 'GPS 정상 도달과 산행 인증이 모두 확인된 산을 모았어요.'
                 }
                 items={screen === 'favorites' ? favoriteMountains : conqueredCollection.items}
                 missingCount={screen === 'conquered' ? conqueredCollection.missingIds.length : 0}
@@ -1584,7 +1587,7 @@ function App() {
                     <p>
                       {(record.distanceMeters / 1000).toFixed(1)}km ·{' '}
                       {Math.floor(record.elapsedMs / 60000)}분 ·{' '}
-                      {record.completed ? '완등' : '산행 종료'}
+                      {isCertifiedSummit(record) ? '인증 완등' : record.completed ? '정상 도달 기록' : '산행 종료'}
                     </p>
                     <p>{scoringText(record.scoring)}</p>
                     {record.journalId !== null ? (

@@ -1,6 +1,7 @@
 import { getErrorMessage } from '../utils/errorMessages';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError } from '../api';
+import { readRefreshState } from '../services/refreshState';
 import {
   EMPTY_GOALS,
   getMonthlyGoals,
@@ -90,14 +91,14 @@ export function useMonthlyGoals(
     },
     [userId, enabled, month, scope, request, onAuthError],
   );
-  const current = enabled && userId !== null && result.request === request;
-  const ready = current && result.data !== null;
+  const view = readRefreshState(enabled && userId !== null, request, result);
+  const ready = view.data !== null;
   return {
-    goals: ready ? result.data! : EMPTY_GOALS,
+    goals: view.data ?? EMPTY_GOALS,
     ready,
     saving,
-    loading: enabled && userId !== null && !current,
-    error: (current ? result.error : '') || (write.scope === scope ? write.error : ''),
+    loading: view.loading,
+    error: view.error || (write.scope === scope ? write.error : ''),
     saveGoals,
     retry: () => setAttempt((value) => value + 1),
   };

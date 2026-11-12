@@ -1,20 +1,19 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ApiError, getHikingRecords, type HikingActivity } from '../api';
 import { koreanMonthBounds, summarizeHikingActivities } from '../services/hikingStatistics';
+import { readRefreshState } from '../services/refreshState';
 
 // 본인 산행 기록을 한 번 조회해 완등한 산 목록과 프로필 산행 통계에 함께 사용한다.
 export function useCompletedHikes(userId: number | null, enabled: boolean, refreshKey = 0) {
   const [attempt, setAttempt] = useState(0);
   const [month, setMonth] = useState(() => koreanMonthBounds().key);
-  const request = useMemo(
-    () => ({ userId, enabled, attempt, refreshKey }),
-    [userId, enabled, attempt, refreshKey],
-  );
+  const scope = useMemo(() => ({ userId, enabled }), [userId, enabled]);
+  const request = useMemo(() => ({ scope, attempt, refreshKey }), [scope, attempt, refreshKey]);
   const [result, setResult] = useState<{
     request: typeof request | null;
-    activities: HikingActivity[];
+    data: HikingActivity[] | null;
     error: string;
-  }>({ request: null, activities: [], error: '' });
+  }>({ request: null, data: null, error: '' });
   useEffect(() => {
     if (userId === null || !enabled) return;
     const controller = new AbortController();
@@ -24,14 +23,14 @@ export function useCompletedHikes(userId: number | null, enabled: boolean, refre
           // 잘못된 데이터를 정상적인 0이나 일부 합계로 표시하지 않고 오류로 처리한다.
           summarizeHikingActivities(activities);
           setMonth(koreanMonthBounds().key);
-          setResult({ request, activities, error: '' });
+          setResult({ request, data: activities, error: '' });
         }
       })
       .catch((cause: unknown) => {
         if (!controller.signal.aborted)
           setResult({
             request,
-            activities: [],
+            data: null,
             error:
               cause instanceof ApiError && cause.status === 401
                 ? '로그인 세션이 만료되었습니다. 다시 로그인해주세요.'
@@ -54,21 +53,17 @@ export function useCompletedHikes(userId: number | null, enabled: boolean, refre
     schedule();
     return () => window.clearTimeout(timer);
   }, [enabled, userId]);
-  const current = enabled && userId !== null && result.request === request;
+  const view = readRefreshState(enabled && userId !== null, request, result);
   const summary = useMemo(
-    () =>
-      summarizeHikingActivities(
-        current && !result.error ? result.activities : [],
-        Date.parse(`${month}-01T00:00:00+09:00`),
-      ),
+    () => summarizeHikingActivities(view.data ?? [], Date.parse(`${month}-01T00:00:00+09:00`)),
     // 화면이 열린 상태에서 한국 시간 기준 월이 바뀌면 월 키를 갱신해 통계를 다시 계산한다.
-    [current, result.activities, result.error, month],
+    [view.data, month],
   );
   return {
     ...summary,
     count: summary.statistics.completedHikeCount,
-    loading: enabled && userId !== null && !current,
-    error: current ? result.error : '',
+    loading: view.loading,
+    error: view.error,
     retry: () => setAttempt((value) => value + 1),
   };
 }

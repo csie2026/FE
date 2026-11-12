@@ -44,6 +44,8 @@ export type RecoveryDraft = {
   endedAt: number | null;
   clientRequestId: string;
   state: 'PAUSED' | 'COMPLETED';
+  // 웹 진행 여부를 보존한다. 기존 및 네이티브 기록의 PAUSED 의미는 유지한다.
+  webTracking?: boolean;
   accumulatedMs: number;
   reachedSummit: boolean;
   distanceMeters: number;
@@ -73,6 +75,13 @@ export const initialSession = (): Session => ({
   reachedSummit: false,
   pendingInput: null,
 });
+export function sessionStatistics(session: Session, now: number) {
+  const elapsedMs =
+    session.accumulatedMs +
+    (session.activeSince === null ? 0 : Math.max(0, now - session.activeSince));
+  const distance = session.pendingInput?.distanceMeters ?? trackDistance(session.segments);
+  return { elapsedMs, distance, averageSpeed: elapsedMs ? (distance / elapsedMs) * 3600 : 0 };
+}
 export function pauseSession(session: Session, now = Date.now()): Session {
   if (session.state !== 'TRACKING') return session;
   return {
@@ -137,8 +146,8 @@ export function sessionFromDraft(draft: RecoveryDraft): Session {
     startedAt: draft.startedAt,
     endedAt: draft.endedAt,
     clientRequestId: draft.clientRequestId,
-    state: draft.state,
-    activeSince: null,
+    state: draft.webTracking ? 'TRACKING' : draft.state,
+    activeSince: draft.webTracking ? draft.updatedAt : null,
     accumulatedMs: draft.accumulatedMs,
     reachedSummit: draft.reachedSummit,
     ...(draft.native ? { native: { ...draft.native } } : {}),
@@ -194,6 +203,9 @@ export function draftFromSession(
     clientRequestId: paused.clientRequestId!,
     ...(paused.native ? { native: { ...paused.native } } : {}),
     state: paused.state === 'COMPLETED' ? 'COMPLETED' : 'PAUSED',
+    ...(!session.native && session.state !== 'COMPLETED'
+      ? { webTracking: session.state === 'TRACKING' }
+      : {}),
     accumulatedMs: paused.accumulatedMs,
     reachedSummit: paused.reachedSummit,
     distanceMeters: paused.pendingInput?.distanceMeters ?? trackDistance(paused.segments),
@@ -243,6 +255,14 @@ export function validateDraft(
     ) ||
     !Array.isArray(d.segments) ||
     d.segments.length > MAX_RECOVERY_POINTS
+  )
+    return false;
+  if (
+    d.webTracking !== undefined &&
+    (typeof d.webTracking !== 'boolean' ||
+      d.state !== 'PAUSED' ||
+      d.native !== undefined ||
+      (d.webTracking && d.trackingStopReason))
   )
     return false;
   if (d.native !== undefined) {

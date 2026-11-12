@@ -1,4 +1,5 @@
 import type { HikingActivity } from '../api.ts';
+import { isCertifiedSummit } from './activityCertification.ts';
 
 export interface CompletedMountainSummary {
   mountainId: string;
@@ -6,12 +7,12 @@ export interface CompletedMountainSummary {
   latestStartedAt: string | null;
 }
 
-// 프로필 완등 통계와 완등한 산 목록은 동일한 completed=true 기록을 기준으로 묶는다.
+// 프로필 완등 통계와 완등한 산 목록은 동일한 서버 인증·GPS 정상 도달 검증 기록을 기준으로 묶는다.
 // 같은 산을 다시 완등하면 횟수는 늘어나지만 목록에는 산 ID별로 한 항목만 표시한다.
 export function summarizeCompletedHikes(activities: HikingActivity[]) {
   const completed = activities.filter(
     (activity) =>
-      activity.completed === true &&
+      isCertifiedSummit(activity) &&
       Number.isSafeInteger(activity.mountainId) &&
       activity.mountainId > 0,
   );

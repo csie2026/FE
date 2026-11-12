@@ -25,9 +25,11 @@ const a = (
   elapsedMs: 0,
   completed,
   journalId: null,
+  gpsValidationVersion: 1,
+  scoring: { status: 'CERTIFIED', certificationDate: '2026-11-01', visitPoints: 200, summitPoints: completed ? 70 : 0, policyVersion: 'visit-general-or-verified-summit-multi-v2' },
 });
 
-test('all saved activities count without journals, certification, distance or duration eligibility filters', () => {
+test('server-certified activities count without FE reinterpreting eligibility thresholds', () => {
   const records = [
     a(1, '2026-11-01T00:00:00Z', 0),
     a(2, '2026-11-02T00:00:00Z', 500),
@@ -43,6 +45,27 @@ test('all saved activities count without journals, certification, distance or du
     completedHikeCount: 0,
     completedMountainCount: 0,
   });
+});
+
+test('uncertified short test-course records remain outside hike and summit counts', () => {
+  const records = [1, 2, 3].map((id) => ({
+    ...a(id, `2026-11-05T00:0${id}:00Z`, 90, true, 142),
+    courseId: 421,
+    elapsedMs: 73000,
+    scoring: {
+      status: 'BELOW_MINIMUM' as const,
+      certificationDate: '2026-11-05',
+      visitPoints: 0,
+      summitPoints: 0,
+      policyVersion: 'visit-500m-20m-daily1-v1',
+    },
+  }));
+  const { statistics } = summarizeHikingActivities(records, NOW);
+  assert.equal(statistics.totalHikeCount, 0);
+  assert.equal(statistics.completedHikeCount, 0);
+  assert.equal(statistics.completedMountainCount, 0);
+  assert.equal(records.filter((record) => String(record.scoring.status) === 'CERTIFIED').length, 0);
+  assert.equal(records.reduce((sum, record) => sum + record.scoring.visitPoints + record.scoring.summitPoints, 0), 0);
 });
 
 test('repeated summits increase completed count but unique mountain count stays separate from all hikes', () => {

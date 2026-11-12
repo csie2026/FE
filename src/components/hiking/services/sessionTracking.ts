@@ -94,7 +94,11 @@ export function recordTrackPoint(
   } catch (cause) {
     const reason = cause instanceof RecoveryCapacityError ? 'capacity-limit' : 'storage-error';
     // 저장하지 못한 시간으로 진행하지 않고 마지막 저장 성공 기록의 좌표와 누적 시간을 함께 복원한다.
-    const stopped = stopTracking(lastCheckpoint, reason, now);
+    const stopped = stopTracking(
+      { ...lastCheckpoint, state: 'PAUSED', activeSince: null },
+      reason,
+      now,
+    );
     try {
       persist(stopped);
     } catch {

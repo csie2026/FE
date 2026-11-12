@@ -24,13 +24,15 @@ const activity = (
   distanceMeters: 0,
   elapsedMs: 0,
   journalId: null,
+  gpsValidationVersion: 1,
+  scoring: { status: 'CERTIFIED', certificationDate: '2026-11-01', visitPoints: 200, summitPoints: completed ? 70 : 0, policyVersion: 'visit-general-or-verified-summit-multi-v2' },
 });
 const catalog = [
   { id: '1', name: 'DB 산 이름', city: '파주시', region: '북부권역' },
   { id: '2', name: '다른 산', city: '부천시', region: '서부권역' },
 ];
 
-test('completed true groups repeat summits once, without journal or score-certification requirements', () => {
+test('only certified and GPS-verified summits enter the collection', () => {
   const repeated = {
     ...activity(2, 1, true, '2026-11-02T00:00:00Z'),
     scoring: {
@@ -43,10 +45,10 @@ test('completed true groups repeat summits once, without journal or score-certif
   };
   const summary = summarizeCompletedHikes([activity(1, 1, true), repeated, activity(3, 2, false)]);
   const collection = buildCompletedMountainCollection(catalog, summary.mountains);
-  assert.equal(summary.count, 2);
+  assert.equal(summary.count, 1);
   assert.equal(collection.items.length, 1);
-  assert.equal(collection.items[0].completion.completedCount, 2);
-  assert.equal(collection.items[0].completion.latestStartedAt, '2026-11-02T00:00:00Z');
+  assert.equal(collection.items[0].completion.completedCount, 1);
+  assert.equal(collection.items[0].completion.latestStartedAt, '2026-11-01T00:00:00Z');
 });
 
 test('only completed hikes determine the latest completed hike date', () => {
