@@ -1,6 +1,6 @@
 import type { HikingActivity } from '../api.ts';
 import { summarizeCompletedHikes } from './completedHikes.ts';
-import { isCertifiedActivity } from './activityCertification.ts';
+import { isRecognizedHike } from './activityCertification.ts';
 
 const KOREA_OFFSET_MS = 9 * 60 * 60 * 1000;
 
@@ -43,13 +43,15 @@ export function summarizeHikingActivities(activities: HikingActivity[], now = Da
       typeof activity.completed !== 'boolean' ||
       typeof activity.distanceMeters !== 'number' ||
       !Number.isFinite(activity.distanceMeters) ||
-      activity.distanceMeters < 0
+      activity.distanceMeters < 0 ||
+      !Number.isSafeInteger(activity.elapsedMs) ||
+      activity.elapsedMs < 0
     ) {
       throw new Error('산행 통계에 필요한 기록을 확인할 수 없습니다. 다시 시도해주세요.');
     }
     totalDistanceMeters += activity.distanceMeters;
     if (startedAt >= month.start && startedAt < month.end) {
-      if (isCertifiedActivity(activity)) monthlyHikeCount++;
+      if (isRecognizedHike(activity)) monthlyHikeCount++;
       monthlyDistanceMeters += activity.distanceMeters;
     }
   }
@@ -58,7 +60,7 @@ export function summarizeHikingActivities(activities: HikingActivity[], now = Da
   const completed = summarizeCompletedHikes(activities);
   const statistics: HikingStatistics = {
     month: month.key,
-    totalHikeCount: activities.filter(isCertifiedActivity).length,
+    totalHikeCount: activities.filter(isRecognizedHike).length,
     monthlyHikeCount,
     totalDistanceMeters,
     monthlyDistanceMeters,

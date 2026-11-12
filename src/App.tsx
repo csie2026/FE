@@ -1,8 +1,9 @@
 import { getPublicProfileView } from './services/publicProfile';
+import { updateProfile, isProfileAccountMismatch } from './services/profileUpdate';
 import { createScopedRequest } from './services/scopedRequest';
 import { subscribeForegroundRefresh } from './services/foregroundRefresh';
 import { recordLifecycle } from './services/lifecycleDiagnostics';
-import { isCertifiedSummit } from './services/activityCertification';
+import { isVerifiedSummit } from './services/activityCertification';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
 import ProfileAvatar from './components/common/ProfileAvatar';
@@ -109,6 +110,7 @@ function App() {
   }, []);
   useEffect(() => { recordLifecycle('global-loading', { loading }); }, [loading]);
   const [busy, setBusy] = useState(false);
+  const [profileAccountChanged, setProfileAccountChanged] = useState(false);
   const [oauthFailure] = useState(() => readOAuthFailure(window.location.href));
   const [error, setError] = useState(oauthFailure?.message ?? '');
   const [logoutError, setLogoutError] = useState(false);
@@ -312,6 +314,7 @@ function App() {
   };
   // 계정 세대를 증가시켜 로그아웃 이전의 비동기 응답이 새 회원 상태에 반영되지 않게 한다.
   const clearAccount = useCallback(() => {
+    setProfileAccountChanged(false);
     profileSave.current.invalidate();
     journalSave.current.invalidate();
     accountVersion.current += 1;
@@ -736,7 +739,7 @@ function App() {
   };
   // 프로필 저장 응답을 회원 상태에 반영한 뒤, 최초 설정과 기존 프로필 편집의 복귀 화면을 구분한다.
   const saveProfile = async () => {
-    if (busy) return;
+    if (busy || !me || screen !== 'setup') return;
     const year = Number(birthYear);
     if (!nickname.trim() || nickname.trim().length > 30) {
       setError('닉네임은 1~30자로 입력해주세요.');
@@ -746,22 +749,39 @@ function App() {
       setError('출생연도를 선택해 주세요.');
       return;
     }
+    const snapshot = {
+      expectedUserId: me.userId,
+      nickname: nickname.trim(),
+      birthYear: year,
+    };
+    const version = accountVersion.current;
+    const wasProfileCompleted = me.profileCompleted;
+    const current = profileSave.current.capture();
+    const isCurrent = () => current() && version === accountVersion.current &&
+      currentMemberId.current === snapshot.expectedUserId;
     await profileSave.current.run(
       async () => {
         setBusy(true);
         setError('');
-        return api<Member>('/api/users/me/profile', 'PATCH', {
-          nickname: nickname.trim(),
-          birthYear: year,
-        });
+        return updateProfile(snapshot, isCurrent);
       },
       {
         success: (user) => {
+          if (!isCurrent()) return;
           setMe(user);
-          setBusy(Boolean(me?.profileCompleted));
-          setScreen(me?.profileCompleted ? 'profile' : 'explore');
+          setBusy(wasProfileCompleted);
+          setScreen(wasProfileCompleted ? 'profile' : 'explore');
         },
         failure: (cause) => {
+          if (!isCurrent()) return;
+          if (isProfileAccountMismatch(cause)) {
+            clearAccount();
+            setBusy(false);
+            setProfileAccountChanged(true);
+            setError(cause.message);
+            setScreen('login', null, null, null, true);
+            return;
+          }
           if (!logoutPending.current) fail(cause);
         },
         settled: () => setBusy(false),
@@ -997,6 +1017,11 @@ function App() {
       {error && (
         <div className="error-banner" role="alert">
           {error}
+          {profileAccountChanged && (
+            <button type="button" onClick={() => window.location.reload()}>
+              현재 로그인 계정 다시 확인
+            </button>
+          )}
           <button onClick={() => setError('')}>닫기</button>
         </div>
       )}
@@ -1587,7 +1612,7 @@ function App() {
                     <p>
                       {(record.distanceMeters / 1000).toFixed(1)}km ·{' '}
                       {Math.floor(record.elapsedMs / 60000)}분 ·{' '}
-                      {isCertifiedSummit(record) ? '인증 완등' : record.completed ? '정상 도달 기록' : '산행 종료'}
+                      {isVerifiedSummit(record) ? '인증 완등' : record.completed ? '정상 도달 기록' : '산행 종료'}
                     </p>
                     <p>{scoringText(record.scoring)}</p>
                     {record.journalId !== null ? (
