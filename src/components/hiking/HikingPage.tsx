@@ -25,6 +25,8 @@ import {
   type CourseOption,
 } from './services/courseApi';
 import { useGeolocation } from './hooks/useGeolocation';
+import { useNativeStartPreview } from './hooks/useNativeStartPreview';
+import { startAvailability } from './services/startAvailability';
 import { useHikingSession } from './hooks/useHikingSession';
 import { distanceMeters, formatDuration, isUsablePoint } from './trackUtils';
 import type { HikingCourse, LocationStatus } from './types';
@@ -719,6 +721,27 @@ function ActiveHike({
     !session.nativeIOS && session.state !== 'COMPLETED' && !session.trackingStopReason,
     session.onPosition,
   );
+  const nativeStart = useNativeStartPreview(
+    session.nativeIOS &&
+      session.state === 'READY' &&
+      !session.startChecking &&
+      !session.nativeBusy &&
+      session.nativeKnown,
+    course,
+    userId,
+  );
+  const startReady = startAvailability(
+    course.startPoint,
+    session.nativeIOS ? nativeStart.position : webGps.position,
+    session.nativeIOS
+      ? nativeStart.checking
+        ? 'REQUESTING'
+        : nativeStart.position
+          ? 'AVAILABLE'
+          : 'IDLE'
+      : webGps.status,
+    session.nativeIOS ? nativeStart.now : webGps.now,
+  );
   const gps = session.nativeIOS
     ? {
         position: latestNativeDisplayPosition(session.nativePosition, [], session.receptionNow),
@@ -818,6 +841,29 @@ function ActiveHike({
       <div className="hiking-panel">
         {session.startChecking && <p role="status">출발점 위치를 확인하고 있습니다…</p>}
         {session.startError && <p role="alert">{session.startError}</p>}
+        {session.state === 'READY' && (
+          <div className="hiking-note" role="status">
+            <p>
+              {nativeStart.checking
+                ? '출발점 위치를 확인하고 있습니다…'
+                : nativeStart.error || startReady.message}
+            </p>
+            {session.nativeIOS && (
+              <button
+                type="button"
+                onClick={() => void nativeStart.retry()}
+                disabled={
+                  nativeStart.checking ||
+                  session.startChecking ||
+                  session.nativeBusy ||
+                  !session.nativeKnown
+                }
+              >
+                위치 다시 확인
+              </button>
+            )}
+          </div>
+        )}
         {session.nativeError && (
           <div role="alert" className="recovery-storage-error">
             <p>{session.nativeError}</p>
@@ -872,7 +918,7 @@ function ActiveHike({
                   : gps.reception === 'waiting' && gps.status === 'AVAILABLE'
                     ? '새 GPS 위치를 기다리고 있습니다.'
                     : session.nativeIOS && session.state === 'READY'
-                      ? '등산 시작 시 iOS 위치 권한을 확인합니다.'
+                      ? '위치 다시 확인을 눌러 출발점과의 거리를 확인해주세요.'
                       : messages[gps.status]}
           {session.state !== 'COMPLETED' &&
             !session.trackingStopReason &&
@@ -931,7 +977,10 @@ function ActiveHike({
             disabled={session.nativeBusy || !session.nativeKnown}
             style={{ border: 0, padding: 0, margin: 0 }}
           >
-            <HikingControls {...session} canStart={!session.startChecking} />
+            <HikingControls
+              {...session}
+              canStart={!session.startChecking && !nativeStart.checking && startReady.allowed}
+            />
           </fieldset>
         ) : (
           <div className="hiking-controls">

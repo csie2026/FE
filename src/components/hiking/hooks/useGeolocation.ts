@@ -70,6 +70,7 @@ export function useGeolocation(enabled: boolean, onPosition: (point: GpsPoint) =
   return {
     position,
     status,
+    now: reception.now,
     reception: gpsReception(reception.watchStartedAt, reception.lastReceivedAt, reception.now),
     retry: () => setAttempt((value) => value + 1),
   };
