@@ -136,8 +136,8 @@ test('inaccessible journal detail preserves the server rejection', async () => {
     globalThis.fetch = original;
   }
 });
-test('score distinguishes an uncalculated score from zero', () => {
-  assert.equal(scoreText(null), '점수 미산정');
+test('score displays null and zero as zero points', () => {
+  assert.equal(scoreText(null), '0점');
   assert.equal(scoreText(0), '0점');
   assert.equal(scoreText(1250), '1,250점');
 });

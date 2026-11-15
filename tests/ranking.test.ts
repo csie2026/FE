@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ApiError, getRankingSummary, scoreText } from '../src/api.ts';
 
-test('ranking snapshot preserves server rank outside top 100 and distinguishes null from zero', async () => {
+test('ranking snapshot preserves server rank and nullable score while displaying zero points', async () => {
   const original = globalThis.fetch;
   const payload = {
     members: [{ userId: 1, nickname: 'first', profileImageUrl: null, score: 0, rank: 1 }],
@@ -18,7 +18,7 @@ test('ranking snapshot preserves server rank outside top 100 and distinguishes n
   try {
     const result = await getRankingSummary();
     assert.deepEqual(result, payload);
-    assert.equal(scoreText(result.mine!.score), '점수 미산정');
+    assert.equal(scoreText(result.mine!.score), '0점');
     assert.equal(scoreText(result.members[0].score), '0점');
     assert.equal(scoreText(1250), '1,250점');
   } finally { globalThis.fetch = original; }
