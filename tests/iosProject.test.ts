@@ -255,7 +255,16 @@ test('initial storyboard loads the controller that registers the same plugin nam
   );
   assert.deepEqual(
     methods.sort(),
-    ['requestPermissions', 'start', 'pause', 'resume', 'stop', 'getStatus', 'readPoints'].sort(),
+    [
+      'getStartPosition',
+      'requestPermissions',
+      'start',
+      'pause',
+      'resume',
+      'stop',
+      'getStatus',
+      'readPoints',
+    ].sort(),
   );
   // 기억에 의존하지 않고 설치된 SDK의 실제 플러그인 등록 API와 대조한다.
   assert.match(

@@ -1,6 +1,12 @@
 import { subscribeWebSessionLifecycle } from '../services/webSessionLifecycle';
+import {
+  acquireNativeStartPosition,
+  acquireWebStartPosition,
+  createStartGate,
+} from '../services/startValidation';
+import { getCurrentMember } from '../../../api';
 import { getErrorMessage } from '../../../utils/errorMessages';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GpsPoint, HikingCourse } from '../types';
 import { isNativeIOS, nativeLocation } from '../../../native/backgroundLocation';
 import {
@@ -38,6 +44,43 @@ export function useHikingSession(
   onRecoveryRequired: () => void,
 ) {
   const nativeIOS = isNativeIOS();
+  const [startGate] = useState(createStartGate);
+  const [startChecking, setStartChecking] = useState(false);
+  const [startError, setStartError] = useState('');
+  const startScope = useRef({ course, userId });
+  const startLive = useRef(false);
+  useLayoutEffect(() => {
+    startScope.current = { course, userId };
+    startLive.current = true;
+    queueMicrotask(() => {
+      if (
+        startLive.current &&
+        startScope.current.course === course &&
+        startScope.current.userId === userId
+      )
+        setStartChecking(startGate.busy);
+    });
+    const cancel = () => {
+      startGate.cancel();
+      setStartChecking(false);
+    };
+    const visibility = () => {
+      if (document.hidden) cancel();
+    };
+    const recoveryChanged = (event: StorageEvent) => {
+      if (event.key === null || event.key === recoveryKey(userId)) cancel();
+    };
+    window.addEventListener('pagehide', cancel);
+    window.addEventListener('storage', recoveryChanged);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      startLive.current = false;
+      startGate.cancel();
+      window.removeEventListener('pagehide', cancel);
+      window.removeEventListener('storage', recoveryChanged);
+      document.removeEventListener('visibilitychange', visibility);
+    };
+  }, [course, userId, startGate]);
   const [session, setSession] = useState<Session>(() =>
     recovery ? sessionFromDraft(recovery.draft) : initialSession(),
   );
@@ -225,26 +268,66 @@ export function useHikingSession(
     },
     [course, userId, ownerToken, ownsSession, persist, publish, onRecoveryRequired],
   );
-  const start = () => {
+  const start = async () => {
+    if (startGate.busy || !startLive.current || document.hidden) return;
     if (sessionRef.current.state !== 'READY') return;
     if (readRecovery(userId).kind !== 'none') {
       onRecoveryRequired();
       return;
     }
-    const startedAt = Date.now();
-    const next: Session = {
-      ...initialSession(),
-      state: nativeIOS ? 'PAUSED' : 'TRACKING',
-      activeSince: nativeIOS ? null : startedAt,
-      startedAt,
-      clientRequestId: crypto.randomUUID(),
-      segments: [[]],
-      ...(nativeIOS ? { native: nativeCheckpoint() } : {}),
-    };
-    if (checkpoint(next, 'create')) {
-      if (nativeIOS) setNativePosition(null);
-      publish(next);
-      if (nativeIOS) void runNative('start');
+    const sameScope = () =>
+      startLive.current &&
+      !document.hidden &&
+      startScope.current.course === course &&
+      startScope.current.userId === userId;
+    setStartChecking(true);
+    setStartError('');
+    try {
+      await startGate.run({
+        startPoint: course.startPoint,
+        isCurrent: () =>
+          sameScope() &&
+          sessionRef.current.state === 'READY' &&
+          !retired.current &&
+          readRecovery(userId).kind === 'none',
+        acquire: async (signal) => {
+          const point = nativeIOS
+            ? await acquireNativeStartPosition(nativeLocation, signal)
+            : await acquireWebStartPosition(signal);
+          const member = await getCurrentMember(signal);
+          if (member.userId !== userId)
+            throw new Error('로그인 계정이 변경되었습니다. 같은 계정으로 다시 확인해주세요.');
+          return point;
+        },
+        commit: () => {
+          const startedAt = Date.now();
+          const next: Session = {
+            ...initialSession(),
+            state: nativeIOS ? 'PAUSED' : 'TRACKING',
+            activeSince: nativeIOS ? null : startedAt,
+            startedAt,
+            clientRequestId: crypto.randomUUID(),
+            segments: [[]],
+            ...(nativeIOS ? { native: nativeCheckpoint() } : {}),
+          };
+          if (checkpoint(next, 'create')) {
+            if (nativeIOS) setNativePosition(null);
+            publish(next);
+            if (nativeIOS) void runNative('start');
+          }
+        },
+      });
+      if (
+        sameScope() &&
+        sessionRef.current.state === 'READY' &&
+        readRecovery(userId).kind !== 'none'
+      )
+        onRecoveryRequired();
+    } catch (cause) {
+      if (sameScope() && !(cause instanceof DOMException && cause.name === 'AbortError'))
+        setStartError(getErrorMessage(cause, '위치를 확인하지 못했습니다. 다시 시도해주세요.'));
+    } finally {
+      if (sameScope()) setStartChecking(startGate.busy);
     }
   };
   const pause = useCallback(() => {
@@ -414,6 +497,8 @@ export function useHikingSession(
     ...sessionStatistics(session, now),
     onPosition,
     start,
+    startChecking,
+    startError,
     pause,
     resume,
     complete,

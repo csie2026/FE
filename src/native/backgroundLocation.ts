@@ -16,6 +16,7 @@ export type LocationFailureCode =
   | 'PERMISSION_DENIED'
   | 'LOCATION_SERVICES_DISABLED'
   | 'LOCATION_UNAVAILABLE'
+  | 'TIMEOUT'
   | 'SERVICE_INTERRUPTED'
   | 'STORAGE_ERROR'
   | 'NATIVE_ERROR';
@@ -63,6 +64,7 @@ export type NativeLocationPage = {
 
 /** 모든 시각은 유닉스 밀리초이며 조회·중지 작업으로 기록을 삭제하지 않는다. */
 export interface BackgroundLocationPlugin {
+  getStartPosition?(): Promise<{ lat: number; lng: number; accuracy: number; timestamp: number }>;
   requestPermissions(): Promise<LocationPermissions>;
   start(options: LocationSessionKey): Promise<NativeLocationStatus>;
   pause(options: LocationSessionKey): Promise<NativeLocationStatus>;
@@ -95,6 +97,7 @@ const failureCodes = new Set<string>([
   'PERMISSION_DENIED',
   'LOCATION_SERVICES_DISABLED',
   'LOCATION_UNAVAILABLE',
+  'TIMEOUT',
   'SERVICE_INTERRUPTED',
   'STORAGE_ERROR',
   'NATIVE_ERROR',
@@ -154,6 +157,15 @@ export function createBackgroundLocationClient(runtime: LocationRuntime): Backgr
     }
   }
   return {
+    getStartPosition: () =>
+      invoke((native) => {
+        if (!native.getStartPosition)
+          throw new BackgroundLocationError(
+            'PLUGIN_UNAVAILABLE',
+            'Start location measurement is unavailable.',
+          );
+        return native.getStartPosition();
+      }),
     requestPermissions: () => invoke((native) => native.requestPermissions()),
     start: (options) => invoke((native) => native.start(sessionKey(options))),
     pause: (options) => invoke((native) => native.pause(sessionKey(options))),
