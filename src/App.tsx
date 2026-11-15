@@ -3,7 +3,7 @@ import { updateProfile, confirmProfileSave, ProfileSaveUnconfirmed, isProfileAcc
 import { createScopedRequest } from './services/scopedRequest';
 import { subscribeForegroundRefresh } from './services/foregroundRefresh';
 import { recordLifecycle } from './services/lifecycleDiagnostics';
-import { isVerifiedSummit } from './services/activityCertification';
+import HikingRecordCard from './components/profile/HikingRecordCard';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
 import ProfileAvatar from './components/common/ProfileAvatar';
@@ -12,7 +12,6 @@ import { createLogout } from './services/logout';
 import { confirmLogin, forgetLogin, shouldNotifySessionExpiry } from './services/loginHistory';
 import { koreanMonthBounds } from './services/hikingStatistics';
 import { buildCompletedMountainCollection } from './services/completedHikes';
-import { scoringText } from './components/hiking/services/scoringDisplay';
 import { useCompletedHikes } from './hooks/useCompletedHikes';
 import {
   readHikingSelection,
@@ -1650,35 +1649,25 @@ function App() {
       {screen === 'hikingRecords' && (
         <>
           {header('등산기록', true)}
-          <section className="scroll-content utility-content">
+          <section className="scroll-content utility-content hiking-records-list">
             {busy ? (
               <p role="status">불러오는 중…</p>
             ) : hikingRecords.length ? (
               hikingRecords.map((record) => (
-                <article className="profile-summary" key={record.id}>
-                  <div>
-                    <b>{record.mountainName}</b>
-                    <p>{record.hikingDate}</p>
-                    <p>
-                      {(record.distanceMeters / 1000).toFixed(1)}km ·{' '}
-                      {Math.floor(record.elapsedMs / 60000)}분 ·{' '}
-                      {isVerifiedSummit(record) ? '인증 완등' : record.completed ? '정상 도달 기록' : '산행 종료'}
-                    </p>
-                    <p>{scoringText(record.scoring)}</p>
-                    {record.journalId !== null ? (
-                      <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          go('write');
-                          setSelectedRecordId(record.id);
-                        }}
-                      >
-                        등산일지 작성
-                      </button>
-                    )}
-                  </div>
-                </article>
+                <HikingRecordCard record={record} key={record.id}>
+                  {record.journalId !== null ? (
+                    <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        go('write');
+                        setSelectedRecordId(record.id);
+                      }}
+                    >
+                      등산일지 작성
+                    </button>
+                  )}
+                </HikingRecordCard>
               ))
             ) : (
               <p>저장된 등산기록이 없습니다.</p>
