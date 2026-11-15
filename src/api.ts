@@ -431,7 +431,7 @@ export async function deleteMemberImage(
   return ownedImageResponse(await getCurrentMember(signal), expectedUserId);
 }
 export const scoreText = (score: number | null) =>
-  score === null ? '점수 미산정' : `${score.toLocaleString()}점`;
+  `${(score ?? 0).toLocaleString()}점`;
 
 export interface WeatherHour {
   time: string;

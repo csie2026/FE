@@ -816,6 +816,8 @@ function ActiveHike({
         state={session.state}
       />
       <div className="hiking-panel">
+        {session.startChecking && <p role="status">출발점 위치를 확인하고 있습니다…</p>}
+        {session.startError && <p role="alert">{session.startError}</p>}
         {session.nativeError && (
           <div role="alert" className="recovery-storage-error">
             <p>{session.nativeError}</p>
@@ -929,7 +931,7 @@ function ActiveHike({
             disabled={session.nativeBusy || !session.nativeKnown}
             style={{ border: 0, padding: 0, margin: 0 }}
           >
-            <HikingControls {...session} canStart={session.nativeIOS || Boolean(usable)} />
+            <HikingControls {...session} canStart={!session.startChecking} />
           </fieldset>
         ) : (
           <div className="hiking-controls">

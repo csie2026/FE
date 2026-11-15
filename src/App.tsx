@@ -3,7 +3,8 @@ import { updateProfile, confirmProfileSave, ProfileSaveUnconfirmed, isProfileAcc
 import { createScopedRequest } from './services/scopedRequest';
 import { subscribeForegroundRefresh } from './services/foregroundRefresh';
 import { recordLifecycle } from './services/lifecycleDiagnostics';
-import { isVerifiedSummit } from './services/activityCertification';
+import HikingRecordCard from './components/profile/HikingRecordCard';
+import { canCreateHikingJournal, JOURNAL_ELIGIBILITY_MESSAGE } from './services/journalEligibility';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
 import ProfileAvatar from './components/common/ProfileAvatar';
@@ -12,7 +13,6 @@ import { createLogout } from './services/logout';
 import { confirmLogin, forgetLogin, shouldNotifySessionExpiry } from './services/loginHistory';
 import { koreanMonthBounds } from './services/hikingStatistics';
 import { buildCompletedMountainCollection } from './services/completedHikes';
-import { scoringText } from './components/hiking/services/scoringDisplay';
 import { useCompletedHikes } from './hooks/useCompletedHikes';
 import {
   readHikingSelection,
@@ -169,7 +169,7 @@ function App() {
   const [hikingRecords, setHikingRecords] = useState<HikingActivity[]>([]);
   const [selectedRecordId, setSelectedRecordId] = useState<number | null>(null);
   const selectedRecord = hikingRecords.find((record) => record.id === selectedRecordId);
-  const availableRecords = hikingRecords.filter((record) => record.journalId === null);
+  const availableRecords = hikingRecords.filter(canCreateHikingJournal);
   const [journalMountain, setJournalMountain] = useState('');
   const [selected, setSelected] = useState<string | null>(null);
   const [hikingSelection, setHikingSelection] = useState<HikingSelection | null>(null);
@@ -833,7 +833,11 @@ function App() {
   // 목록에 다시 진입할 때는 최신 데이터를 조회한다.
   const saveJournal = async () => {
     if (busy) return;
-    if (!title.trim() || (!editing && (!selectedRecord || selectedRecord.journalId !== null))) {
+    if (!editing && selectedRecord && !canCreateHikingJournal(selectedRecord)) {
+      setError(selectedRecord.journalId !== null ? '이미 등산일지를 작성한 기록입니다.' : JOURNAL_ELIGIBILITY_MESSAGE);
+      return;
+    }
+    if (!title.trim() || (!editing && !canCreateHikingJournal(selectedRecord))) {
       setError('등산기록을 선택하고 제목을 입력해주세요.');
       return;
     }
@@ -1245,6 +1249,10 @@ function App() {
             initialSelection={hikingSelection}
             onClearSelection={clearHikingSelection}
             onWriteJournal={(record) => {
+              if (!canCreateHikingJournal(record)) {
+                setError(record.journalId !== null ? '이미 등산일지를 작성한 기록입니다.' : JOURNAL_ELIGIBILITY_MESSAGE);
+                return;
+              }
               go('write');
               setSelectedRecordId(record.id);
             }}
@@ -1434,11 +1442,16 @@ function App() {
                 ) : (
                   availableRecords.length === 0 && (
                     <p className="muted">
-                      작성 가능한 등산기록이 없습니다. 산행을 마치고 기록을 저장해주세요.
+                      작성 가능한 등산기록이 없습니다. {JOURNAL_ELIGIBILITY_MESSAGE}
                     </p>
                   )
                 )}
               </>
+            )}
+            {!editing && selectedRecord && !canCreateHikingJournal(selectedRecord) && (
+              <p role="alert" className="muted">
+                {selectedRecord.journalId !== null ? '이미 등산일지를 작성한 기록입니다.' : JOURNAL_ELIGIBILITY_MESSAGE}
+              </p>
             )}
             {(editing || selectedRecord) && (
               <dl className="journal-write-summary" aria-label="산행 정보">
@@ -1487,7 +1500,7 @@ function App() {
             <button
               className="submit"
               disabled={
-                busy || (!editing && (!selectedRecord || selectedRecord.journalId !== null))
+                busy || (!editing && !canCreateHikingJournal(selectedRecord))
               }
             >
               일지 저장하기
@@ -1650,35 +1663,35 @@ function App() {
       {screen === 'hikingRecords' && (
         <>
           {header('등산기록', true)}
-          <section className="scroll-content utility-content">
+          <section className="scroll-content utility-content hiking-records-list">
             {busy ? (
               <p role="status">불러오는 중…</p>
             ) : hikingRecords.length ? (
               hikingRecords.map((record) => (
-                <article className="profile-summary" key={record.id}>
-                  <div>
-                    <b>{record.mountainName}</b>
-                    <p>{record.hikingDate}</p>
-                    <p>
-                      {(record.distanceMeters / 1000).toFixed(1)}km ·{' '}
-                      {Math.floor(record.elapsedMs / 60000)}분 ·{' '}
-                      {isVerifiedSummit(record) ? '인증 완등' : record.completed ? '정상 도달 기록' : '산행 종료'}
-                    </p>
-                    <p>{scoringText(record.scoring)}</p>
-                    {record.journalId !== null ? (
-                      <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
-                    ) : (
+                <HikingRecordCard record={record} key={record.id}>
+                  {record.journalId !== null ? (
+                    <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
+                  ) : (
+                    <div style={{ width: '100%', minWidth: 0 }}>
                       <button
+                        disabled={!canCreateHikingJournal(record)}
+                        aria-describedby={!canCreateHikingJournal(record) ? `journal-eligibility-${record.id}` : undefined}
                         onClick={() => {
+                          if (!canCreateHikingJournal(record)) return;
                           go('write');
                           setSelectedRecordId(record.id);
                         }}
                       >
                         등산일지 작성
                       </button>
-                    )}
-                  </div>
-                </article>
+                      {!canCreateHikingJournal(record) && (
+                        <p id={`journal-eligibility-${record.id}`} className="muted" style={{ fontSize: 12, lineHeight: 1.7, margin: '10px 0 0' }}>
+                          {JOURNAL_ELIGIBILITY_MESSAGE}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </HikingRecordCard>
               ))
             ) : (
               <p>저장된 등산기록이 없습니다.</p>

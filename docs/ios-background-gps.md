@@ -3,7 +3,7 @@
 ## 현재 상태
 
 React 산행 화면과 Capacitor iOS의 Core Location/SQLite를 연결했다.
-브라우저/Safari/PWA는 기존 watchPosition과 숨김 자동 일시정지를 유지한다.
+브라우저/Safari/PWA는 watchPosition을 사용한다. 현행 웹 생명주기 이벤트는 체크포인트만 남기며 단순 숨김만으로 사용자 일시정지하지 않는다. 같은 탭·최근12시간 이내 유효 웹 초안은 이전 진행/수동 일시정지 상태를 복구한다. 아래 도입·검증 기록은 작성 당시 범위이며 최신 코드의 복구 규칙은 recoveryPolicy/webSessionLifecycle을 함께 확인한다.
 iOS 앱은 네이티브 수집 시작 확인 후 TRACKING을 확정하며, 화면 잠금/앱 전환만으로 pause하지 않는다.
 명시적 pause/resume/종료, 복귀 조회, 복구 종료/삭제를 연결했다.
 
@@ -22,9 +22,9 @@ Windows 테스트는 네이티브 GPS의 실기기 동작을 입증하지 않는
 
 macOS, Xcode 26 이상, Command Line Tools, Node 22 이상이 필요하다.
 Capacitor 8의 iOS 최소 지원 버전은 15다. 연결할 iPhone과 Xcode의 호환성을 확인한다.
-현재 Windows Node는 v24.19.0이다.
+도입 당시와 2026-11-13 재검증 환경의 Windows Node는 v24.19.0이다. 웹 빌드/테스트에는 Vite 8 요구사항을 함께 만족하는 Node 22.12 이상을 사용한다.
 
-작업 디렉터리는 FE/이며 기존 브랜치 fix/28-hiking-session-recovery와 미커밋 파일을 보존한다.
+작업 디렉터리는 FE/이며 현재 체크아웃과 미커밋 파일을 보존한다. 도입 당시 브랜치는 fix/28-hiking-session-recovery였으며, 이 이름으로 강제 이동하는 절차가 아니다.
 아래는 Mac에서 수행할 절차이며 이번 Windows 작업에서는 실행하지 않았다.
 
 ```sh
@@ -203,6 +203,8 @@ FE 한도는 복귀/병합 시 적용하므로 긴 백그라운드 구간의 원
 
 ## Windows 검증
 
+아래 CLI 오류·파일 비교·189/194개 수치는 도입 당시 기록이다. 2026-11-13 문서 2차 검증에서는 FE 테스트352개와 build가 통과했다. cap sync/copy와 Swift/Xcode/실기기 검증은 이번에도 수행하지 않았다.
+
 - npm.cmd test: 기존 전체 FE 테스트 + 네이티브 연동 테스트
 - npm.cmd run build: TypeScript 검사 + React/Vite production build
 - npm.cmd run lint: 프로젝트 기존 Oxlint (ESLint를 추가하지 않음)
@@ -219,7 +221,7 @@ XML 파서는 설치된 Capacitor CLI의 기존 plist/xml2js 의존성을 재사
 uv_os_get_passwd ENOMEM 오류로 종료됐다. CLI/시스템 설정을 패치하거나 우회하지 않았다.
 Capacitor 설정은 TypeScript 파일을 직접 로드해 App/생성 JSON과 대조했다.
 cap copy/sync 성공은 이번 실행에서 검증하지 않았으며 Mac에서 다시 수행해야 한다.
-현재 생성된 앱 public/에는 최신 dist/와 바이트가 동일한 웹 파일 9개가 있음을 확인했다.
+도입 당시 생성된 앱 public/의 웹 파일 9개는 당시 dist/와 바이트가 같았다. 이후 웹 빌드까지 앱 public/에 동기화되었다는 뜻은 아니며 Mac에서 cap sync ios로 다시 확인한다.
 따라서 CLI 실패를 우회해 생성 파일을 수동 복사하거나 관리 파일을 변경하지 않았다.
 
 nativeTracking 테스트는 mock bridge와 실제 병합/복구 저장 함수로 시작 확인, pause/resume,
@@ -253,7 +255,7 @@ React 산행 화면으로 다음을 시험한다. 기존 개발용 네이티브 
 
 | 시험                          | 확인할 결과                                          |
 | ----------------------------- | ---------------------------------------------------- |
-| 일반 웹/Safari 시작·숨김·복귀 | 기존 자동 pause, 명시적 resume, 15초 필터 유지       |
+| 일반 웹/Safari 시작·숨김·복귀 | 숨김은 체크포인트, 진행/수동 pause 상태 유지, 15초 필터 |
 | iOS 권한 허용·시작            | native 확인 전 TRACKING 미확정, 같은 UUID            |
 | 화면 잠금 10–15분 이동        | 잠금 구간 좌표 반영, 숨김만으로 pause하지 않음       |
 | 다른 앱 전환·반복 복귀        | 구간 좌표 반영, cursor/거리 중복 없음                |
