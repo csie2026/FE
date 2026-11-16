@@ -46,7 +46,7 @@ export function trackDistance(segments: GpsPoint[][]): number {
 export function hasReachedSummit(point: GpsPoint, summit: Coordinate, now = Date.now()): boolean {
   return isUsablePoint(point, now) && distanceMeters(point, summit) <= SUMMIT_RADIUS_METERS;
 }
-// 각 코스 선분에 투영한 최소 거리. 짧은 산행 코스용 지역 평면 근사입니다.
+// 각 코스 선분에 투영한 최소 거리로, 짧은 산행 코스에 지역 평면 근사를 적용한다.
 export function distanceToCourse(point: Coordinate, path: Coordinate[]): number {
   if (!path.length) return Infinity;
   if (path.length === 1) return distanceMeters(point, path[0]);

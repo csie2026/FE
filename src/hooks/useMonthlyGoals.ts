@@ -18,6 +18,7 @@ export function useMonthlyGoals(
   refreshKey: number,
   onAuthError: (error: unknown) => void,
 ) {
+  // 회원·활성 여부·월을 하나의 범위로 묶어 이전 범위의 늦은 응답을 구분한다.
   const scope = useMemo(() => ({ userId, enabled, month }), [userId, enabled, month]);
   const [attempt, setAttempt] = useState(0);
   const request = useMemo(() => ({ scope, refreshKey, attempt }), [scope, refreshKey, attempt]);
@@ -43,6 +44,7 @@ export function useMonthlyGoals(
     };
   }, [scope]);
   useEffect(() => {
+    // 저장 중 재조회가 완료된 저장 결과를 이전 값으로 덮어쓰지 않도록 조회를 잠시 멈춘다.
     if (userId === null || !enabled || saving) return;
     const controller = new AbortController();
     getMonthlyGoals(userId, month, controller.signal)
@@ -62,6 +64,7 @@ export function useMonthlyGoals(
   }, [userId, enabled, month, request, saving, onAuthError]);
   const saveGoals = useCallback(
     async (next: MonthlyGoals) => {
+      // 범위가 바뀌었거나 쓰기 요청이 진행 중이면 같은 목표를 중복 저장하지 않는다.
       if (userId === null || !enabled || active.current !== scope || writer.current) return false;
       const controller = new AbortController();
       writer.current = controller;

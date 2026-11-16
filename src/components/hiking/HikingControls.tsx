@@ -20,6 +20,7 @@ export default function HikingControls({
   complete,
   reset,
 }: Props) {
+  // 산행 상태마다 허용된 동작만 노출해 시작·재개·완료 요청이 동시에 발생하지 않게 한다.
   return (
     <div className="hiking-controls">
       {state === 'READY' && (
@@ -33,6 +34,7 @@ export default function HikingControls({
         </button>
       )}
       {state === 'PAUSED' && (
+        // 저장 한도 초과 등 자동 중지 사유가 있으면 기존 기록은 완료할 수 있지만 재개할 수 없다.
         <button type="button" onClick={resume} disabled={Boolean(trackingStopReason)}>
           ▶ 계속하기
         </button>

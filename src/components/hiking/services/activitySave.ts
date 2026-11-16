@@ -46,6 +46,7 @@ export function confirmsSavedActivity(
   );
 }
 export function describeSaveFailure(cause: unknown): ActivitySaveFailure {
+  // 재시도 가능성에 따라 오류를 분류해 임시 기록 보존과 다음 행동을 다르게 안내한다.
   if (cause instanceof ActivitySaveFailure) return cause;
   if (cause instanceof ApiError) {
     if (cause.status === 413)
@@ -121,6 +122,7 @@ export async function submitPendingActivity(
     }, timeoutMs);
   });
   try {
+    // 요청 구현이 취소 신호를 무시해도 사용자 취소와 시간 제한이 저장 대기를 끝내게 한다.
     const record = await Promise.race([
       saveHikingRecord(input, controller.signal, userId),
       cancelled,

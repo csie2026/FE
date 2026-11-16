@@ -5,6 +5,7 @@ export function loginProviderLabel(provider?: string | null): string {
 }
 
 export function formatJoinedDate(joinedAt?: string | null): string {
+  // 시간대가 명시된 서버 시각만 받아 한국 날짜로 변환하고 불완전한 값은 추정하지 않는다.
   if (!joinedAt || !/(Z|[+-]\d{2}:\d{2})$/.test(joinedAt)) return '가입일 정보 없음';
   const instant = new Date(joinedAt);
   if (!Number.isFinite(instant.getTime())) return '가입일 정보 없음';

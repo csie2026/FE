@@ -11,7 +11,7 @@ type Preview = {
   error: string;
 };
 
-// iOS의 시작 버튼 표시용 단발 측정이며 산행 세션이나 경로를 생성하지 않습니다.
+// iOS의 시작 버튼 표시용 단발 측정이며 산행 세션이나 경로를 생성하지 않는다.
 export function useNativeStartPreview(enabled: boolean, course: HikingCourse, userId: number) {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [now, setNow] = useState(Date.now);
