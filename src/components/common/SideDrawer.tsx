@@ -48,6 +48,7 @@ export default function SideDrawer({
       if (!dialog.open) dialog.showModal();
       frame = requestAnimationFrame(() => dialog.classList.add('is-open'));
     } else {
+      // 닫힘 애니메이션이 끝난 뒤에만 대화상자를 닫아 패널이 갑자기 사라지지 않게 한다.
       dialog.classList.remove('is-open');
       timer = window.setTimeout(() => dialog.close(), 220);
     }
@@ -63,6 +64,7 @@ export default function SideDrawer({
       type="button"
       aria-current={activeScreen === destination ? 'page' : undefined}
       onClick={() => {
+        // 모달 상태를 먼저 해제한 뒤 화면을 바꿔 새 화면의 포커스 이동을 막지 않게 한다.
         onClose();
         onNavigate(destination);
       }}

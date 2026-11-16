@@ -6,6 +6,7 @@ export function loadMountainWeather(mountainId: number): Promise<MountainWeather
   if (!Number.isSafeInteger(mountainId) || mountainId <= 0)
     return Promise.reject(new Error('산 ID를 확인해주세요.'));
   const existing = cache.get(mountainId);
+  // 같은 산의 동시 조회는 진행 중인 Promise까지 공유해 중복 요청을 만들지 않는다.
   if (existing && existing.expires > Date.now()) return existing.value;
   const value = getMountainWeather(mountainId, AbortSignal.timeout(12_000)).then((data) => {
     if (!data || data.mountainId !== mountainId || (data.days != null && !Array.isArray(data.days)))
@@ -17,6 +18,7 @@ export function loadMountainWeather(mountainId: number): Promise<MountainWeather
   cache.set(mountainId, entry);
   if (cache.size > 40) cache.delete(cache.keys().next().value!);
   void value.catch(() => {
+    // 실패한 Promise는 캐시에 남기지 않아 사용자가 즉시 다시 조회할 수 있게 한다.
     if (cache.get(mountainId) === entry) cache.delete(mountainId);
   });
   return value;
@@ -34,6 +36,7 @@ export function weatherError(cause: unknown): string {
 }
 
 export function forecastTime(value: string | null | undefined): string {
+  // 서버가 제공한 한국 현지 시각 문자열을 다시 시간대 변환하지 않고 화면 형식만 바꾼다.
   const match = value?.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/);
   if (!match) return '시각 미제공';
   return `${match[2]}/${match[3]} ${match[4]}:${match[5]}`;

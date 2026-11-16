@@ -1,7 +1,7 @@
 import { validateStartPosition } from './startValidation.ts';
 import type { Coordinate, GpsPoint, LocationStatus } from '../types.ts';
 
-// 버튼 표시용 사전 확인입니다. 클릭 후 새 GPS를 요청하는 시작 검증을 대체하지 않습니다.
+// 버튼 표시용 사전 확인이며 클릭 후 새 GPS를 요청하는 시작 검증을 대체하지 않는다.
 export function startAvailability(
   start: Coordinate,
   point: GpsPoint | null,

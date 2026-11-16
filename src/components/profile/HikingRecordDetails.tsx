@@ -48,6 +48,7 @@ export default function HikingRecordDetails({
   );
 
   async function load() {
+    // 빠른 재시도나 패널 닫기 뒤 이전 요청 결과가 화면을 덮어쓰지 않도록 먼저 취소한다.
     request.current?.abort();
     const controller = new AbortController();
     request.current = controller;
@@ -69,6 +70,7 @@ export default function HikingRecordDetails({
 
   function toggle() {
     if (expanded) {
+      // 상세 패널을 닫으면 진행 중인 조회도 함께 종료해 보이지 않는 상태 갱신을 막는다.
       request.current?.abort();
       request.current = null;
       setLoading(false);

@@ -67,6 +67,7 @@ export default function CityMountainList({
         aria-label="시·군 산 목록 필터, 좌우로 넘겨보세요"
         onPointerDown={(event) => {
           suppressFilterClick.current = false;
+          // 터치 화면은 기본 스크롤을 사용하고 마우스 왼쪽 버튼에만 끌기 동작을 추가한다.
           if (event.pointerType !== 'mouse' || event.button !== 0) return;
           filterDrag.current = {
             pointerId: event.pointerId,
@@ -79,6 +80,7 @@ export default function CityMountainList({
           const drag = filterDrag.current;
           if (!drag || drag.pointerId !== event.pointerId) return;
           const distance = event.clientX - drag.startX;
+          // 작은 포인터 흔들림은 클릭으로 유지하고 5px 이상 움직일 때만 드래그로 전환한다.
           if (!drag.moved && Math.abs(distance) < 5) return;
           if (!drag.moved) {
             drag.moved = true;
@@ -104,6 +106,7 @@ export default function CityMountainList({
           setDraggingFilters(false);
         }}
         onClickCapture={(event) => {
+          // 드래그를 끝낸 손 떼기 동작이 시·군 선택 클릭으로 이어지지 않게 한 번만 차단한다.
           if (suppressFilterClick.current && event.detail !== 0) {
             event.preventDefault();
             event.stopPropagation();

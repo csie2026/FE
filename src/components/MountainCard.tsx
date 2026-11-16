@@ -30,6 +30,7 @@ export default function MountainCard({
         <span className="badge">보기</span>
       </button>
       {onFavoriteToggle && (
+        // 상세 보기 버튼과 분리해 즐겨찾기 조작이 상세 화면 이동까지 일으키지 않게 한다.
         <button
           type="button"
           className={`mountain-card__favorite ${isFavorite ? 'is-favorite' : ''}`}

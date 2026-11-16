@@ -33,12 +33,14 @@ export default function GyeonggiMap({ activeRegion, selectedCity, onSelect }: Pr
     type: 'FeatureCollection',
     features,
   };
+  // 현재 권역의 도형만 360×320 영역에 맞춰 권역별 지도가 같은 공간을 사용하게 한다.
   const projection = geoMercator().fitSize([360, 320], collection);
   const path = geoPath(projection);
   const cityGroups =
     region?.cities.map((city) => {
       const cityFeatures = features.filter((feature) => cityOf(feature) === city.id);
       const centroids = cityFeatures.map((feature) => path.centroid(feature));
+      // 여러 행정구로 나뉜 시는 각 도형 중심의 평균 지점에 하나의 도시 라벨을 배치한다.
       const center = centroids.length
         ? centroids
             .reduce(([sumX, sumY], [x, y]) => [sumX + x, sumY + y], [0, 0])
