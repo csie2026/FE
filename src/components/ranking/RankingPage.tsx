@@ -1,7 +1,14 @@
 import { getErrorMessage } from '../../utils/errorMessages';
 import ProfileAvatar from '../common/ProfileAvatar';
-import { useEffect, useMemo, useState } from 'react';
-import { ApiError, scoreText, type RankingMember, type RankingSummary } from '../../api';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ApiError,
+  getRankings,
+  recalculateScore,
+  scoreText,
+  type RankingMember,
+  type RankingSummary,
+} from '../../api';
 import './RankingPage.css';
 import { startRankingRequest } from '../../services/ranking';
 import { subscribeForegroundRefresh } from '../../services/foregroundRefresh';
@@ -46,6 +53,12 @@ function points(member: RankingMember) {
 // 서버가 정렬한 공개 회원 목록을 사용하고, 사용자 선택은 상위 화면의 타인 프로필 이동으로 연결한다.
 export default function RankingPage({ currentUserId, onSelectUser, onAuthError }: Props) {
   const [attempt, setAttempt] = useState(0);
+  const scoreRefreshAbort = useRef<AbortController | null>(null);
+  const [scoreRefreshState, setScoreRefreshState] = useState<{
+    scope: number | null;
+    busy: boolean;
+    error: string;
+  }>({ scope: null, busy: false, error: '' });
   const request = useMemo(() => ({ scope: currentUserId, attempt }), [currentUserId, attempt]);
   const [result, setResult] = useState<{
     request: typeof request | null;
@@ -74,9 +87,41 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
     });
   }, [request, currentUserId, onAuthError]);
 
-  function refresh() {
+  function retryRanking() {
     setAttempt((value) => value + 1);
   }
+  async function refresh() {
+    if (currentUserId === null || scoreRefreshAbort.current) return;
+    const userId = currentUserId;
+    const controller = new AbortController();
+    scoreRefreshAbort.current = controller;
+    setScoreRefreshState({ scope: userId, busy: true, error: '' });
+    try {
+      await recalculateScore(controller.signal, userId);
+      if (controller.signal.aborted) return;
+      // R01도 새로고침 흐름에서 호출하되, 기존 화면은 순위·전체 인원을 제공하는 R02를 계속 기준으로 삼는다.
+      // 보조 호출을 기다리거나 오류를 화면에 반영하지 않아 기존 R02 새로고침 흐름에 영향을 주지 않는다.
+      void getRankings(controller.signal).catch(() => undefined);
+      setScoreRefreshState({ scope: userId, busy: false, error: '' });
+      setAttempt((value) => value + 1);
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      setScoreRefreshState({
+        scope: userId,
+        busy: false,
+        error: getErrorMessage(cause, '점수와 순위를 새로고침하지 못했습니다. 다시 시도해주세요.'),
+      });
+      if (cause instanceof ApiError && cause.status === 401) onAuthError(cause);
+    } finally {
+      if (scoreRefreshAbort.current === controller) scoreRefreshAbort.current = null;
+    }
+  }
+  useEffect(() => {
+    return () => {
+      scoreRefreshAbort.current?.abort();
+      scoreRefreshAbort.current = null;
+    };
+  }, [currentUserId]);
   useEffect(() => {
     return subscribeForegroundRefresh(window, document, () => setAttempt((value) => value + 1));
   }, []);
@@ -84,6 +129,12 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
   const members = summary?.members ?? [];
   const mine = summary?.mine;
   const positions = [2, 1, 3];
+  const scoreRefreshing =
+    currentUserId !== null && scoreRefreshState.scope === currentUserId && scoreRefreshState.busy;
+  const scoreRefreshError =
+    currentUserId !== null && scoreRefreshState.scope === currentUserId
+      ? scoreRefreshState.error
+      : '';
 
   return (
     <section className="leaderboard-layout" aria-label="유저 랭킹">
@@ -98,7 +149,7 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
         ) : error ? (
           <div className="leaderboard-feedback">
             <p role="alert">{error}</p>
-            <button type="button" onClick={refresh}>
+            <button type="button" onClick={retryRanking}>
               다시 불러오기
             </button>
           </div>
@@ -106,10 +157,15 @@ export default function RankingPage({ currentUserId, onSelectUser, onAuthError }
           <>
             <div className="leaderboard-toolbar">
               <span>같은 점수는 회원 등록 순서로 순위가 정해집니다.</span>
-              <button type="button" onClick={refresh}>
+              <button type="button" onClick={() => void refresh()} disabled={scoreRefreshing}>
                 새로고침
               </button>
             </div>
+            {scoreRefreshError && (
+              <p className="leaderboard-refresh-error" role="alert">
+                {scoreRefreshError}
+              </p>
+            )}
             {members.length === 0 && (
               <p className="leaderboard-empty" role="status">
                 아직 랭킹에 표시할 회원이 없습니다.

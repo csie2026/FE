@@ -6,9 +6,11 @@ import './HikingRecordCard.css';
 
 export default function HikingRecordCard({
   record,
+  details,
   children,
 }: {
   record: HikingActivity;
+  details?: ReactNode;
   children: ReactNode;
 }) {
   const verified = isVerifiedSummit(record);
@@ -77,6 +79,7 @@ export default function HikingRecordCard({
           scoreLines.map((line, index) => <p key={index}>{line}</p>)
         )}
       </div>
+      {details}
       <footer className="hiking-record-card__footer bottom-actions">{children}</footer>
     </article>
   );

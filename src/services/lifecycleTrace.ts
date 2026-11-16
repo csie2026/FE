@@ -203,7 +203,7 @@ export function classifyPageQuery(path: string): TraceDetails['query'] | undefin
   if (path === '/api/journals') return 'journals';
   if (/^\/api\/journals\/\d+$/.test(path)) return 'journal-detail';
   if (path === '/api/users/me/journals') return 'my-journals';
-  if (path === '/api/users/me/hiking-records') return 'hiking-records';
+  if (/^\/api\/users\/me\/hiking-records(?:\/\d+)?$/.test(path)) return 'hiking-records';
   if (/^\/api\/users\/\d+\/profile$/.test(path)) return 'public-profile';
   if (/^\/api\/users\/\d+\/journals$/.test(path)) return 'public-journals';
   if (/^\/api\/rankings(?:\/summary)?(?:\?[^#]*)?$/.test(path)) return 'ranking';
