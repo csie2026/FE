@@ -181,6 +181,8 @@ test('App keeps the journalId branch and existing navigation; list adds no filte
     app.indexOf("{screen === 'accountSettings'"),
   );
   assert.match(section, /hikingRecords\.map/);
+  assert.match(section, /HikingRecordDetails/);
+  assert.match(section, /recordId=\{record\.id\}/);
   assert.doesNotMatch(section, /\.filter\(|\.sort\(|isRecognizedHike|isCertifiedActivity/);
   assert.match(section, /record\.journalId !== null/);
   assert.match(section, /openJournal\(record\.journalId!\)/);

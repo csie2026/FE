@@ -24,14 +24,39 @@ export interface RankingMember {
   rank: number;
 }
 
-export const getRankings = () => api<PublicProfile[]>('/api/rankings');
 export interface RankingSummary {
   members: RankingMember[];
   mine: RankingMember | null;
   totalMembers: number;
 }
+export const getRankings = (signal?: AbortSignal) =>
+  api<PublicProfile[]>('/api/rankings', 'GET', undefined, signal);
 export const getRankingSummary = (signal?: AbortSignal) =>
   api<RankingSummary>('/api/rankings/summary', 'GET', undefined, signal);
+export interface ScoreSummary {
+  totalPoints: number;
+  visitPoints: number;
+  summitPoints: number;
+  publicBonusPoints: number;
+  policyVersion: string;
+}
+export const recalculateScore = (signal?: AbortSignal, expectedUserId?: number) =>
+  api<ScoreSummary>(
+    '/api/users/me/hiking-records/recalculate-score',
+    'POST',
+    undefined,
+    signal,
+    expectedUserId === undefined
+      ? undefined
+      : async (requestSignal) => {
+          const member = await getCurrentMember(requestSignal);
+          if (member.userId !== expectedUserId)
+            throw new ApiError(
+              401,
+              '점수를 갱신할 회원과 현재 로그인한 회원이 다릅니다. 다시 로그인해주세요.',
+            );
+        },
+  );
 export interface Member extends PublicProfile {
   provider?: string | null;
   email?: string | null;
@@ -100,6 +125,19 @@ export type GpsEvidencePoint = {
 };
 export const getHikingRecords = (signal?: AbortSignal) =>
   api<HikingActivity[]>('/api/users/me/hiking-records', 'GET', undefined, signal);
+export async function getHikingRecord(id: number, signal?: AbortSignal) {
+  if (!Number.isSafeInteger(id) || id <= 0)
+    throw new ApiError(400, '확인할 산행 기록을 선택해주세요.');
+  const record = await api<HikingActivity>(
+    `/api/users/me/hiking-records/${id}`,
+    'GET',
+    undefined,
+    signal,
+  );
+  if (record.id !== id)
+    throw new ApiError(502, '요청한 산행 기록과 다른 응답을 받았습니다. 다시 시도해주세요.');
+  return record;
+}
 export const saveHikingRecord = (
   input: HikingActivityInput,
   signal?: AbortSignal,
@@ -299,8 +337,12 @@ export async function api<T>(
     finishDiagnostic?.('success');
     return result;
   } catch (cause) {
-    const outcome = cause instanceof ApiError && cause.code === 'request_timeout'
-      ? 'timeout' : signal?.aborted ? 'cancelled' : 'error';
+    const outcome =
+      cause instanceof ApiError && cause.code === 'request_timeout'
+        ? 'timeout'
+        : signal?.aborted
+          ? 'cancelled'
+          : 'error';
     finishDiagnostic?.(outcome, cause instanceof ApiError ? cause.status : undefined);
     throw cause;
   } finally {
@@ -430,8 +472,7 @@ export async function deleteMemberImage(
   );
   return ownedImageResponse(await getCurrentMember(signal), expectedUserId);
 }
-export const scoreText = (score: number | null) =>
-  `${(score ?? 0).toLocaleString()}점`;
+export const scoreText = (score: number | null) => `${(score ?? 0).toLocaleString()}점`;
 
 export interface WeatherHour {
   time: string;

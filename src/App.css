@@ -965,12 +965,21 @@
 }
 button:disabled {
   opacity: 0.55;
+  cursor: default;
+}
+button:disabled[aria-busy='true'] {
   cursor: wait;
 }
 
 .avatar {
   position: relative;
   flex: none;
+}
+.avatar.is-initials {
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 16px;
+  line-height: 1;
 }
 .avatar img {
   position: absolute;

@@ -4,6 +4,7 @@ import { createScopedRequest } from './services/scopedRequest';
 import { subscribeForegroundRefresh } from './services/foregroundRefresh';
 import { recordLifecycle } from './services/lifecycleDiagnostics';
 import HikingRecordCard from './components/profile/HikingRecordCard';
+import HikingRecordDetails from './components/profile/HikingRecordDetails';
 import { canCreateHikingJournal, JOURNAL_ELIGIBILITY_MESSAGE } from './services/journalEligibility';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
@@ -1668,7 +1669,20 @@ function App() {
               <p role="status">불러오는 중…</p>
             ) : hikingRecords.length ? (
               hikingRecords.map((record) => (
-                <HikingRecordCard record={record} key={record.id}>
+                <HikingRecordCard
+                  record={record}
+                  key={record.id}
+                  details={
+                    <HikingRecordDetails
+                      recordId={record.id}
+                      onLoaded={(detail) =>
+                        setHikingRecords((current) =>
+                          current.map((item) => (item.id === detail.id ? detail : item)),
+                        )
+                      }
+                    />
+                  }
+                >
                   {record.journalId !== null ? (
                     <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
                   ) : (

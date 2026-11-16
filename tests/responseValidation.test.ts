@@ -60,6 +60,7 @@ const cases: [string, unknown][] = [
   ['/api/users/1/journals', [journalResponse()]],
   ['/api/journals/9', journalResponse({ hikingRecordId: null })],
   ['/api/users/me/hiking-records', [activityResponse()]],
+  ['/api/users/me/hiking-records/42', activityResponse({ id: 42 })],
   ['/api/rankings/summary', { members: [rank], mine: null, totalMembers: 1 }],
   ['/api/mountains', [mountain]],
   ['/api/mountains/1/courses', [course]],
