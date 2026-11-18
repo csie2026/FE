@@ -10,9 +10,7 @@ test('profile write sends session cookies and server CSRF token', async () => {
     calls.push([String(input), init]);
     return new Response(
       JSON.stringify(
-        calls.length === 1
-          ? { headerName: 'X-CSRF-TOKEN', token: 'csrf' }
-          : memberResponse(),
+        calls.length === 1 ? { headerName: 'X-CSRF-TOKEN', token: 'csrf' } : memberResponse(),
       ),
       { status: 200 },
     );

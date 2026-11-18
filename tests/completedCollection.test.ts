@@ -25,7 +25,13 @@ const activity = (
   elapsedMs: 0,
   journalId: null,
   gpsValidationVersion: 1,
-  scoring: { status: 'CERTIFIED', certificationDate: '2026-11-01', visitPoints: 200, summitPoints: completed ? 70 : 0, policyVersion: 'visit-general-or-verified-summit-multi-v2' },
+  scoring: {
+    status: 'CERTIFIED',
+    certificationDate: '2026-11-01',
+    visitPoints: 200,
+    summitPoints: completed ? 70 : 0,
+    policyVersion: 'visit-general-or-verified-summit-multi-v2',
+  },
 });
 const catalog = [
   { id: '1', name: 'DB 산 이름', city: '파주시', region: '북부권역' },

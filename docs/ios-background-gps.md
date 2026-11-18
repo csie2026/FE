@@ -253,25 +253,25 @@ TypeScript/Vite production build, Oxlint, 이번 변경 테스트/문서의 Pret
 
 React 산행 화면으로 다음을 시험한다. 기존 개발용 네이티브 수집기가 남아 있지 않은지 먼저 확인한다.
 
-| 시험                          | 확인할 결과                                          |
-| ----------------------------- | ---------------------------------------------------- |
+| 시험                          | 확인할 결과                                             |
+| ----------------------------- | ------------------------------------------------------- |
 | 일반 웹/Safari 시작·숨김·복귀 | 숨김은 체크포인트, 진행/수동 pause 상태 유지, 15초 필터 |
-| iOS 권한 허용·시작            | native 확인 전 TRACKING 미확정, 같은 UUID            |
-| 화면 잠금 10–15분 이동        | 잠금 구간 좌표 반영, 숨김만으로 pause하지 않음       |
-| 다른 앱 전환·반복 복귀        | 구간 좌표 반영, cursor/거리 중복 없음                |
-| pause → 이동 → resume         | pause 중 기록 없음, 같은 UUID·새 구간·휴식 시간 제외 |
-| pause/stop 반복               | 시간·구간 중복 누적과 좌표 삭제 없음                 |
-| stopped UUID resume           | SESSION_CLOSED, 완료 본문 유지                       |
-| 산행 화면 이탈·로그아웃       | 가능한 범위에서 pause, 다른 사용자와 분리            |
-| WebView reload                | 기존 UUID 복구 후 native recording/paused 상태 대조  |
-| 프로세스 종료·재실행          | interrupted, 미확인 시간 자동 누적 없음              |
-| 복구 종료·저장                | stop/마지막 병합 후 확정, 재시도 UUID/본문 유지      |
-| 임시 기록 삭제                | stop 확인 후 웹 초안 삭제, SQLite 원본 보존          |
-| 권한 철회·서비스 끄기         | 오류 구분, 상태 재확인, web fallback 없음            |
-| 저장 실패 주입                | 수집 중단, cursor/확정 본문 미진행, 원본 보존        |
-| v1 데이터가 있는 앱 업데이트  | 좌표/sequence 보존, v2 스키마, pause/resume          |
-| 10,000점/FE 용량 경계         | 명시적 중단, 원본 보존, 완료 요청 유효성             |
-| 오프라인·서버 응답 유실       | 로컬 수집 유지, 기존 UUID/본문으로 재시도            |
+| iOS 권한 허용·시작            | native 확인 전 TRACKING 미확정, 같은 UUID               |
+| 화면 잠금 10–15분 이동        | 잠금 구간 좌표 반영, 숨김만으로 pause하지 않음          |
+| 다른 앱 전환·반복 복귀        | 구간 좌표 반영, cursor/거리 중복 없음                   |
+| pause → 이동 → resume         | pause 중 기록 없음, 같은 UUID·새 구간·휴식 시간 제외    |
+| pause/stop 반복               | 시간·구간 중복 누적과 좌표 삭제 없음                    |
+| stopped UUID resume           | SESSION_CLOSED, 완료 본문 유지                          |
+| 산행 화면 이탈·로그아웃       | 가능한 범위에서 pause, 다른 사용자와 분리               |
+| WebView reload                | 기존 UUID 복구 후 native recording/paused 상태 대조     |
+| 프로세스 종료·재실행          | interrupted, 미확인 시간 자동 누적 없음                 |
+| 복구 종료·저장                | stop/마지막 병합 후 확정, 재시도 UUID/본문 유지         |
+| 임시 기록 삭제                | stop 확인 후 웹 초안 삭제, SQLite 원본 보존             |
+| 권한 철회·서비스 끄기         | 오류 구분, 상태 재확인, web fallback 없음               |
+| 저장 실패 주입                | 수집 중단, cursor/확정 본문 미진행, 원본 보존           |
+| v1 데이터가 있는 앱 업데이트  | 좌표/sequence 보존, v2 스키마, pause/resume             |
+| 10,000점/FE 용량 경계         | 명시적 중단, 원본 보존, 완료 요청 유효성                |
+| 오프라인·서버 응답 유실       | 로컬 수집 유지, 기존 UUID/본문으로 재시도               |
 
 Safari Web Inspector와 Xcode Devices and Simulators의 앱 컨테이너에서 UUID/sequence/상태를 비교한다.
 debugger 없이도 시험한다. 잠금 중 파일 쓰기, When In Use 지속 수집, 배터리/저전력 모드,
