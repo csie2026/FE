@@ -104,9 +104,9 @@ test('storage denial preserves in-memory confirmation and server revocation evid
 });
 
 test('App wires confirmation to server success and cleanup to explicit logout', () => {
-  const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-  assert.match(app, /confirmLogin\(\);\s*setMe\(user\)/);
-  assert.match(app, /const clearAccount = useCallback\(\(\) => \{[\s\S]*?forgetLogin\(\)/);
-  assert.match(app, /onSuccess: \(\) => \{\s*clearAccount\(\)/);
-  assert.match(app, /if \(logoutPending.current \|\| !shouldNotifySessionExpiry\(code\)\) return/);
+  const auth = readFileSync(new URL('../src/hooks/useAppAuth.ts', import.meta.url), 'utf8');
+  assert.match(auth, /confirmLogin\(\);\s*setMe\(user\)/);
+  assert.match(auth, /const clearAccount = useCallback\(\(\) => \{[\s\S]*?forgetLogin\(\)/);
+  assert.match(auth, /onSuccess: \(\) => \{\s*clearAccount\(\)/);
+  assert.match(auth, /if \(logoutPending.current \|\| !shouldNotifySessionExpiry\(code\)\) return/);
 });

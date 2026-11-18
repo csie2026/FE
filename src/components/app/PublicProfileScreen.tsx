@@ -1,12 +1,13 @@
-import type { ReactNode } from 'react';
-import { scoreText, type PublicProfileDetails } from '../../api';
+import { scoreText, type Journal, type PublicProfileDetails } from '../../api';
 import ProfileAvatar from '../common/ProfileAvatar';
+import JournalList from './JournalList';
 
 type Props = {
   busy: boolean;
   readError: boolean;
   profile: PublicProfileDetails | null;
-  journals: ReactNode;
+  journals: Journal[];
+  onOpenJournal: (id: number) => void;
   onRetry: () => void;
 };
 
@@ -15,6 +16,7 @@ export default function PublicProfileScreen({
   readError,
   profile,
   journals,
+  onOpenJournal,
   onRetry,
 }: Props) {
   return (
@@ -59,7 +61,13 @@ export default function PublicProfileScreen({
             등반·완등 횟수는 저장된 GPS 산행 활동을 기준으로 합니다.
           </p>
           <h3>공개 등산일지</h3>
-          {journals}
+          <JournalList
+            busy={busy}
+            readError={readError}
+            journals={journals}
+            emptyMessage="공개 등산일지가 없습니다."
+            onOpen={onOpenJournal}
+          />
         </>
       ) : (
         <p role="status">공개 프로필을 확인할 수 없습니다.</p>
