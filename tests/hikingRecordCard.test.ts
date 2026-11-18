@@ -174,19 +174,20 @@ test('all records retain input order, safe escaped names and original metric rou
   assert.match(html, /<strong>1<\/strong>/);
 });
 
-test('App keeps the journalId branch and existing navigation; list adds no filtering or sorting', () => {
+test('hiking record screen keeps the journalId branch and existing navigation without filtering or sorting', () => {
   const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
-  const section = app.slice(
-    app.indexOf("{screen === 'hikingRecords' &&"),
-    app.indexOf("{screen === 'accountSettings'"),
+  const section = readFileSync(
+    new URL('../src/components/app/HikingRecordsScreen.tsx', import.meta.url),
+    'utf8',
   );
-  assert.match(section, /hikingRecords\.map/);
+  assert.match(section, /records\.map/);
   assert.match(section, /HikingRecordDetails/);
   assert.match(section, /recordId=\{record\.id\}/);
   assert.doesNotMatch(section, /\.filter\(|\.sort\(|isRecognizedHike|isCertifiedActivity/);
   assert.match(section, /record\.journalId !== null/);
-  assert.match(section, /openJournal\(record\.journalId!\)/);
-  assert.match(section, /go\('write'\);\s*setSelectedRecordId\(record\.id\)/);
+  assert.match(section, /onOpenJournal\(record\.journalId!\)/);
+  assert.match(section, /onWriteJournal\(record\)/);
+  assert.match(app, /go\('write'\);\s*setSelectedRecordId\(record\.id\)/);
   assert.match(section, /저장된 등산기록이 없습니다/);
 });
 

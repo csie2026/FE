@@ -9,13 +9,9 @@ import {
 import { createScopedRequest } from './services/scopedRequest';
 import { subscribeForegroundRefresh } from './services/foregroundRefresh';
 import { recordLifecycle } from './services/lifecycleDiagnostics';
-import HikingRecordCard from './components/profile/HikingRecordCard';
-import HikingRecordDetails from './components/profile/HikingRecordDetails';
 import { canCreateHikingJournal, JOURNAL_ELIGIBILITY_MESSAGE } from './services/journalEligibility';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
-import ProfileAvatar from './components/common/ProfileAvatar';
-import JournalAuthor from './components/common/JournalAuthor';
 import { createLogout } from './services/logout';
 import { confirmLogin, forgetLogin, shouldNotifySessionExpiry } from './services/loginHistory';
 import { koreanMonthBounds } from './services/hikingStatistics';
@@ -25,24 +21,10 @@ import {
   readHikingSelection,
   type HikingSelection,
 } from './components/hiking/services/hikingNavigation';
-import logo from './assets/topeak-logo.svg';
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
-import HikingPage from './components/hiking/HikingPage';
 import HikingRecoveryNotice from './components/hiking/HikingRecoveryNotice';
-import MountainCourseInfo from './components/MountainCourseInfo';
-import MountainWeather from './components/MountainWeather';
 import MyPage from './components/profile/MyPage';
-import MountainCollection from './components/profile/MountainCollection';
 import RankingPage from './components/ranking/RankingPage';
 import { groupExploreMountains } from './services/exploreMountains';
 import { useExploreMountains } from './hooks/useExploreMountains';
@@ -51,6 +33,20 @@ import { useMonthlyGoals } from './hooks/useMonthlyGoals';
 import { clearLegacyMemberImages } from './utils/memberImages';
 import SideDrawer from './components/common/SideDrawer';
 import SettingsPage from './components/settings/SettingsPage';
+import AboutScreen from './components/app/AboutScreen';
+import AppHeader from './components/app/AppHeader';
+import JournalList from './components/app/JournalList';
+import LoginScreen from './components/app/LoginScreen';
+import HikingRecordsScreen from './components/app/HikingRecordsScreen';
+import JournalDetailScreen from './components/app/JournalDetailScreen';
+import JournalEditorScreen from './components/app/JournalEditorScreen';
+import ProfileSetupScreen from './components/app/ProfileSetupScreen';
+import PublicProfileScreen from './components/app/PublicProfileScreen';
+import AppNotices from './components/app/AppNotices';
+import HikingTrackingScreen from './components/app/HikingTrackingScreen';
+import MountainDetailScreen from './components/app/MountainDetailScreen';
+import ExploreScreen from './components/app/ExploreScreen';
+import MountainCollectionScreen from './components/app/MountainCollectionScreen';
 import { withdrawAccount } from './services/withdrawal';
 import {
   clearWithdrawnAccountData,
@@ -68,14 +64,10 @@ import {
   createJournal,
   updateJournal,
   type HikingActivity,
-  scoreText,
   type Member,
   type Journal,
-  type PublicProfile,
   type PublicProfileDetails,
 } from './api';
-
-const RegionExplorer = lazy(() => import('./components/RegionExplorer'));
 
 type Screen =
   | 'login'
@@ -95,15 +87,6 @@ type Screen =
   | 'favorites'
   | 'conquered'
   | 'about';
-
-function BrandMark() {
-  return (
-    <div className="brand-mark" aria-label="ToPeak 로고">
-      <img src={logo} alt="" />
-      <strong>ToPeak</strong>
-    </div>
-  );
-}
 
 // 화면 상태와 회원 상태를 한곳에서 조율하며, history/hash를 통해 뒤로 가기와 상세 링크를 복원한다.
 function App() {
@@ -908,14 +891,6 @@ function App() {
       },
     );
   };
-  const avatar = (profile: PublicProfile) => (
-    <ProfileAvatar
-      userId={profile.userId}
-      nickname={profile.nickname}
-      src={profile.profileImageUrl}
-      className="avatar"
-    />
-  );
   // 화면에서 중복 삭제와 타인 일지 삭제를 막고, 실제 소유권은 서버가 다시 검증한다.
   // 삭제한 상세 화면은 history에서 교체해 뒤로 가기로 같은 항목을 다시 열지 않게 한다.
   const removeJournal = async (journal: Journal) => {
@@ -963,42 +938,6 @@ function App() {
     setIsPublic(journal.isPublic);
     setScreen('write');
   };
-  const journalList = () =>
-    busy ? (
-      <p role="status">불러오는 중…</p>
-    ) : journalReadError ? (
-      <p role="status">등산일지를 불러오지 못했습니다. 화면을 다시 열어 조회해주세요.</p>
-    ) : journals.length ? (
-      journals.map((j) => (
-        <article
-          className="diary-card diary-card--clickable"
-          key={j.id}
-          role="button"
-          tabIndex={0}
-          aria-label={`${j.title} 등산일지 상세 보기`}
-          onClick={() => openJournal(j.id)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault();
-              openJournal(j.id);
-            }
-          }}
-        >
-          <div className="diary-card__body">
-            <b>{j.title}</b>
-            <small>
-              {j.mountainName} · {j.hikingDate} · {j.nickname}
-            </small>
-            <p className="journal-content">{j.content}</p>
-          </div>
-          <span className="badge">{j.isPublic ? '공개' : '비공개'}</span>
-        </article>
-      ))
-    ) : (
-      <p className="muted">
-        {screen === 'publicProfile' ? '공개된 등산일지가 없습니다.' : '아직 등산일지가 없습니다.'}
-      </p>
-    );
   if (loading)
     return (
       <main className="app-shell auth-loading" aria-busy="true">
@@ -1008,45 +947,15 @@ function App() {
     );
 
   const header = (title: string, back = false) => (
-    <header className={`topbar${screen === 'ranking' ? ' topbar--ranking' : ''}`}>
-      {back ? (
-        <button
-          type="button"
-          className="back"
-          onClick={goBack}
-          aria-label="뒤로가기"
-          disabled={withdrawalPending}
-        >
-          ‹
-        </button>
-      ) : (
-        <span aria-hidden="true" />
-      )}
-      <strong>{title}</strong>
-      {me?.profileCompleted ? (
-        <button
-          type="button"
-          className="icon-button menu-button"
-          onClick={() => setDrawerOpen(true)}
-          disabled={withdrawalPending}
-          aria-label="메뉴 열기"
-          aria-haspopup="dialog"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            aria-hidden="true"
-          >
-            <path d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-      ) : (
-        <span aria-hidden="true" />
-      )}
-    </header>
+    <AppHeader
+      title={title}
+      back={back}
+      ranking={screen === 'ranking'}
+      menuVisible={Boolean(me?.profileCompleted)}
+      disabled={withdrawalPending}
+      onBack={goBack}
+      onOpenMenu={() => setDrawerOpen(true)}
+    />
   );
 
   return (
@@ -1059,56 +968,23 @@ function App() {
         onLogout={() => void logout()}
         busy={busy || withdrawalPending}
       />
-      {withdrawalNotice && (
-        <div className="error-banner" role="status">
-          <span>
-            {withdrawalNotice.failed
-              ? '회원탈퇴는 완료됐지만 이 브라우저의 일부 저장 정보를 정리하지 못했어요. 저장소 설정을 확인한 뒤 다시 시도해주세요.'
-              : '회원탈퇴가 완료되었습니다.'}
-          </span>
-          {withdrawalNotice.failed && (
-            <button
-              type="button"
-              onClick={() => {
-                const result = clearWithdrawnAccountData(withdrawalNotice.userId);
-                setWithdrawalNotice({ userId: withdrawalNotice.userId, ...result });
-              }}
-            >
-              브라우저 정보 정리 다시 시도
-            </button>
-          )}
-          <button type="button" onClick={() => setWithdrawalNotice(null)}>
-            닫기
-          </button>
-        </div>
-      )}
-      {logoutError && (
-        <div className="error-banner" role="alert">
-          로그아웃 완료를 확인하지 못했습니다. 다시 시도해주세요.
-          <button type="button" disabled={busy} onClick={() => void logout()}>
-            로그아웃 다시 시도
-          </button>
-          <button type="button" onClick={() => setLogoutError(false)}>
-            닫기
-          </button>
-        </div>
-      )}
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-          {profileAccountChanged && (
-            <button type="button" onClick={() => window.location.reload()}>
-              현재 로그인 계정 다시 확인
-            </button>
-          )}
-          <button onClick={() => setError('')}>닫기</button>
-        </div>
-      )}
-      {me?.profileCompleted && favoriteError && (
-        <div className="error-banner" role="alert">
-          {favoriteError}
-        </div>
-      )}
+      <AppNotices
+        withdrawalNotice={withdrawalNotice}
+        logoutError={logoutError}
+        error={error}
+        profileAccountChanged={profileAccountChanged}
+        favoriteError={favoriteError}
+        profileCompleted={Boolean(me?.profileCompleted)}
+        busy={busy}
+        onRetryWithdrawalCleanup={(userId) => {
+          const result = clearWithdrawnAccountData(userId);
+          setWithdrawalNotice({ userId, ...result });
+        }}
+        onDismissWithdrawal={() => setWithdrawalNotice(null)}
+        onRetryLogout={() => void logout()}
+        onDismissLogout={() => setLogoutError(false)}
+        onDismissError={() => setError('')}
+      />
       {!loading && me?.profileCompleted && screen !== 'login' && (
         <HikingRecoveryNotice
           key={me.userId}
@@ -1117,154 +993,47 @@ function App() {
           onNavigate={go}
         />
       )}
-      {screen === 'login' && (
-        <section className="login-screen">
-          <div className="login-brand">
-            <BrandMark />
-            <p>기록하고 즐겁게 오르는 방법</p>
-          </div>
-          <div className="login-actions">
-            <button
-              className="social google"
-              disabled={busy}
-              onClick={() => window.location.assign('/oauth2/authorization/google')}
-            >
-              <svg viewBox="0 0 48 48" aria-hidden="true">
-                <path
-                  fill="#4285F4"
-                  d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.7h11a9.4 9.4 0 0 1-4.1 6.2v5h6.6c3.9-3.6 6.1-8.8 6.1-14.8Z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M24 44c5.5 0 10.1-1.8 13.5-4.8l-6.6-5c-1.8 1.2-4.1 2-6.9 2-5.3 0-9.8-3.6-11.4-8.4H5.8v5.2A20 20 0 0 0 24 44Z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M12.6 27.8a12 12 0 0 1 0-7.6V15H5.8a20 20 0 0 0 0 17.9l6.8-5.1Z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M24 11.8c3 0 5.7 1 7.8 3.1l5.8-5.8A19.4 19.4 0 0 0 24 4 20 20 0 0 0 5.8 15l6.8 5.2c1.6-4.8 6.1-8.4 11.4-8.4Z"
-                />
-              </svg>
-              <span>Google로 시작하기</span>
-            </button>
-            <button
-              className="social kakao"
-              disabled={busy}
-              onClick={() => window.location.assign('/oauth2/authorization/kakao')}
-            >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  fill="#191919"
-                  d="M12 3C6.48 3 2 6.54 2 10.9c0 2.8 1.86 5.26 4.67 6.66l-.96 3.55a.35.35 0 0 0 .53.38l4.2-2.78c.51.07 1.03.1 1.56.1 5.52 0 10-3.54 10-7.91S17.52 3 12 3Z"
-                />
-              </svg>
-              <span>카카오로 시작하기</span>
-            </button>
-            <small>간편하게 시작하고 나만의 산행을 기록해보세요</small>
-          </div>
-        </section>
-      )}
+      {screen === 'login' && <LoginScreen busy={busy} />}
       {screen === 'explore' && (
         <>
           {header('산 탐색')}
-          <div className="scroll-content">
-            <Suspense
-              fallback={
-                <p className="region-loading" role="status">
-                  경기도 권역 지도를 불러오는 중…
-                </p>
-              }
-            >
-              <RegionExplorer
-                onSelectCourse={openHikingCourse}
-                regions={exploreRegions}
-                loading={explore.loading}
-                error={explore.error}
-                onRetry={explore.retry}
-                activeRegionIndex={exploreRegion}
-                onRegionChange={setExploreRegion}
-                selectedCity={exploreCity}
-                onSelectCity={setExploreCity}
-                favoriteIds={favoriteIds}
-                onFavoriteToggle={toggleFavorite}
-              />
-            </Suspense>
-          </div>
+          <ExploreScreen
+            onSelectCourse={openHikingCourse}
+            regions={exploreRegions}
+            loading={explore.loading}
+            error={explore.error}
+            onRetry={explore.retry}
+            activeRegionIndex={exploreRegion}
+            onRegionChange={setExploreRegion}
+            selectedCity={exploreCity}
+            onSelectCity={setExploreCity}
+            favoriteIds={favoriteIds}
+            onFavoriteToggle={toggleFavorite}
+          />
         </>
       )}
-      {screen === 'detail' && !mountain && (
+      {screen === 'detail' && (
         <>
           {header('상세', true)}
-          <div className="scroll-content">
-            {explore.loading ? (
-              <p role="status">산 정보를 불러오는 중…</p>
-            ) : explore.error ? (
-              <div role="alert">
-                <p>{explore.error}</p>
-                <button onClick={explore.retry}>다시 시도</button>
-              </div>
-            ) : (
-              <p>선택한 산을 찾을 수 없습니다. 산 탐색에서 다시 선택해주세요.</p>
-            )}
-            <button onClick={() => go('explore')}>산 탐색으로</button>
-          </div>
-        </>
-      )}
-      {screen === 'detail' && mountain && (
-        <>
-          {header('상세', true)}
-          <div className="scroll-content detail-content">
-            <div className="detail-title">
-              <div>
-                <h1>{mountain.name}</h1>
-                <small>{mountain.city}</small>
-              </div>
-              <button
-                className={`heart ${favoriteIds.includes(mountain.id) ? 'is-favorite' : ''}`}
-                aria-label={favoriteIds.includes(mountain.id) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
-                aria-pressed={favoriteIds.includes(mountain.id)}
-                onClick={() => toggleFavorite(mountain.id)}
-              >
-                {favoriteIds.includes(mountain.id) ? '♥' : '♡'}
-              </button>
-            </div>
-            <div className="stats">
-              <div>
-                <b>{mountain.height}</b>
-                <small>높이</small>
-              </div>
-              <div>
-                <b>{mountain.distance}</b>
-                <small>코스 거리</small>
-              </div>
-              <div>
-                <b>코스별 확인</b>
-                <small>난이도</small>
-              </div>
-            </div>
-            <MountainWeather mountainId={mountain.id} />
-            <MountainCourseInfo
-              key={mountain.id}
-              mountainId={mountain.id}
-              onSelectCourse={openHikingCourse}
-            />
-            <div className="bottom-actions">
-              <button onClick={() => go('diary')}>등산 기록하기</button>
-              <button className="primary" onClick={() => go('hikingTracking')}>
-                등산 앱과 연동하기
-              </button>
-            </div>
-          </div>
+          <MountainDetailScreen
+            mountain={mountain}
+            loading={explore.loading}
+            error={explore.error}
+            favorite={Boolean(mountain && favoriteIds.includes(mountain.id))}
+            onRetry={explore.retry}
+            onExplore={() => go('explore')}
+            onFavoriteToggle={toggleFavorite}
+            onSelectCourse={openHikingCourse}
+            onOpenDiary={() => go('diary')}
+            onOpenHiking={() => go('hikingTracking')}
+          />
         </>
       )}
       {screen === 'hikingTracking' && (
         <>
           {header('등산', hikingSelection !== null)}
-          <HikingPage
+          <HikingTrackingScreen
             onOpenRecords={() => go('hikingRecords')}
-            key={me?.userId}
             userId={me!.userId}
             onRestoreSelection={(selection) => {
               setSelected(String(selection.mountainId));
@@ -1280,7 +1049,7 @@ function App() {
                 window.location.href,
               );
             }}
-            initialSelection={hikingSelection}
+            selection={hikingSelection}
             onClearSelection={clearHikingSelection}
             onWriteJournal={(record) => {
               if (!canCreateHikingJournal(record)) {
@@ -1303,66 +1072,20 @@ function App() {
             me?.profileCompleted ? '프로필 편집' : '프로필 설정',
             Boolean(me?.profileCompleted),
           )}
-          <form
-            className="scroll-content form-content"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void saveProfile();
-            }}
-          >
-            <h2>
-              ToPeak에서 사용할
-              <br />
-              정보를 입력해주세요.
-            </h2>
-            <label>
-              닉네임
-              <input
-                value={nickname}
-                onChange={(e) => setNickname(e.target.value)}
-                disabled={busy || Boolean(profileConfirmation?.isCurrent())}
-                maxLength={30}
-                required
-                autoComplete="nickname"
-              />
-              {nickname.length >= 30 && (
-                <span style={{ color: '#c2410c', fontSize: '12px' }}>
-                  닉네임은 최대 30자까지 입력할 수 있습니다.
-                </span>
-              )}
-            </label>
-            <label>
-              출생연도
-              <select
-                value={birthYear}
-                onChange={(e) => setBirthYear(e.target.value)}
-                autoComplete="bday-year"
-                required
-                disabled={busy || Boolean(profileConfirmation?.isCurrent())}
-              >
-                <option value="" disabled>
-                  출생연도를 선택해 주세요
-                </option>
-                {birthYearOptions.map((year) => (
-                  <option key={year} value={String(year)}>
-                    {year}년
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="muted">출생연도를 선택해 주세요.</p>
-            {profileConfirmation?.isCurrent() && (
-              <div role="status">
-                <p>{profileConfirmation.message}</p>
-                <button type="button" disabled={busy} onClick={() => void confirmSavedProfile()}>
-                  저장 결과 확인
-                </button>
-              </div>
-            )}
-            <button className="submit" disabled={busy || Boolean(profileConfirmation?.isCurrent())}>
-              {me?.profileCompleted ? '변경 사항 저장' : '시작하기'}
-            </button>
-          </form>
+          <ProfileSetupScreen
+            profileCompleted={Boolean(me?.profileCompleted)}
+            nickname={nickname}
+            birthYear={birthYear}
+            birthYearOptions={birthYearOptions}
+            busy={busy}
+            confirmationMessage={
+              profileConfirmation?.isCurrent() ? profileConfirmation.message : null
+            }
+            onNicknameChange={setNickname}
+            onBirthYearChange={setBirthYear}
+            onConfirm={() => void confirmSavedProfile()}
+            onSubmit={() => void saveProfile()}
+          />
         </>
       )}
       {(screen === 'diary' || screen === 'myJournals') && (
@@ -1373,177 +1096,51 @@ function App() {
               <b>{screen === 'diary' ? '등산일지' : '내 등산일지'}</b>
               <button onClick={() => go('write')}>등산일지 작성 ＋</button>
             </div>
-            {journalList()}
+            <JournalList
+              busy={busy}
+              readError={journalReadError}
+              journals={journals}
+              emptyMessage="아직 등산일지가 없습니다."
+              onOpen={openJournal}
+            />
           </div>
         </>
       )}
       {screen === 'journalDetail' && (
         <>
           {header('등산일지', true)}
-          <section className="scroll-content journal-detail">
-            {busy ? (
-              <p role="status">불러오는 중…</p>
-            ) : journalReadError ? (
-              <p role="status">
-                등산일지를 확인할 수 없습니다. 삭제되었거나 공개 상태가 변경되었을 수 있습니다.
-              </p>
-            ) : journalDetail ? (
-              <>
-                <article className="journal-detail__body">
-                  <span className="badge">{journalDetail.isPublic ? '공개' : '비공개'}</span>
-                  <h2>{journalDetail.title}</h2>
-                  <dl className="journal-detail__meta">
-                    <div>
-                      <dt>산 이름</dt>
-                      <dd>{journalDetail.mountainName}</dd>
-                    </div>
-                    <div>
-                      <dt>등산 날짜</dt>
-                      <dd>{journalDetail.hikingDate}</dd>
-                    </div>
-                    <div className="journal-detail__author-row">
-                      <dt>작성자</dt>
-                      <dd>
-                        <JournalAuthor
-                          key={journalDetail.userId}
-                          userId={journalDetail.userId}
-                          nickname={journalDetail.nickname}
-                          onSelect={openProfile}
-                        />
-                      </dd>
-                    </div>
-                  </dl>
-                  <p className="journal-detail__content">{journalDetail.content}</p>
-                </article>
-                {journalDetail.userId === me?.userId && (
-                  <div className="bottom-actions">
-                    <button
-                      type="button"
-                      className="primary"
-                      disabled={deletingJournalId !== null}
-                      onClick={() => editJournal(journalDetail)}
-                    >
-                      수정
-                    </button>
-                    <button
-                      type="button"
-                      disabled={deletingJournalId !== null}
-                      onClick={() => void removeJournal(journalDetail)}
-                    >
-                      {deletingJournalId === journalDetail.id ? '삭제 중…' : '삭제'}
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="muted">등산일지를 확인할 수 없습니다.</p>
-            )}
-          </section>
+          <JournalDetailScreen
+            busy={busy}
+            readError={journalReadError}
+            journal={journalDetail}
+            currentUserId={me?.userId ?? null}
+            deletingJournalId={deletingJournalId}
+            onSelectAuthor={openProfile}
+            onEdit={editJournal}
+            onDelete={(journal) => void removeJournal(journal)}
+          />
         </>
       )}
       {screen === 'write' && (
         <>
           {header(editing ? '일지 수정' : '일지 작성')}
-          <form
-            className="scroll-content form-content"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void saveJournal();
-            }}
-          >
-            <h2>오늘의 산행을 기록해요</h2>
-            <p className="muted">멋있었던 순간을 남겨보세요</p>
-            {!editing && (
-              <>
-                <label>
-                  내 등산기록 선택
-                  <select
-                    value={selectedRecordId ?? ''}
-                    disabled={busy}
-                    onChange={(e) =>
-                      setSelectedRecordId(e.target.value ? Number(e.target.value) : null)
-                    }
-                    required
-                  >
-                    <option value="">등산기록을 선택해주세요</option>
-                    {availableRecords.map((record) => (
-                      <option key={record.id} value={record.id}>
-                        {record.mountainName} · {record.hikingDate} ·{' '}
-                        {(record.distanceMeters / 1000).toFixed(1)}km ·{' '}
-                        {Math.floor(record.elapsedMs / 60000)}분
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {busy ? (
-                  <p role="status">등산기록을 불러오는 중…</p>
-                ) : (
-                  availableRecords.length === 0 && (
-                    <p className="muted">
-                      작성 가능한 등산기록이 없습니다. {JOURNAL_ELIGIBILITY_MESSAGE}
-                    </p>
-                  )
-                )}
-              </>
-            )}
-            {!editing && selectedRecord && !canCreateHikingJournal(selectedRecord) && (
-              <p role="alert" className="muted">
-                {selectedRecord.journalId !== null
-                  ? '이미 등산일지를 작성한 기록입니다.'
-                  : JOURNAL_ELIGIBILITY_MESSAGE}
-              </p>
-            )}
-            {(editing || selectedRecord) && (
-              <dl className="journal-write-summary" aria-label="산행 정보">
-                <div>
-                  <dt>산</dt>
-                  <dd>{editing ? journalMountain : selectedRecord?.mountainName}</dd>
-                </div>
-                <div>
-                  <dt>등산 날짜</dt>
-                  <dd>{editing ? date : selectedRecord?.hikingDate}</dd>
-                </div>
-              </dl>
-            )}
-            <label>
-              제목
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={100}
-                required
-                placeholder="산행 제목을 입력하세요"
-              />
-            </label>
-            <label>
-              오늘의 여정
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                maxLength={10000}
-                rows={4}
-              />
-            </label>
-            <div className="switch-row">
-              <b>다른 사용자에게 공개</b>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={isPublic}
-                aria-label="다른 사용자에게 공개"
-                className={`switch ${isPublic ? 'on' : ''}`}
-                onClick={() => setIsPublic(!isPublic)}
-              >
-                <span />
-              </button>
-            </div>
-            <button
-              className="submit"
-              disabled={busy || (!editing && !canCreateHikingJournal(selectedRecord))}
-            >
-              일지 저장하기
-            </button>
-          </form>
+          <JournalEditorScreen
+            editing={editing !== null}
+            busy={busy}
+            availableRecords={availableRecords}
+            selectedRecord={selectedRecord}
+            selectedRecordId={selectedRecordId}
+            journalMountain={journalMountain}
+            date={date}
+            title={title}
+            content={content}
+            isPublic={isPublic}
+            onSelectedRecordChange={setSelectedRecordId}
+            onTitleChange={setTitle}
+            onContentChange={setContent}
+            onPublicChange={setIsPublic}
+            onSubmit={() => void saveJournal()}
+          />
         </>
       )}
       {screen === 'profile' && me && (
@@ -1606,156 +1203,71 @@ function App() {
         <>
           {header(screen === 'favorites' ? '찜한 산' : '완등한 산', true)}
           <div className="scroll-content collection-scroll">
-            {explore.loading || (screen === 'conquered' && completedHikes.loading) ? (
-              <p role="status">
-                {screen === 'conquered' ? '완등한 산을 불러오는 중…' : '산 목록을 불러오는 중…'}
-              </p>
-            ) : screen === 'conquered' && completedHikes.error ? (
-              <div role="alert">
-                <p>{completedHikes.error}</p>
-                <button type="button" onClick={completedHikes.retry}>
-                  다시 시도
-                </button>
-              </div>
-            ) : explore.error ? (
-              <div role="alert">
-                <p>{explore.error}</p>
-                <button onClick={explore.retry}>다시 시도</button>
-              </div>
-            ) : (
-              <MountainCollection
-                key={`${screen}:${me?.userId}`}
-                onSelectCourse={openHikingCourse}
-                mode={screen}
-                title={screen === 'favorites' ? '내가 찜한 산' : '완등한 산'}
-                description={
-                  screen === 'favorites'
-                    ? '마음에 담아둔 산을 모아봤어요.'
-                    : 'GPS 정상 도달과 산행 인증이 모두 확인된 산을 모았어요.'
-                }
-                items={screen === 'favorites' ? favoriteMountains : conqueredCollection.items}
-                missingCount={screen === 'conquered' ? conqueredCollection.missingIds.length : 0}
-                onRefreshMountains={explore.retry}
-                favoriteIds={favoriteIds}
-
-                onFavoriteToggle={toggleFavorite}
-              />
-            )}
+            <MountainCollectionScreen
+              key={`${screen}:${me?.userId}`}
+              mode={screen}
+              loading={explore.loading || (screen === 'conquered' && completedHikes.loading)}
+              error={
+                screen === 'conquered' && completedHikes.error
+                  ? completedHikes.error
+                  : explore.error
+              }
+              items={screen === 'favorites' ? favoriteMountains : conqueredCollection.items}
+              missingCount={screen === 'conquered' ? conqueredCollection.missingIds.length : 0}
+              favoriteIds={favoriteIds}
+              onRetry={
+                screen === 'conquered' && completedHikes.error
+                  ? completedHikes.retry
+                  : explore.retry
+              }
+              onRefreshMountains={explore.retry}
+              onFavoriteToggle={toggleFavorite}
+              onSelectCourse={openHikingCourse}
+            />
           </div>
         </>
       )}
       {screen === 'publicProfile' && (
         <>
           {header('공개 프로필', true)}
-          <div className="scroll-content profile-content">
-            {busy ? (
-              <p role="status">불러오는 중…</p>
-            ) : journalReadError ? (
-              <div className="public-profile__error">
-                <p role="status">공개 프로필을 불러오지 못했습니다. 다시 시도해 주세요.</p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError('');
-                    setBusy(true);
-                    setProfileRefresh((value) => value + 1);
-                  }}
-                >
-                  다시 시도
-                </button>
-              </div>
-            ) : publicProfile ? (
-              <>
-                <article className="profile-card">
-                  {avatar(publicProfile)}
-                  <div>
-                    <h2 className="public-profile__name">{publicProfile.nickname ?? '탐험가'}</h2>
-                  </div>
-                </article>
-                <dl className="public-profile__stats" aria-label="산행 통계">
-                  <div>
-                    <dt>점수</dt>
-                    <dd>{scoreText(publicProfile.score)}</dd>
-                  </div>
-                  <div>
-                    <dt>등반 횟수</dt>
-                    <dd>{publicProfile.totalHikeCount}회</dd>
-                  </div>
-                  <div>
-                    <dt>완등 횟수</dt>
-                    <dd>{publicProfile.completedHikeCount}회</dd>
-                  </div>
-                </dl>
-                <p className="public-profile__note">
-                  등반·완등 횟수는 저장된 GPS 산행 활동을 기준으로 합니다.
-                </p>
-                <h3>공개 등산일지</h3>
-                {journalList()}
-              </>
-            ) : (
-              <p role="status">공개 프로필을 확인할 수 없습니다.</p>
-            )}
-          </div>
+          <PublicProfileScreen
+            busy={busy}
+            readError={journalReadError}
+            profile={publicProfile}
+            onRetry={() => {
+              setError('');
+              setBusy(true);
+              setProfileRefresh((value) => value + 1);
+            }}
+            journals={
+              <JournalList
+                busy={busy}
+                readError={journalReadError}
+                journals={journals}
+                emptyMessage="공개된 등산일지가 없습니다."
+                onOpen={openJournal}
+              />
+            }
+          />
         </>
       )}
       {screen === 'hikingRecords' && (
         <>
           {header('등산기록', true)}
-          <section className="scroll-content utility-content hiking-records-list">
-            {busy ? (
-              <p role="status">불러오는 중…</p>
-            ) : hikingRecords.length ? (
-              hikingRecords.map((record) => (
-                <HikingRecordCard
-                  record={record}
-                  key={record.id}
-                  details={
-                    <HikingRecordDetails
-                      recordId={record.id}
-                      onLoaded={(detail) =>
-                        setHikingRecords((current) =>
-                          current.map((item) => (item.id === detail.id ? detail : item)),
-                        )
-                      }
-                    />
-                  }
-                >
-                  {record.journalId !== null ? (
-                    <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
-                  ) : (
-                    <div style={{ width: '100%', minWidth: 0 }}>
-                      <button
-                        disabled={!canCreateHikingJournal(record)}
-                        aria-describedby={
-                          !canCreateHikingJournal(record)
-                            ? `journal-eligibility-${record.id}`
-                            : undefined
-                        }
-                        onClick={() => {
-                          if (!canCreateHikingJournal(record)) return;
-                          go('write');
-                          setSelectedRecordId(record.id);
-                        }}
-                      >
-                        등산일지 작성
-                      </button>
-                      {!canCreateHikingJournal(record) && (
-                        <p
-                          id={`journal-eligibility-${record.id}`}
-                          className="muted"
-                          style={{ fontSize: 12, lineHeight: 1.7, margin: '10px 0 0' }}
-                        >
-                          {JOURNAL_ELIGIBILITY_MESSAGE}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </HikingRecordCard>
-              ))
-            ) : (
-              <p>저장된 등산기록이 없습니다.</p>
-            )}
-          </section>
+          <HikingRecordsScreen
+            busy={busy}
+            records={hikingRecords}
+            onRecordLoaded={(detail) =>
+              setHikingRecords((current) =>
+                current.map((item) => (item.id === detail.id ? detail : item)),
+              )
+            }
+            onOpenJournal={openJournal}
+            onWriteJournal={(record) => {
+              go('write');
+              setSelectedRecordId(record.id);
+            }}
+          />
         </>
       )}
       {screen === 'accountSettings' && me && (
@@ -1775,93 +1287,7 @@ function App() {
       {screen === 'about' && (
         <>
           {header('앱 정보', true)}
-          <section
-            className="scroll-content utility-content about-content"
-            aria-label="ToPeak 소개"
-          >
-            <div className="about-intro">
-              <img className="about-logo" src={logo} alt="" />
-              <h1>ToPeak</h1>
-              <p className="about-tagline">산을 탐색하고, 나만의 산행을 기록하다.</p>
-              <p>
-                산과 등산로를 탐색하고, GPS로 산행을 기록하며 나만의 산행 활동과 일지를 관리하는
-                서비스입니다.
-              </p>
-            </div>
-
-            <section className="about-section" aria-labelledby="about-features-title">
-              <h2 id="about-features-title">주요 기능</h2>
-              <div className="about-features">
-                {[
-                  {
-                    title: '산·등산로 탐색',
-                    description: '산과 코스 정보를 살펴보고 나에게 맞는 산행을 준비해요.',
-                    path: 'M3 19 9 5l4 8 3-5 5 11H3ZM7 10l2 2 2-2',
-                  },
-                  {
-                    title: 'GPS 산행 기록',
-                    description: '위치 권한을 허용하고 이동 경로, 거리와 시간을 기록해요.',
-                    path: 'M6 5a2 2 0 1 0 0 .01M18 19a2 2 0 1 0 0 .01M8 5h7a4 4 0 0 1 0 8H9a3 3 0 0 0 0 6h7',
-                  },
-                  {
-                    title: '산행 활동 및 일지',
-                    description: '저장한 산행 기록을 확인하고 일지로 추억을 남겨요.',
-                    path: 'M5 3h14v18H5V3ZM9 8h6M9 12h6M9 16h4',
-                  },
-                  {
-                    title: '랭킹',
-                    description:
-                      '서버에서 산정한 점수와 회원 순위를 확인해요. 산행 점수는 인증 조건에 따라 반영돼요.',
-                    path: 'M8 3h8v6a4 4 0 0 1-8 0V3ZM8 5H4v2a4 4 0 0 0 4 4M16 5h4v2a4 4 0 0 1-4 4M12 13v7M8 21h8',
-                  },
-                ].map((feature) => (
-                  <article className="about-feature" key={feature.title}>
-                    <span className="about-feature-icon" aria-hidden="true">
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.6"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d={feature.path} />
-                      </svg>
-                    </span>
-                    <div>
-                      <h3>{feature.title}</h3>
-                      <p>{feature.description}</p>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            </section>
-
-            <section className="about-section" aria-labelledby="about-guide-title">
-              <h2 id="about-guide-title">이용 방법</h2>
-              <ol className="about-steps">
-                <li>산과 코스를 선택해요.</li>
-                <li>위치 권한을 허용하고 산행을 시작해요.</li>
-                <li>산행을 종료하고 기록을 저장해요.</li>
-                <li>마이페이지의 등산기록에서 이전 산행을 확인해요.</li>
-              </ol>
-            </section>
-
-            <section className="about-section about-notice" aria-labelledby="about-notice-title">
-              <h2 id="about-notice-title">이용 시 유의사항</h2>
-              <ul>
-                <li>GPS 정확도는 지형, 날씨, 기기 등 이용 환경에 따라 달라질 수 있어요.</li>
-                <li>모바일 웹에서는 화면 잠금이나 앱 전환 시 위치 수집이 제한될 수 있어요.</li>
-                <li>안전한 산행을 위해 출발 전 기상과 탐방로 상태를 확인해 주세요.</li>
-              </ul>
-            </section>
-
-            <footer className="about-project">
-              <h2>프로젝트 정보</h2>
-              <p>2026 컴퓨터정보공학 학술제 프로젝트</p>
-              <p>Team FiveGuys</p>
-            </footer>
-          </section>
+          <AboutScreen />
         </>
       )}
       {screen === 'ranking' && (
