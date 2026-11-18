@@ -1,9 +1,8 @@
-
 name: ToPeak FE CD
 
 on:
   workflow_run:
-    workflows: ["ToPeak FE CI"]
+    workflows: ['ToPeak FE CI']
     types: [completed]
     branches: [main]
 

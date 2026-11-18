@@ -87,7 +87,7 @@ test('linked hiking selection refetches DB records and preserves the exact selec
     controller.abort();
     await assert.rejects(pending, { name: 'AbortError' });
     assert.equal(pendingSignals.length, 2);
-    assert.ok(pendingSignals.every(signal => signal.aborted));
+    assert.ok(pendingSignals.every((signal) => signal.aborted));
   } finally {
     globalThis.fetch = original;
   }
