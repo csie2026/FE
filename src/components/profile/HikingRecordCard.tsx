@@ -6,12 +6,16 @@ import './HikingRecordCard.css';
 
 export default function HikingRecordCard({
   record,
+  details,
   children,
 }: {
   record: HikingActivity;
+  details?: ReactNode;
   children: ReactNode;
 }) {
+  // 완료 여부와 별개로 서버가 GPS 정상 도달을 검증한 기록만 인증 완등으로 표시한다.
   const verified = isVerifiedSummit(record);
+  // 상태별 안내 문구의 구분자를 카드의 여러 줄 설명으로만 변환한다.
   const scoreLines = scoringText(record.scoring).split(' · ');
   return (
     <article className="hiking-record-card" aria-labelledby={`hike-title-${record.id}`}>
@@ -77,6 +81,7 @@ export default function HikingRecordCard({
           scoreLines.map((line, index) => <p key={index}>{line}</p>)
         )}
       </div>
+      {details}
       <footer className="hiking-record-card__footer bottom-actions">{children}</footer>
     </article>
   );

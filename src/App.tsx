@@ -1,9 +1,16 @@
 import { getPublicProfileView } from './services/publicProfile';
-import { updateProfile, confirmProfileSave, ProfileSaveUnconfirmed, isProfileAccountMismatch, type ProfileUpdate } from './services/profileUpdate';
+import {
+  updateProfile,
+  confirmProfileSave,
+  ProfileSaveUnconfirmed,
+  isProfileAccountMismatch,
+  type ProfileUpdate,
+} from './services/profileUpdate';
 import { createScopedRequest } from './services/scopedRequest';
 import { subscribeForegroundRefresh } from './services/foregroundRefresh';
 import { recordLifecycle } from './services/lifecycleDiagnostics';
 import HikingRecordCard from './components/profile/HikingRecordCard';
+import HikingRecordDetails from './components/profile/HikingRecordDetails';
 import { canCreateHikingJournal, JOURNAL_ELIGIBILITY_MESSAGE } from './services/journalEligibility';
 import { getErrorMessage } from './utils/errorMessages';
 import { readOAuthFailure } from './services/oauthFailure';
@@ -103,16 +110,23 @@ function App() {
   const [screen, setCurrentScreen] = useState<Screen>('login');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { recordLifecycle('screen-change', { screen }); }, [screen]);
+  useEffect(() => {
+    recordLifecycle('screen-change', { screen });
+  }, [screen]);
   useEffect(() => {
     recordLifecycle('app-mount');
     return () => recordLifecycle('app-unmount');
   }, []);
-  useEffect(() => { recordLifecycle('global-loading', { loading }); }, [loading]);
+  useEffect(() => {
+    recordLifecycle('global-loading', { loading });
+  }, [loading]);
   const [busy, setBusy] = useState(false);
   const [profileAccountChanged, setProfileAccountChanged] = useState(false);
   const [profileConfirmation, setProfileConfirmation] = useState<{
-    input: ProfileUpdate; wasProfileCompleted: boolean; isCurrent: () => boolean; message: string;
+    input: ProfileUpdate;
+    wasProfileCompleted: boolean;
+    isCurrent: () => boolean;
+    message: string;
   } | null>(null);
   const [oauthFailure] = useState(() => readOAuthFailure(window.location.href));
   const [error, setError] = useState(oauthFailure?.message ?? '');
@@ -763,7 +777,9 @@ function App() {
     const version = accountVersion.current;
     const wasProfileCompleted = me.profileCompleted;
     const current = profileSave.current.capture();
-    const isCurrent = () => current() && version === accountVersion.current &&
+    const isCurrent = () =>
+      current() &&
+      version === accountVersion.current &&
       currentMemberId.current === snapshot.expectedUserId;
     await profileSave.current.run(
       async () => {
@@ -789,7 +805,12 @@ function App() {
             return;
           }
           if (cause instanceof ProfileSaveUnconfirmed) {
-            setProfileConfirmation({ input: snapshot, wasProfileCompleted, isCurrent, message: cause.message });
+            setProfileConfirmation({
+              input: snapshot,
+              wasProfileCompleted,
+              isCurrent,
+              message: cause.message,
+            });
             return;
           }
           if (!logoutPending.current) fail(cause);
@@ -801,40 +822,53 @@ function App() {
   const confirmSavedProfile = async () => {
     const pending = profileConfirmation;
     if (busy || !pending?.isCurrent() || screen !== 'setup') return;
-    await profileSave.current.run(async () => {
-      setBusy(true);
-      setError('');
-      return confirmProfileSave(pending.input.expectedUserId, pending.isCurrent);
-    }, {
-      success: (user) => {
-        if (!pending.isCurrent()) return;
-        setProfileConfirmation(null);
-        setMe(user);
-        if (user.profileCompleted && user.nickname === pending.input.nickname && user.birthYear === pending.input.birthYear) {
-          setScreen(pending.wasProfileCompleted ? 'profile' : 'explore');
-        } else {
-          setError('현재 서버 값이 저장하려던 내용과 다릅니다. 입력 내용을 확인한 뒤 필요한 경우에만 다시 저장해주세요.');
-        }
+    await profileSave.current.run(
+      async () => {
+        setBusy(true);
+        setError('');
+        return confirmProfileSave(pending.input.expectedUserId, pending.isCurrent);
       },
-      failure: (cause) => {
-        if (!pending.isCurrent()) return;
-        if (isProfileAccountMismatch(cause)) {
-          clearAccount();
-          setBusy(false);
-          setProfileAccountChanged(true);
-          setError(cause.message);
-          setScreen('login', null, null, null, true);
-        } else if (!logoutPending.current) fail(cause);
+      {
+        success: (user) => {
+          if (!pending.isCurrent()) return;
+          setProfileConfirmation(null);
+          setMe(user);
+          if (
+            user.profileCompleted &&
+            user.nickname === pending.input.nickname &&
+            user.birthYear === pending.input.birthYear
+          ) {
+            setScreen(pending.wasProfileCompleted ? 'profile' : 'explore');
+          } else {
+            setError(
+              '현재 서버 값이 저장하려던 내용과 다릅니다. 입력 내용을 확인한 뒤 필요한 경우에만 다시 저장해주세요.',
+            );
+          }
+        },
+        failure: (cause) => {
+          if (!pending.isCurrent()) return;
+          if (isProfileAccountMismatch(cause)) {
+            clearAccount();
+            setBusy(false);
+            setProfileAccountChanged(true);
+            setError(cause.message);
+            setScreen('login', null, null, null, true);
+          } else if (!logoutPending.current) fail(cause);
+        },
+        settled: () => setBusy(false),
       },
-      settled: () => setBusy(false),
-    });
+    );
   };
   // 이전 화면의 늦은 응답으로 현재 화면을 이동시키지 않는다. 서버 저장은 완료될 수 있으므로
   // 목록에 다시 진입할 때는 최신 데이터를 조회한다.
   const saveJournal = async () => {
     if (busy) return;
     if (!editing && selectedRecord && !canCreateHikingJournal(selectedRecord)) {
-      setError(selectedRecord.journalId !== null ? '이미 등산일지를 작성한 기록입니다.' : JOURNAL_ELIGIBILITY_MESSAGE);
+      setError(
+        selectedRecord.journalId !== null
+          ? '이미 등산일지를 작성한 기록입니다.'
+          : JOURNAL_ELIGIBILITY_MESSAGE,
+      );
       return;
     }
     if (!title.trim() || (!editing && !canCreateHikingJournal(selectedRecord))) {
@@ -1250,7 +1284,11 @@ function App() {
             onClearSelection={clearHikingSelection}
             onWriteJournal={(record) => {
               if (!canCreateHikingJournal(record)) {
-                setError(record.journalId !== null ? '이미 등산일지를 작성한 기록입니다.' : JOURNAL_ELIGIBILITY_MESSAGE);
+                setError(
+                  record.journalId !== null
+                    ? '이미 등산일지를 작성한 기록입니다.'
+                    : JOURNAL_ELIGIBILITY_MESSAGE,
+                );
                 return;
               }
               go('write');
@@ -1450,7 +1488,9 @@ function App() {
             )}
             {!editing && selectedRecord && !canCreateHikingJournal(selectedRecord) && (
               <p role="alert" className="muted">
-                {selectedRecord.journalId !== null ? '이미 등산일지를 작성한 기록입니다.' : JOURNAL_ELIGIBILITY_MESSAGE}
+                {selectedRecord.journalId !== null
+                  ? '이미 등산일지를 작성한 기록입니다.'
+                  : JOURNAL_ELIGIBILITY_MESSAGE}
               </p>
             )}
             {(editing || selectedRecord) && (
@@ -1499,9 +1539,7 @@ function App() {
             </div>
             <button
               className="submit"
-              disabled={
-                busy || (!editing && !canCreateHikingJournal(selectedRecord))
-              }
+              disabled={busy || (!editing && !canCreateHikingJournal(selectedRecord))}
             >
               일지 저장하기
             </button>
@@ -1668,14 +1706,31 @@ function App() {
               <p role="status">불러오는 중…</p>
             ) : hikingRecords.length ? (
               hikingRecords.map((record) => (
-                <HikingRecordCard record={record} key={record.id}>
+                <HikingRecordCard
+                  record={record}
+                  key={record.id}
+                  details={
+                    <HikingRecordDetails
+                      recordId={record.id}
+                      onLoaded={(detail) =>
+                        setHikingRecords((current) =>
+                          current.map((item) => (item.id === detail.id ? detail : item)),
+                        )
+                      }
+                    />
+                  }
+                >
                   {record.journalId !== null ? (
                     <button onClick={() => openJournal(record.journalId!)}>등산일지 보기</button>
                   ) : (
                     <div style={{ width: '100%', minWidth: 0 }}>
                       <button
                         disabled={!canCreateHikingJournal(record)}
-                        aria-describedby={!canCreateHikingJournal(record) ? `journal-eligibility-${record.id}` : undefined}
+                        aria-describedby={
+                          !canCreateHikingJournal(record)
+                            ? `journal-eligibility-${record.id}`
+                            : undefined
+                        }
                         onClick={() => {
                           if (!canCreateHikingJournal(record)) return;
                           go('write');
@@ -1685,7 +1740,11 @@ function App() {
                         등산일지 작성
                       </button>
                       {!canCreateHikingJournal(record) && (
-                        <p id={`journal-eligibility-${record.id}`} className="muted" style={{ fontSize: 12, lineHeight: 1.7, margin: '10px 0 0' }}>
+                        <p
+                          id={`journal-eligibility-${record.id}`}
+                          className="muted"
+                          style={{ fontSize: 12, lineHeight: 1.7, margin: '10px 0 0' }}
+                        >
                           {JOURNAL_ELIGIBILITY_MESSAGE}
                         </p>
                       )}

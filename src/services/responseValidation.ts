@@ -106,6 +106,19 @@ const ranking = fields({
   mine: nullable(ranked),
   totalMembers: (v) => integer(v) && nonnegative(v),
 });
+const scoreSummary: Check = (value) =>
+  fields({
+    totalPoints: (v) => integer(v) && nonnegative(v),
+    visitPoints: (v) => integer(v) && nonnegative(v),
+    summitPoints: (v) => integer(v) && nonnegative(v),
+    publicBonusPoints: (v) => integer(v) && nonnegative(v),
+    policyVersion: text,
+  })(value) &&
+  object(value) &&
+  value.totalPoints ===
+    (value.visitPoints as number) +
+      (value.summitPoints as number) +
+      (value.publicBonusPoints as number);
 const latitude: Check = (v) => number(v) && Math.abs(v as number) <= 90;
 const longitude: Check = (v) => number(v) && Math.abs(v as number) <= 180;
 const mountain = fields({
@@ -181,11 +194,15 @@ export function validApiResponse(path: string, method: string, value: unknown): 
   if (/^\/api\/users\/\d+\/profile$/.test(path)) return publicProfileDetails(value);
   if (path === '/api/rankings/summary') return ranking(value);
   if (path === '/api/rankings') return array(profile)(value);
+  if (path === '/api/users/me/hiking-records/recalculate-score' && method === 'POST')
+    return scoreSummary(value);
   if (path === '/api/journals') return method === 'GET' ? array(journal)(value) : journal(value);
   if (/^\/api\/journals\/\d+$/.test(path)) return journal(value);
   if (/^\/api\/users\/(me|\d+)\/journals$/.test(path)) return array(journal)(value);
   // POST 저장 성공 여부는 activitySave에서 확정된 원본 요청과 비교해 별도로 확인한다.
   if (path === '/api/users/me/hiking-records' && method === 'GET') return array(activity)(value);
+  if (/^\/api\/users\/me\/hiking-records\/\d+$/.test(path) && method === 'GET')
+    return activity(value);
   if (path === '/api/mountains') return array(mountain)(value);
   if (/^\/api\/mountains\/\d+\/courses$/.test(path)) return array(course)(value);
   if (/^\/api\/courses\/\d+$/.test(path)) return courseDetail(value);

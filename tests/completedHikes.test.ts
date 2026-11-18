@@ -16,7 +16,13 @@ const activity = (id: number, mountainId: number, completed: boolean): HikingAct
   elapsedMs: 3600000,
   journalId: null,
   gpsValidationVersion: 1,
-  scoring: { status: 'CERTIFIED', certificationDate: '2026-11-01', visitPoints: 200, summitPoints: completed ? 70 : 0, policyVersion: 'visit-general-or-verified-summit-multi-v2' },
+  scoring: {
+    status: 'CERTIFIED',
+    certificationDate: '2026-11-01',
+    visitPoints: 200,
+    summitPoints: completed ? 70 : 0,
+    policyVersion: 'visit-general-or-verified-summit-multi-v2',
+  },
 });
 
 test('only completed GPS activities count; repeated summits count as activities but list one mountain', () => {

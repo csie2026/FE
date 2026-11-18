@@ -382,3 +382,13 @@
   color: #234431;
   font: inherit;
 }
+.leaderboard-toolbar button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+.leaderboard-refresh-error {
+  margin: -4px 0 12px;
+  color: #9b3d2d;
+  font-size: 11px;
+  line-height: 1.5;
+}

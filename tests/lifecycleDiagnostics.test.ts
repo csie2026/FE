@@ -201,7 +201,7 @@ test('DEV events survive a simulated document restart without HMR payloads or br
     assert.equal(end?.status, 401);
     assert.equal(JSON.stringify(saved).includes('/api/users/142/profile'), false);
     assert.equal(JSON.stringify(saved).includes('"userId"'), false);
-    // A fresh window simulates the next document; no location or fetch is supplied.
+    // 위치 정보나 fetch를 제공하지 않은 새 window로 다음 문서 진입을 재현한다.
     Object.defineProperty(globalThis, 'window', {
       value: Object.assign(new EventTarget(), { sessionStorage: storage }),
       configurable: true,

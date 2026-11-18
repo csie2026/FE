@@ -32,6 +32,7 @@ export default function MountainWeather({ mountainId }: { mountainId: string | n
       active = false;
     };
   }, [request]);
+  // 이전 산이나 재시도의 늦은 응답이 현재 화면에 표시되지 않도록 요청 객체까지 대조한다.
   const current = result?.request === request ? result : null;
   return (
     <section className="mountain-weather" aria-label="산 날씨 예보">

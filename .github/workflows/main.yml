@@ -1,4 +1,3 @@
-
 name: ToPeak FE CI
 
 on:
@@ -35,11 +34,18 @@ jobs:
         working-directory: FE
         run: npm ci
 
+      - name: Check formatting
+        working-directory: FE
+        run: npm run format:check
+
+      - name: Run lint
+        working-directory: FE
+        run: npm run lint
+
       - name: Run tests
         working-directory: FE
         run: npm test
 
-      
       - name: Build frontend
         working-directory: FE
         env:

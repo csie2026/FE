@@ -84,6 +84,7 @@ const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 export function safeEntry(value: unknown): TraceEntry | null {
+  // 허용 목록의 필드만 새 객체로 복사해 URL·회원 정보 같은 임의 값이 저장되지 않게 한다.
   if (
     !record(value) ||
     !events.includes(value.event as TraceEvent) ||
@@ -126,6 +127,7 @@ export function readTraceHistory(storage: Store | undefined, now: number): Trace
       return [];
     }
     const documents: TraceDocument[] = [];
+    // 새로고침 전후 비교에 필요한 최근 두 문서만 읽고 오래되거나 미래인 기록은 버린다.
     for (const item of raw.documents.slice(-2)) {
       if (
         !record(item) ||
@@ -203,7 +205,7 @@ export function classifyPageQuery(path: string): TraceDetails['query'] | undefin
   if (path === '/api/journals') return 'journals';
   if (/^\/api\/journals\/\d+$/.test(path)) return 'journal-detail';
   if (path === '/api/users/me/journals') return 'my-journals';
-  if (path === '/api/users/me/hiking-records') return 'hiking-records';
+  if (/^\/api\/users\/me\/hiking-records(?:\/\d+)?$/.test(path)) return 'hiking-records';
   if (/^\/api\/users\/\d+\/profile$/.test(path)) return 'public-profile';
   if (/^\/api\/users\/\d+\/journals$/.test(path)) return 'public-journals';
   if (/^\/api\/rankings(?:\/summary)?(?:\?[^#]*)?$/.test(path)) return 'ranking';

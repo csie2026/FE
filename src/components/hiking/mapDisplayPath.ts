@@ -2,7 +2,7 @@ import type { Coordinate } from './types.ts';
 import { GPS_FILTER } from './config.ts';
 import { distanceMeters } from './trackUtils.ts';
 
-// 지도 전용 최근접점: 원본 GPS 좌표는 변경하지 않습니다.
+// 지도 전용 최근접점으로 원본 GPS 좌표는 변경하지 않는다.
 export function nearestCoursePosition(point: Coordinate, path: readonly Coordinate[]) {
   if (!path.length || !Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return null;
   // 위도에 따른 경도 길이 차이를 보정한 뒤 코스 선분에 투영해 표시 위치를 구한다.
@@ -49,8 +49,8 @@ export function matchCoursePosition(point: Coordinate, path: readonly Coordinate
     : null;
 }
 
-// 지도 표시 전용: 원본 기록을 변경하지 않고 코스의 가장 멀리 진행한 위치까지 복사합니다.
-// 산행 거리, GPS 필터 및 정상 도달 판정에는 이 좌표를 사용하지 않습니다.
+// 지도 표시를 위해 원본 기록을 변경하지 않고 코스의 가장 멀리 진행한 위치까지 복사한다.
+// 산행 거리, GPS 필터 및 정상 도달 판정에는 이 좌표를 사용하지 않는다.
 export function courseProgressPath(
   path: readonly Coordinate[],
   segments: readonly (readonly Coordinate[])[],

@@ -1,4 +1,4 @@
-// SDK 타입은 이 어댑터에만 한정합니다. 도메인 좌표는 Kakao에 의존하지 않습니다.
+// SDK 타입은 이 어댑터에만 한정하며 도메인 좌표는 Kakao에 의존하지 않는다.
 type LatLng = object;
 type MapInstance = {
   setBounds(bounds: object): void;

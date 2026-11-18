@@ -64,6 +64,7 @@ export default function MountainCollection({
               onFavoriteToggle={() => onFavoriteToggle(item.id)}
               onClick={() => {
                 setSelected(item);
+                // 선택 항목을 먼저 저장해야 대화상자가 열리는 즉시 해당 산의 코스를 조회할 수 있다.
                 dialog.current?.showModal();
               }}
             >
@@ -98,6 +99,7 @@ export default function MountainCollection({
         className="region-mountain-dialog"
         ref={dialog}
         onClick={(event) => {
+          // 대화상자 내부 클릭은 유지하고 바깥 배경을 누른 경우에만 닫는다.
           if (event.target === event.currentTarget) dialog.current?.close();
         }}
       >

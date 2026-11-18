@@ -96,6 +96,7 @@ export default function MyPage({
   const [hikesEnabled, setHikesEnabled] = useState(monthlyGoals.hikeCount !== null);
   const [distanceDraft, setDistanceDraft] = useState(String(monthlyGoals.distanceKm ?? 80));
   const [hikesDraft, setHikesDraft] = useState(String(monthlyGoals.hikeCount ?? 4));
+  // 통계는 저장된 GPS 산행을 기준으로 계산된 상위 화면의 값을 그대로 표시한다.
   const monthlyHikes = statistics?.monthlyHikeCount ?? null;
   const monthlyDistanceKm = statistics ? statistics.monthlyDistanceMeters / 1000 : null;
   const totalDistanceKm = statistics ? statistics.totalDistanceMeters / 1000 : null;
@@ -150,6 +151,7 @@ export default function MyPage({
 
   function openGoalSettings() {
     if (!goalsReady || goalsLoading || goalsSaving) return;
+    // 대화상자를 열 때마다 서버에서 확인한 최신 목표로 편집 초안을 초기화한다.
     setDistanceEnabled(monthlyGoals.distanceKm !== null);
     setHikesEnabled(monthlyGoals.hikeCount !== null);
     setDistanceDraft(String(monthlyGoals.distanceKm ?? 80));
@@ -225,6 +227,7 @@ export default function MyPage({
         aria-label="배경 사진 파일"
         onChange={(event) => {
           const file = event.currentTarget.files?.[0];
+          // 같은 파일을 다시 골라도 change 이벤트가 발생하도록 입력 값을 비운다.
           event.currentTarget.value = '';
           if (file) {
             setFailedBanner(null);

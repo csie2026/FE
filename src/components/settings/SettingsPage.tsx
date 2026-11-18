@@ -27,12 +27,14 @@ export default function SettingsPage({
   const trigger = useRef<HTMLButtonElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
+    // 대화상자가 열리면 제목으로, 닫히면 원래 실행 버튼으로 포커스를 되돌린다.
     if (open) {
       dialog.current?.showModal();
       heading.current?.focus();
     } else dialog.current?.close();
   }, [open]);
   function close() {
+    // 탈퇴 요청 중에는 대화상자를 닫아 처리 결과를 잃지 않게 한다.
     if (pending) return;
     setOpen(false);
     setAcknowledged(false);
