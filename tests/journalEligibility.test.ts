@@ -69,6 +69,14 @@ test('same-day and same-mountain activities stay independent; linked journals bl
 
 test('UI checks list candidates, selected-record submission, direct entry and card action while preserving existing journal viewing', () => {
   const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const editor = readFileSync(
+    new URL('../src/components/app/JournalEditorScreen.tsx', import.meta.url),
+    'utf8',
+  );
+  const cards = readFileSync(
+    new URL('../src/components/app/HikingRecordsScreen.tsx', import.meta.url),
+    'utf8',
+  );
   assert.match(app, /availableRecords = hikingRecords\.filter\(canCreateHikingJournal\)/);
   const save = app.slice(
     app.indexOf('const saveJournal ='),
@@ -78,18 +86,17 @@ test('UI checks list candidates, selected-record submission, direct entry and ca
   assert.ok(
     save.indexOf('!canCreateHikingJournal(selectedRecord)') < save.indexOf('createJournal('),
   );
-  assert.match(app, /!editing && selectedRecord && !canCreateHikingJournal\(selectedRecord\) &&/);
-  assert.match(app, /busy \|\| \(!editing && !canCreateHikingJournal\(selectedRecord\)\)/);
-  const cards = app.slice(
-    app.indexOf("{screen === 'hikingRecords' &&"),
-    app.indexOf("{screen === 'accountSettings'"),
+  assert.match(
+    editor,
+    /!editing && selectedRecord && !canCreateHikingJournal\(selectedRecord\) &&/,
   );
+  assert.match(editor, /busy \|\| \(!editing && !canCreateHikingJournal\(selectedRecord\)\)/);
   assert.match(
     cards,
-    /record\.journalId !== null \? \(\s*<button onClick=\{\(\) => openJournal\(record\.journalId!\)\}/,
+    /record\.journalId !== null \? \(\s*<button onClick=\{\(\) => onOpenJournal\(record\.journalId!\)\}/,
   );
   assert.match(cards, /disabled=\{!canCreateHikingJournal\(record\)\}/);
-  assert.match(cards, /if \(!canCreateHikingJournal\(record\)\) return;/);
+  assert.match(cards, /if \(canCreateHikingJournal\(record\)\) onWriteJournal\(record\)/);
   assert.match(cards, /JOURNAL_ELIGIBILITY_MESSAGE/);
   assert.match(JOURNAL_ELIGIBILITY_MESSAGE, /500m/);
   assert.match(JOURNAL_ELIGIBILITY_MESSAGE, /20분/);
