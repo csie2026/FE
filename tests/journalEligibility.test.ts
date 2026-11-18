@@ -68,7 +68,7 @@ test('same-day and same-mountain activities stay independent; linked journals bl
 });
 
 test('UI checks list candidates, selected-record submission, direct entry and card action while preserving existing journal viewing', () => {
-  const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const flow = readFileSync(new URL('../src/hooks/useActivityFlow.ts', import.meta.url), 'utf8');
   const editor = readFileSync(
     new URL('../src/components/app/JournalEditorScreen.tsx', import.meta.url),
     'utf8',
@@ -77,10 +77,10 @@ test('UI checks list candidates, selected-record submission, direct entry and ca
     new URL('../src/components/app/HikingRecordsScreen.tsx', import.meta.url),
     'utf8',
   );
-  assert.match(app, /availableRecords = hikingRecords\.filter\(canCreateHikingJournal\)/);
-  const save = app.slice(
-    app.indexOf('const saveJournal ='),
-    app.indexOf('const saveJournal =') + 1400,
+  assert.match(flow, /availableRecords = hikingRecords\.filter\(canCreateHikingJournal\)/);
+  const save = flow.slice(
+    flow.indexOf('const saveJournal ='),
+    flow.indexOf('const saveJournal =') + 1400,
   );
   assert.match(save, /!editing && selectedRecord && !canCreateHikingJournal\(selectedRecord\)/);
   assert.ok(

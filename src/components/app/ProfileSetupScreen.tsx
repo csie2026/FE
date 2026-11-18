@@ -1,33 +1,30 @@
 import type { FormEvent } from 'react';
+import type { useProfileForm } from '../../hooks/useProfileData';
 
 type Props = {
   profileCompleted: boolean;
-  nickname: string;
-  birthYear: string;
+  form: Pick<
+    ReturnType<typeof useProfileForm>,
+    'nickname' | 'birthYear' | 'profileConfirmation' | 'setNickname' | 'setBirthYear'
+  >;
   birthYearOptions: number[];
   busy: boolean;
-  confirmationMessage: string | null;
-  onNicknameChange: (value: string) => void;
-  onBirthYearChange: (value: string) => void;
   onConfirm: () => void;
   onSubmit: () => void;
 };
 
 export default function ProfileSetupScreen({
   profileCompleted,
-  nickname,
-  birthYear,
+  form: { nickname, birthYear, profileConfirmation, setNickname, setBirthYear },
   birthYearOptions,
   busy,
-  confirmationMessage,
-  onNicknameChange,
-  onBirthYearChange,
   onConfirm,
   onSubmit,
 }: Props) {
+  const confirmationMessage = profileConfirmation?.isCurrent() ? profileConfirmation.message : null;
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    onSubmit();
+    void onSubmit();
   };
 
   return (
@@ -41,7 +38,7 @@ export default function ProfileSetupScreen({
         닉네임
         <input
           value={nickname}
-          onChange={(event) => onNicknameChange(event.target.value)}
+          onChange={(event) => setNickname(event.target.value)}
           disabled={busy || confirmationMessage !== null}
           maxLength={30}
           required
@@ -57,7 +54,7 @@ export default function ProfileSetupScreen({
         출생연도
         <select
           value={birthYear}
-          onChange={(event) => onBirthYearChange(event.target.value)}
+          onChange={(event) => setBirthYear(event.target.value)}
           autoComplete="bday-year"
           required
           disabled={busy || confirmationMessage !== null}
@@ -76,7 +73,7 @@ export default function ProfileSetupScreen({
       {confirmationMessage !== null && (
         <div role="status">
           <p>{confirmationMessage}</p>
-          <button type="button" disabled={busy} onClick={onConfirm}>
+          <button type="button" disabled={busy} onClick={() => void onConfirm()}>
             저장 결과 확인
           </button>
         </div>

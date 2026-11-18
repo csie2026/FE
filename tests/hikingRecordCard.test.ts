@@ -175,7 +175,7 @@ test('all records retain input order, safe escaped names and original metric rou
 });
 
 test('hiking record screen keeps the journalId branch and existing navigation without filtering or sorting', () => {
-  const app = readFileSync(new URL('../src/App.tsx', import.meta.url), 'utf8');
+  const flow = readFileSync(new URL('../src/hooks/useActivityFlow.ts', import.meta.url), 'utf8');
   const section = readFileSync(
     new URL('../src/components/app/HikingRecordsScreen.tsx', import.meta.url),
     'utf8',
@@ -187,7 +187,7 @@ test('hiking record screen keeps the journalId branch and existing navigation wi
   assert.match(section, /record\.journalId !== null/);
   assert.match(section, /onOpenJournal\(record\.journalId!\)/);
   assert.match(section, /onWriteJournal\(record\)/);
-  assert.match(app, /go\('write'\);\s*setSelectedRecordId\(record\.id\)/);
+  assert.match(flow, /go\('write'\);\s*setSelectedRecordId\(record\.id\)/);
   assert.match(section, /저장된 등산기록이 없습니다/);
 });
 

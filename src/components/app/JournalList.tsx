@@ -40,3 +40,20 @@ export default function JournalList({ busy, readError, journals, emptyMessage, o
     </article>
   ));
 }
+
+type ScreenProps = Omit<Props, 'emptyMessage'> & {
+  heading: string;
+  onWrite: () => void;
+};
+
+export function JournalListScreen({ heading, onWrite, ...list }: ScreenProps) {
+  return (
+    <div className="scroll-content">
+      <div className="section-heading">
+        <b>{heading}</b>
+        <button onClick={onWrite}>등산일지 작성 ＋</button>
+      </div>
+      <JournalList {...list} emptyMessage="아직 등산일지가 없습니다." />
+    </div>
+  );
+}
